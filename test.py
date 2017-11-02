@@ -29,6 +29,12 @@ event_duration_dist = 'uniform'
 event_duration_min = 0.5
 event_duration_max = 4.0
 
+event_azimuth_dist = 'const'
+event_azimuth = 0
+
+event_elevation_dist = 'const'
+event_elevation = 0
+
 snr_dist = 'uniform'
 snr_min = 6
 snr_max = 30
@@ -65,6 +71,8 @@ for n in range(n_soundscapes):
                      source_time=(source_time_dist, source_time),
                      event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max),
                      event_duration=(event_duration_dist, event_duration_min, event_duration_max),
+                     event_azimuth=(event_azimuth_dist,event_azimuth),
+                     event_elevation=(event_elevation_dist,event_elevation),
                      snr=(snr_dist, snr_min, snr_max),
                      pitch_shift=(pitch_dist, pitch_min, pitch_max),
                      time_stretch=(time_stretch_dist, time_stretch_min, time_stretch_max))

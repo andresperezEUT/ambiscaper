@@ -32,6 +32,7 @@ SUPPORTED_DIST = {"const": lambda x: x,
 EventSpec = namedtuple(
     'EventSpec',
     ['label', 'source_file', 'source_time', 'event_time', 'event_duration',
+     'event_azimuth', 'event_elevation',
      'snr', 'role', 'pitch_shift', 'time_stretch'], verbose=False)
 '''
 Container for storing event specifications, either probabilistic (i.e. using
@@ -542,6 +543,121 @@ def _validate_duration(duration_tuple):
                 'A "truncnorm" distirbution tuple for time must specify a '
                 'positive trunc_min value.')
 
+def _validate_azimuth(azimuth_tuple):
+    '''
+    Validate that an azimuth tuple has the right format and that the
+    specified distribution wraps into (0..2pi)
+
+    Parameters
+    ----------
+    azimuth : tuple
+        Azimuth tuple (see ```Scaper.add_event``` for required format).
+
+    Raises
+    ------
+    ScaperError
+        If the validation fails.
+
+    '''
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(azimuth_tuple)
+
+    # Ensure the values are valid for duration
+    if azimuth_tuple[0] == "const":
+        if (not is_real_number(azimuth_tuple[1]) or azimuth_tuple[1] < 0 or azimuth_tuple[1] > 2*np.pi) :
+            raise ScaperError(
+                'Azimuth must be a real number in the range [0..2pi].')
+    elif azimuth_tuple[0] == "choose":
+        if (not azimuth_tuple[1] or
+                not is_real_array(azimuth_tuple[1]) or
+                not all(x > 0 for x in azimuth_tuple[1]) or
+                not all(x < (2*np.pi) for x in azimuth_tuple[1])):
+            raise ScaperError(
+                'Azimuth list must be a non-empty list of real '
+                'numbers in the range [0..2pi].')
+    elif azimuth_tuple[0] == "uniform":
+        if azimuth_tuple[1] < 0:
+            raise ScaperError(
+                'A "uniform" distribution tuple for azimuth must have '
+                'min_value >= 0')
+        elif azimuth_tuple[2] > (2*np.pi):
+            raise ScaperError(
+                'A "uniform" distribution tuple for azimuth must have '
+                'max_value <= 2pi')
+    elif azimuth_tuple[0] == "normal":
+        warnings.warn(
+            'A "normal" distribution tuple for azimuth can result in '
+            'values out of range, in which case the distribution will be '
+            're-sampled until a positive value is returned: this can result '
+            'in an infinite loop!',
+            ScaperWarning)
+    elif azimuth_tuple[0] == "truncnorm":
+        if azimuth_tuple[3] < 0:
+            raise ScaperError(
+                'A "truncnorm" distirbution tuple for azimuth must specify a '
+                'trunc_min >= 0.')
+        elif azimuth_tuple[4] > (2*np.pi):
+            raise ScaperError(
+                'A "truncnorm" distirbution tuple for azimuth must specify a '
+                'trunc_max value <= 2pi.')
+
+def _validate_elevation(elevation_tuple):
+    '''
+    Validate that an azimuth tuple has the right format and that the
+    specified distribution wraps into (-pi..pi)
+
+    Parameters
+    ----------
+    duration : tuple
+        Duration tuple (see ```Scaper.add_event``` for required format).
+
+    Raises
+    ------
+    ScaperError
+        If the validation fails.
+
+    '''
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(elevation_tuple)
+
+    # Ensure the values are valid for duration
+    if elevation_tuple[0] == "const":
+        if (not is_real_number(elevation_tuple[1]) or elevation_tuple[1] < -np.pi or elevation_tuple[1] > np.pi) :
+            raise ScaperError(
+                'Elevation must be a real number in the range [-pi..pi].')
+    elif elevation_tuple[0] == "choose":
+        if (not elevation_tuple[1] or
+                not is_real_array(elevation_tuple[1]) or
+                not all(x > -np.pi for x in elevation_tuple[1]) or
+                not all(x < np.pi for x in elevation_tuple[1])):
+            raise ScaperError(
+                'Elevation list must be a non-empty list of real '
+                'numbers in the range [-pi..pi].')
+    elif elevation_tuple[0] == "uniform":
+        if elevation_tuple[1] < -np.pi:
+            raise ScaperError(
+                'A "uniform" distribution tuple for elevation must have '
+                'min_value >= -pi')
+        elif elevation_tuple[2] > np.pi:
+            raise ScaperError(
+                'A "uniform" distribution tuple for elevation must have '
+                'max_value <= pi')
+    elif elevation_tuple[0] == "normal":
+        warnings.warn(
+            'A "normal" distribution tuple for elevation can result in '
+            'values out of range, in which case the distribution will be '
+            're-sampled until a positive value is returned: this can result '
+            'in an infinite loop!',
+            ScaperWarning)
+    elif elevation_tuple[0] == "truncnorm":
+        if elevation_tuple[3] < -np.pi:
+            raise ScaperError(
+                'A "truncnorm" distirbution tuple for elevation must specify a '
+                'trunc_min >= -pi')
+        elif elevation_tuple[4] > np.pi:
+            raise ScaperError(
+                'A "truncnorm" distirbution tuple for azimuth must specify a '
+                'trunc_max value <= pi.')
 
 def _validate_snr(snr_tuple):
     '''
@@ -671,7 +787,8 @@ def _validate_time_stretch(time_stretch_tuple):
 
 
 def _validate_event(label, source_file, source_time, event_time,
-                    event_duration, snr, allowed_labels, pitch_shift,
+                    event_duration, event_azimuth, event_elevation,
+                    snr, allowed_labels, pitch_shift,
                     time_stretch):
     '''
     Check that event parameter values are valid.
@@ -683,6 +800,8 @@ def _validate_event(label, source_file, source_time, event_time,
     source_time : tuple
     event_time : tuple
     event_duration : tuple
+    event_azimuth : tuple
+    event_elevation : tuple
     snr : tuple
     allowed_labels : list
         List of allowed labels for the event.
@@ -718,6 +837,12 @@ def _validate_event(label, source_file, source_time, event_time,
 
     # EVENT DURATION
     _validate_duration(event_duration)
+
+    # EVENT AZIMUTH
+    _validate_azimuth(event_azimuth)
+
+    # EVENT ELEVATION
+#    _validate_elevation(event_elevation)
 
     # SNR
     _validate_snr(snr)
@@ -883,6 +1008,8 @@ class Scaper(object):
         # These values are fixed for the background sound
         event_time = ("const", 0)
         event_duration = ("const", self.duration)
+        event_azimuth = ("const", 0)
+        event_elevation = ("const", 0)
         snr = ("const", 0)
         role = 'background'
         pitch_shift = None
@@ -890,7 +1017,8 @@ class Scaper(object):
 
         # Validate parameter format and values
         _validate_event(label, source_file, source_time, event_time,
-                        event_duration, snr, self.bg_labels, None, None)
+                        event_duration, event_azimuth, event_elevation,
+                        snr, self.bg_labels, None, None)
 
         # Create background sound event
         bg_event = EventSpec(label=label,
@@ -898,6 +1026,8 @@ class Scaper(object):
                              source_time=source_time,
                              event_time=event_time,
                              event_duration=event_duration,
+                             event_azimuth=event_azimuth,
+                             event_elevation=event_elevation,
                              snr=snr,
                              role=role,
                              pitch_shift=pitch_shift,
@@ -907,7 +1037,8 @@ class Scaper(object):
         self.bg_spec.append(bg_event)
 
     def add_event(self, label, source_file, source_time, event_time,
-                  event_duration, snr, pitch_shift, time_stretch):
+                  event_duration, event_azimuth, event_elevation,
+                  snr, pitch_shift, time_stretch):
         '''
         Add a foreground sound event to the foreground specification.
 
@@ -1002,8 +1133,8 @@ class Scaper(object):
 
         # SAFETY CHECKS
         _validate_event(label, source_file, source_time, event_time,
-                        event_duration, snr, self.fg_labels, pitch_shift,
-                        time_stretch)
+                        event_duration, event_azimuth, event_elevation,
+                        snr, self.fg_labels, pitch_shift, time_stretch)
 
         # Create event
         event = EventSpec(label=label,
@@ -1011,6 +1142,8 @@ class Scaper(object):
                           source_time=source_time,
                           event_time=event_time,
                           event_duration=event_duration,
+                          event_azimuth=event_azimuth,
+                          event_elevation=event_elevation,
                           snr=snr,
                           role='foreground',
                           pitch_shift=pitch_shift,
@@ -1168,6 +1301,12 @@ class Scaper(object):
                         label, old_duration, source_duration, event_duration),
                     ScaperWarning)
 
+        # Get the event azimuth
+        event_azimuth = _get_value_from_dist(event.event_azimuth)
+
+        # Get the event elevation
+        event_elevation = _get_value_from_dist(event.event_elevation)
+
         # Get time stretch value
         if event.time_stretch is None:
             time_stretch = None
@@ -1283,6 +1422,8 @@ class Scaper(object):
                                        source_time=source_time,
                                        event_time=event_time,
                                        event_duration=event_duration,
+                                       event_azimuth=event_azimuth,
+                                       event_elevation=event_elevation,
                                        snr=snr,
                                        role=role,
                                        pitch_shift=pitch_shift,

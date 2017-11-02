@@ -86,6 +86,8 @@ def test_generate_from_jams():
                          source_time=('const', 0),
                          event_time=('uniform', 0, 9),
                          event_duration=('choose', [1, 2, 3]),
+                         event_azimuth=('const', 0),
+                         event_elevation=('const', 0),
                          snr=('uniform', 10, 20),
                          pitch_shift=('uniform', -1, 1),
                          time_stretch=('uniform', 0.8, 1.2))
@@ -212,6 +214,8 @@ def test_trim():
                          source_time=('const', 5),
                          event_time=('const', event_time),
                          event_duration=('const', 1),
+                         event_azimuth=('const', 0),
+                         event_elevation=('const', 0),
                          snr=('const', 10),
                          pitch_shift=None,
                          time_stretch=None)
@@ -482,6 +486,68 @@ def test_validate_duration():
     __test_bad_duration_tuple(('truncnorm', 0, 1, 0, 1))
 
 
+def test_validate_azimuth():
+
+    def __test_bad_azimuth_tuple(azimuth_tuple):
+        pytest.raises(ScaperError, scaper.core._validate_azimuth,
+                      azimuth_tuple)
+
+    # bad consts
+    bad_azi_values = [None, -1, 3*np.pi, 1j, 'yes', [], [8]]
+    for bav in bad_azi_values:
+        __test_bad_azimuth_tuple(('const', bav))
+
+    # empty list for choose
+    __test_bad_azimuth_tuple(('choose', []))
+
+    # bad consts in list for choose
+    for bav in bad_azi_values:
+        __test_bad_azimuth_tuple(('const', [bav]))
+
+    # uniform ranges must be within (0, 2pi)
+    __test_bad_azimuth_tuple(('uniform',-1,1))
+    __test_bad_azimuth_tuple(('uniform',0,3*np.pi))
+
+    # using normal will issue a warning since it can generate values out of range
+    pytest.warns(ScaperWarning, scaper.core._validate_azimuth,
+                 ('normal', 5, 2))
+
+    # truncnorm can't have negative or zero min value
+    __test_bad_azimuth_tuple(('truncnorm', 0, 1, -1, 1))
+    __test_bad_azimuth_tuple(('truncnorm', 0, 1, 0, 10))
+
+
+def test_validate_elevation():
+
+    def __test_bad_elevation_tuple(elevation_tuple):
+        pytest.raises(ScaperError, scaper.core._validate_elevation,
+                      elevation_tuple)
+
+    # bad consts
+    bad_ele_values = [None, -4, 2*np.pi, 1j, 'yes', [], [5]]
+    for bev in bad_ele_values:
+        __test_bad_elevation_tuple(('const', bev))
+
+    # empty list for choose
+    __test_bad_elevation_tuple(('choose', []))
+
+    # bad consts in list for choose
+    for bev in bad_ele_values:
+        __test_bad_elevation_tuple(('const', [bev]))
+
+    # uniform ranges must be within (-pi, pi)
+    __test_bad_elevation_tuple(('uniform',-4,1))
+    __test_bad_elevation_tuple(('uniform',0,2*np.pi))
+
+    # using normal will issue a warning since it can generate values out of range
+    pytest.warns(ScaperWarning, scaper.core._validate_elevation,
+                 ('normal', 5, 2))
+
+    # truncnorm can't have negative or zero min value
+    __test_bad_elevation_tuple(('truncnorm', 0, 1, -4, 1))
+    __test_bad_elevation_tuple(('truncnorm', 0, 1, 0, 2*np.pi))
+
+
 def test_validate_snr():
 
     def __test_bad_snr_tuple(snr_tuple):
@@ -558,6 +624,8 @@ def test_validate_event():
                       source_time=('const', 0),
                       event_time=('const', 0),
                       event_duration=('const', 1),
+                      event_azimuth=('const', 0),
+                      event_elevation=('const', 0),
                       snr=('const', 0),
                       allowed_labels=bal,
                       pitch_shift=None,
@@ -613,12 +681,14 @@ def test_scaper_add_background():
 
     # Check that event has been added to the background spec, and that the
     # values that are set automatically by this method (event_time,
-    # event_duration, snr and role) are correctly set to their expected values.
+    # event_duration, event_azimuth, event_elevation, snr and role) are correctly set to their expected values.
     bg_event_expected = EventSpec(label=("const", "park"),
                                   source_file=("choose", []),
                                   source_time=("const", 0),
                                   event_time=("const", 0),
                                   event_duration=("const", sc.duration),
+                                  event_azimuth=('const', 0),
+                                  event_elevation=('const', 0),
                                   snr=("const", 0),
                                   role='background',
                                   pitch_shift=None,
@@ -639,6 +709,8 @@ def test_scaper_add_event():
                  source_time=('const', 0),
                  event_time=('uniform', 0, 9),
                  event_duration=('truncnorm', 2, 1, 1, 3),
+                 event_azimuth=('const', 0),
+                 event_elevation=('const', 0),
                  snr=('uniform', 10, 20),
                  pitch_shift=('normal', 0, 1),
                  time_stretch=('uniform', 0.8, 1.2))
@@ -649,6 +721,8 @@ def test_scaper_add_event():
                                   source_time=('const', 0),
                                   event_time=('uniform', 0, 9),
                                   event_duration=('truncnorm', 2, 1, 1, 3),
+                                  event_azimuth=('const', 0),
+                                  event_elevation=('const', 0),
                                   snr=('uniform', 10, 20),
                                   role='foreground',
                                   pitch_shift=('normal', 0, 1),
@@ -664,6 +738,8 @@ def test_scaper_instantiate_event():
                          source_time=('const', 0),
                          event_time=('uniform', 0, 9),
                          event_duration=('truncnorm', 2, 1, 1, 3),
+                         event_azimuth=('const', 0),
+                         event_elevation=('const', 0),
                          snr=('uniform', 10, 20),
                          role='foreground',
                          pitch_shift=('normal', 0, 1),
@@ -681,6 +757,8 @@ def test_scaper_instantiate_event():
     assert instantiated_event.source_time == 0
     assert 0 <= instantiated_event.event_time <= 9
     assert 1 <= instantiated_event.event_duration <= 3
+    assert instantiated_event.event_azimuth == 0
+    assert instantiated_event.event_elevation == 0
     assert 10 <= instantiated_event.snr <= 20
     assert instantiated_event.role == 'foreground'
     assert scaper.util.is_real_number(instantiated_event.pitch_shift)
@@ -808,6 +886,8 @@ def test_scaper_instantiate():
         source_time=('const', 5),
         event_time=('const', 2),
         event_duration=('const', 5),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 5),
         pitch_shift=None,
         time_stretch=None)
@@ -820,6 +900,8 @@ def test_scaper_instantiate():
         source_time=('const', 0),
         event_time=('const', 5),
         event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 20),
         pitch_shift=('const', 1),
         time_stretch=None)
@@ -832,14 +914,16 @@ def test_scaper_instantiate():
         source_time=('const', 0),
         event_time=('const', 7),
         event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 10),
         pitch_shift=None,
         time_stretch=('const', 1.2))
 
     jam = sc._instantiate(disable_instantiation_warnings=True)
     regjam = jams.load(REG_JAM_PATH)
-    # print(jam)
-    # print(regression_jam)
+    print(jam)
+    # print(regjam)
 
     # Note: can't compare directly, since:
     # 1. scaper/and jams liberary versions may change
@@ -925,6 +1009,8 @@ def test_generate_audio():
         source_time=('const', 5),
         event_time=('const', 2),
         event_duration=('const', 5),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 5),
         pitch_shift=None,
         time_stretch=None)
@@ -937,6 +1023,8 @@ def test_generate_audio():
         source_time=('const', 0),
         event_time=('const', 5),
         event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 20),
         pitch_shift=('const', 1),
         time_stretch=None)
@@ -949,6 +1037,8 @@ def test_generate_audio():
         source_time=('const', 0),
         event_time=('const', 7),
         event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 10),
         pitch_shift=None,
         time_stretch=('const', 1.2))
@@ -1042,6 +1132,8 @@ def test_generate():
         source_time=('const', 5),
         event_time=('const', 2),
         event_duration=('const', 5),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 5),
         pitch_shift=None,
         time_stretch=None)
@@ -1054,6 +1146,8 @@ def test_generate():
         source_time=('const', 0),
         event_time=('const', 5),
         event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 20),
         pitch_shift=('const', 1),
         time_stretch=None)
@@ -1066,6 +1160,8 @@ def test_generate():
         source_time=('const', 0),
         event_time=('const', 7),
         event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
         snr=('const', 10),
         pitch_shift=None,
         time_stretch=('const', 1.2))
