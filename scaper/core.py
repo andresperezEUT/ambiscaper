@@ -21,7 +21,8 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
-import scaper.ambisonics
+from .ambisonics import MAX_AMBISONICS_ORDER
+from .ambisonics import get_number_of_ambisonics_channels
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -128,12 +129,13 @@ def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
 
     # Create scaper object
     duration = ann.sandbox.scaper['duration']
+    ambisonics_order = ann.sandbox.scaper['ambisonics_order']
     protected_labels = ann.sandbox.scaper['protected_labels']
-    sc = Scaper(duration, new_fg_path, new_bg_path, protected_labels)
+    sc = Scaper(duration, ambisonics_order, new_fg_path, new_bg_path, protected_labels)
 
     # Set synthesis parameters
     sc.ref_db = ann.sandbox.scaper['ref_db']
-    sc.n_channels = ann.sandbox.scaper['n_channels']
+    sc.n_channels = get_number_of_ambisonics_channels(ambisonics_order)
     sc.fade_in_len = ann.sandbox.scaper['fade_in_len']
     sc.fade_out_len = ann.sandbox.scaper['fade_out_len']
 
@@ -442,7 +444,6 @@ def _validate_source_file(source_file_tuple, label_tuple):
             'Source file must be specified using a "const" or "choose" tuple.')
 
 
-# TODO do something with that code later when ambi order properly implemented
 
 # def _validate_ambisonics_order(ambisonics_order_tuple):
 #     '''
@@ -979,7 +980,7 @@ class Scaper(object):
 
     '''
 
-    def __init__(self, duration, fg_path, bg_path, protected_labels=[]):
+    def __init__(self, duration, ambisonics_order, fg_path, bg_path, protected_labels=[]):
         '''
         Create a Scaper object.
 
@@ -987,6 +988,8 @@ class Scaper(object):
         ----------
         duration : float
             Duration of the soundscape, in seconds.
+        ambisonics_order: int
+            Ambisonics Order
         fg_path : str
             Path to foreground folder.
         bg_path : str
@@ -1011,10 +1014,18 @@ class Scaper(object):
         else:
             raise ScaperError('Duration must be a positive real value')
 
+        # Validate ambisonics order
+        if not isinstance(ambisonics_order,int):
+            raise ScaperError('Ambisonics Order must be an integer')
+        elif ambisonics_order < 0 or ambisonics_order > MAX_AMBISONICS_ORDER :
+            raise ScaperError('Ambisonics Order must be in the range [0..' + str(MAX_AMBISONICS_ORDER) + ']')
+        else:
+            self.ambisonics_order = ambisonics_order
+            self.num_channels = get_number_of_ambisonics_channels(ambisonics_order)
+
         # Initialize parameters
-        self.sr = 44100
+        self.sr = 48000
         self.ref_db = -12
-        self.n_channels = 1
         self.fade_in_len = 0.01  # 10 ms
         self.fade_out_len = 0.01  # 10 ms
 
@@ -1655,7 +1666,7 @@ class Scaper(object):
             bg_labels=self.bg_labels,
             protected_labels=self.protected_labels,
             ref_db=self.ref_db,
-            n_channels=self.n_channels,
+            ambisonics_order=self.ambisonics_order,
             fade_in_len=self.fade_in_len,
             fade_out_len=self.fade_out_len,
             n_events=n_events,
@@ -1744,7 +1755,7 @@ class Scaper(object):
                         cmb = sox.Combiner()
                         # Ensure consistent sampling rate and channels
                         cmb.convert(samplerate=self.sr,
-                                    n_channels=self.n_channels,
+                                    n_channels=get_number_of_ambisonics_channels(self.ambisonics_order),
                                     bitdepth=None)
                         # Then trim
                         cmb.trim(e.value['source_time'],
@@ -1770,7 +1781,7 @@ class Scaper(object):
                         tfm = sox.Transformer()
                         # Ensure consistent sampling rate and channels
                         tfm.convert(samplerate=self.sr,
-                                    n_channels=self.n_channels,
+                                    n_channels=get_number_of_ambisonics_channels(self.ambisonics_order),
                                     bitdepth=None)
                         # Trim
                         tfm.trim(e.value['source_time'],

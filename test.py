@@ -12,9 +12,9 @@ background_folder = '~/audio/scaper/background/'
 n_soundscapes = 1
 ref_db = -50
 duration = 10.0
+ambisonics_order = 3
 
-min_events = 1
-max_events = 9
+num_events = 1
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -35,6 +35,9 @@ event_azimuth = 0
 event_elevation_dist = 'const'
 event_elevation = 0
 
+event_spread_dist = 'const'
+event_spread = 0
+
 snr_dist = 'uniform'
 snr_min = 6
 snr_max = 30
@@ -54,7 +57,7 @@ for n in range(n_soundscapes):
     print('Generating soundscape: {:d}/{:d}'.format(n+1, n_soundscapes))
 
     # create a scaper
-    sc = scaper.Scaper(duration, foreground_folder, background_folder)
+    sc = scaper.Scaper(duration, ambisonics_order, foreground_folder, background_folder)
     sc.protected_labels = []
     sc.ref_db = ref_db
 
@@ -63,8 +66,7 @@ for n in range(n_soundscapes):
                       source_file=('choose', []),
                       source_time=('const', 0))
 
-    # add random number of foreground events
-    n_events = np.random.randint(min_events, max_events+1)
+    n_events = num_events
     for _ in range(n_events):
         sc.add_event(label=('choose', []),
                      source_file=('choose', []),
@@ -73,6 +75,7 @@ for n in range(n_soundscapes):
                      event_duration=(event_duration_dist, event_duration_min, event_duration_max),
                      event_azimuth=(event_azimuth_dist,event_azimuth),
                      event_elevation=(event_elevation_dist,event_elevation),
+                     event_spread=(event_spread_dist,event_spread),
                      snr=(snr_dist, snr_min, snr_max),
                      pitch_shift=(pitch_dist, pitch_min, pitch_max),
                      time_stretch=(time_stretch_dist, time_stretch_min, time_stretch_max))

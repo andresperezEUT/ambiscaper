@@ -73,7 +73,7 @@ def test_generate_from_jams():
         tmpfiles.append(gen_jam_file)
 
         # --- Define scaper --- *
-        sc = scaper.Scaper(10, FG_PATH, BG_PATH)
+        sc = scaper.Scaper(10, 3, FG_PATH, BG_PATH)
         sc.protected_labels = []
         sc.ref_db = -50
         sc.add_background(label=('choose', []),
@@ -201,7 +201,7 @@ def test_trim():
         tmpfiles.append(trimstrict_jam_file)
 
         # --- Create soundscape and save to tempfiles --- #
-        sc = scaper.Scaper(10, FG_PATH, BG_PATH)
+        sc = scaper.Scaper(10, 3, FG_PATH, BG_PATH)
         sc.protected_labels = []
         sc.ref_db = -50
         sc.add_background(label=('const', 'park'),
@@ -647,6 +647,8 @@ def test_validate_time_stretch():
         ScaperWarning, scaper.core._validate_time_stretch, ('normal', 5, 1))
 
 
+
+
 def test_validate_event():
 
     bad_allowed_labels = [0, 'yes', 1j, np.array([1, 2, 3])]
@@ -673,32 +675,36 @@ def test_scaper_init():
     '''
 
     # bad duration
-    sc = pytest.raises(ScaperError, scaper.Scaper, -5, FG_PATH, BG_PATH)
+    sc = pytest.raises(ScaperError, scaper.Scaper, -5, 1, FG_PATH, BG_PATH)
+
+    # bad ambisonics order
+    sc = pytest.raises(ScaperError, scaper.Scaper, 1, -1, FG_PATH, BG_PATH)
+    sc = pytest.raises(ScaperError, scaper.Scaper, 1, 9, FG_PATH, BG_PATH)
+    sc = pytest.raises(ScaperError, scaper.Scaper, 1, 1.3, FG_PATH, BG_PATH)
 
     # all args valid
-    sc = scaper.Scaper(10.0, FG_PATH, BG_PATH)
+    sc = scaper.Scaper(10.0, 3, FG_PATH, BG_PATH)
     assert sc.fg_path == FG_PATH
     assert sc.bg_path == BG_PATH
 
     # bad fg path
-    sc = pytest.raises(ScaperError, scaper.Scaper, 10.0,
+    sc = pytest.raises(ScaperError, scaper.Scaper, 10.0, 3,
                        'tests/data/audio/wrong',
                        BG_PATH)
 
     # bad bg path
-    sc = pytest.raises(ScaperError, scaper.Scaper, 10.0,
+    sc = pytest.raises(ScaperError, scaper.Scaper, 10.0, 3,
                        FG_PATH,
                        'tests/data/audio/wrong')
 
     # ensure fg_labels and bg_labels populated properly
-    sc = scaper.Scaper(10.0, FG_PATH, BG_PATH)
+    sc = scaper.Scaper(10.0, 3, FG_PATH, BG_PATH)
     assert sorted(sc.fg_labels) == sorted(FB_LABELS)
     assert sorted(sc.bg_labels) == sorted(BG_LABELS)
 
     # ensure default values have been set
-    assert sc.sr == 44100
+    assert sc.sr == 48000
     assert sc.ref_db == -12
-    assert sc.n_channels == 1
     assert sc.fade_in_len == 0.01  # 10 ms
     assert sc.fade_out_len == 0.01  # 10 ms
 
@@ -708,7 +714,7 @@ def test_scaper_add_background():
     Test Scaper.add_background function
 
     '''
-    sc = scaper.Scaper(10.0, FG_PATH, BG_PATH)
+    sc = scaper.Scaper(10.0, 3, FG_PATH, BG_PATH)
 
     # Set concrete background label
     # label, source_file, source_time
@@ -734,7 +740,7 @@ def test_scaper_add_background():
 
 def test_scaper_add_event():
 
-    sc = scaper.Scaper(10.0, FG_PATH, BG_PATH)
+    sc = scaper.Scaper(10.0, 3, FG_PATH, BG_PATH)
 
     # Initially fg_spec should be empty
     assert sc.fg_spec == []
@@ -785,7 +791,7 @@ def test_scaper_instantiate_event():
                          time_stretch=('uniform', 0.8, 1.2))
 
     # test valid case
-    sc = scaper.Scaper(10.0, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = scaper.Scaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     instantiated_event = sc._instantiate_event(
         fg_event, isbackground=False, allow_repeated_label=True,
         allow_repeated_source=True, used_labels=[], used_source_files=[],
@@ -835,7 +841,7 @@ def test_scaper_instantiate_event():
             '42-Human-Vocal-Voice-taxi-2_edit.wav')
 
     # Protected labels must have original source duration and source time 0
-    sc = scaper.Scaper(10.0, fg_path=FG_PATH, bg_path=BG_PATH,
+    sc = scaper.Scaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH,
                        protected_labels='human_voice')
     fg_event10 = fg_event._replace(
         label=('const', 'human_voice'),
@@ -849,7 +855,7 @@ def test_scaper_instantiate_event():
     assert instantiated_event.event_duration == 0.806236
 
     # repeated label when not allowed throws error
-    sc = scaper.Scaper(10.0, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = scaper.Scaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     pytest.raises(ScaperError, sc._instantiate_event, fg_event,
                   isbackground=False,
                   allow_repeated_label=False,
@@ -905,7 +911,7 @@ def test_scaper_instantiate():
 
     # Here we just instantiate a known fixed spec and check if that jams
     # we get back is as expected.
-    sc = scaper.Scaper(10.0, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = scaper.Scaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background
@@ -1031,7 +1037,7 @@ def test_generate_audio():
     # Regression test: same spec, same audio (not this will fail if we update
     # any of the audio processing techniques used (e.g. change time stretching
     # algorithm.
-    sc = scaper.Scaper(10.0, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = scaper.Scaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background
@@ -1157,7 +1163,7 @@ def test_generate_audio():
 def test_generate():
 
     # Final regression test on all files
-    sc = scaper.Scaper(10.0, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = scaper.Scaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background

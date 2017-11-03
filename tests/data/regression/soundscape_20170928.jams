@@ -24,6 +24,7 @@
             "street"
           ],
           "bg_path": "tests/data/audio/background",
+          "ambisonics_order": 3,
           "n_channels": 1,
           "duration": 10.0,
           "bg_spec": [
