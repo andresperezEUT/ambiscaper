@@ -60,6 +60,10 @@
                 "const",
                 0
               ],
+              [
+                "const",
+                0
+              ],
               "background",
               null,
               null
@@ -99,6 +103,10 @@
               ],
               [
                 "const",
+                0
+              ],
+              [
+                "const",
                 5
               ],
               "foreground",
@@ -125,6 +133,10 @@
               [
                 "const",
                 2
+              ],
+              [
+                "const",
+                0
               ],
               [
                 "const",
@@ -176,6 +188,10 @@
               ],
               [
                 "const",
+                0
+              ],
+              [
+                "const",
                 10
               ],
               "foreground",
@@ -212,6 +228,7 @@
             "source_time": 0,
             "event_time": 0,
             "event_elevation": 0,
+            "event_spread": 0,
             "label": "park",
             "event_azimuth": 0,
             "event_duration": 10.0,
@@ -230,6 +247,7 @@
             "source_time": 5,
             "event_time": 2,
             "event_elevation": 0,
+            "event_spread": 0,
             "label": "siren",
             "event_azimuth": 0,
             "event_duration": 5,
@@ -248,6 +266,7 @@
             "source_time": 0,
             "event_time": 5,
             "event_elevation": 0,
+            "event_spread": 0,
             "label": "car_horn",
             "event_azimuth": 0,
             "event_duration": 0.687506,
@@ -266,6 +285,7 @@
             "source_time": 0,
             "event_time": 7,
             "event_elevation": 0,
+            "event_spread": 0,
             "label": "human_voice",
             "event_azimuth": 0,
             "event_duration": 0.806236,

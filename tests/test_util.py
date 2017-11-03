@@ -156,6 +156,7 @@ def test_max_polyphony():
                                            event_duration=10,
                                            event_azimuth=0.,
                                            event_elevation=0.,
+                                           event_spread=0.,
                                            snr=0,
                                            role='foreground',
                                            pitch_shift=None,
@@ -181,6 +182,7 @@ def test_max_polyphony():
                                            event_duration=5,
                                            event_azimuth=0.,
                                            event_elevation=0.,
+                                           event_spread=0.,
                                            snr=0,
                                            role='foreground',
                                            pitch_shift=None,
@@ -256,6 +258,7 @@ def test_polyphony_gini():
                          event_duration=('const', offset - onset),
                          event_azimuth=('const', 0),
                          event_elevation=('const', 0),
+                         event_spread=('const', 0),
                          snr=('uniform', 6, 30),
                          pitch_shift=('uniform', -3, 3),
                          time_stretch=None)
