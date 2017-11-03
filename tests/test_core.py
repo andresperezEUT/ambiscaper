@@ -1055,14 +1055,14 @@ def test_generate_audio():
         # validate audio
         wav, sr = soundfile.read(wav_file.name)
         regwav, sr = soundfile.read(REG_WAV_PATH)
-        assert np.allclose(wav, regwav, atol=1e-8, rtol=1e-8)
+        assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
 
         # with reverb
         sc._generate_audio(wav_file.name, jam.annotations[0], reverb=0.2)
         # validate audio
         wav, sr = soundfile.read(wav_file.name)
         regwav, sr = soundfile.read(REG_REVERB_WAV_PATH)
-        assert np.allclose(wav, regwav, atol=1e-8, rtol=1e-8)
+        assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
 
         # Don't disable sox warnings (just to cover line)
         sc._generate_audio(wav_file.name, jam.annotations[0],
@@ -1070,7 +1070,7 @@ def test_generate_audio():
         # validate audio
         wav, sr = soundfile.read(wav_file.name)
         regwav, sr = soundfile.read(REG_WAV_PATH)
-        assert np.allclose(wav, regwav, atol=1e-8, rtol=1e-8)
+        assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
 
         # namespace must be sound_event
         jam.annotations[0].namespace = 'tag_open'
@@ -1105,7 +1105,7 @@ def test_generate_audio():
         # validate audio
         wav, sr = soundfile.read(wav_file.name)
         regwav, sr = soundfile.read(REG_BGONLY_WAV_PATH)
-        assert np.allclose(wav, regwav, atol=1e-8, rtol=1e-8)
+        assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
 
 
 def test_generate():
@@ -1181,7 +1181,7 @@ def test_generate():
         # validate audio
         wav, sr = soundfile.read(wav_file.name)
         regwav, sr = soundfile.read(REG_WAV_PATH)
-        assert np.allclose(wav, regwav, atol=1e-8, rtol=1e-8)
+        assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
 
         # validate jams
         jam = jams.load(jam_file.name)
