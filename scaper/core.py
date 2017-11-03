@@ -604,7 +604,7 @@ def _validate_azimuth(azimuth_tuple):
 def _validate_elevation(elevation_tuple):
     '''
     Validate that an azimuth tuple has the right format and that the
-    specified distribution wraps into (-pi..pi)
+    specified distribution wraps into (-pi/2..pi/2)
 
     Parameters
     ----------
@@ -622,26 +622,26 @@ def _validate_elevation(elevation_tuple):
 
     # Ensure the values are valid for duration
     if elevation_tuple[0] == "const":
-        if (not is_real_number(elevation_tuple[1]) or elevation_tuple[1] < -np.pi or elevation_tuple[1] > np.pi) :
+        if (not is_real_number(elevation_tuple[1]) or elevation_tuple[1] < -np.pi/2. or elevation_tuple[1] > np.pi/2.) :
             raise ScaperError(
-                'Elevation must be a real number in the range [-pi..pi].')
+                'Elevation must be a real number in the range [-pi/2..pi/2].')
     elif elevation_tuple[0] == "choose":
         if (not elevation_tuple[1] or
                 not is_real_array(elevation_tuple[1]) or
-                not all(x > -np.pi for x in elevation_tuple[1]) or
-                not all(x < np.pi for x in elevation_tuple[1])):
+                not all(x > -np.pi/2. for x in elevation_tuple[1]) or
+                not all(x < np.pi/2. for x in elevation_tuple[1])):
             raise ScaperError(
                 'Elevation list must be a non-empty list of real '
-                'numbers in the range [-pi..pi].')
+                'numbers in the range [-pi/2..pi/2]')
     elif elevation_tuple[0] == "uniform":
-        if elevation_tuple[1] < -np.pi:
+        if elevation_tuple[1] < -np.pi/2.:
             raise ScaperError(
                 'A "uniform" distribution tuple for elevation must have '
-                'min_value >= -pi')
-        elif elevation_tuple[2] > np.pi:
+                'min_value >= -pi/2')
+        elif elevation_tuple[2] > np.pi/2.:
             raise ScaperError(
                 'A "uniform" distribution tuple for elevation must have '
-                'max_value <= pi')
+                'max_value <= pi/2')
     elif elevation_tuple[0] == "normal":
         warnings.warn(
             'A "normal" distribution tuple for elevation can result in '
@@ -650,14 +650,14 @@ def _validate_elevation(elevation_tuple):
             'in an infinite loop!',
             ScaperWarning)
     elif elevation_tuple[0] == "truncnorm":
-        if elevation_tuple[3] < -np.pi:
+        if elevation_tuple[3] < -np.pi/2.:
             raise ScaperError(
                 'A "truncnorm" distirbution tuple for elevation must specify a '
-                'trunc_min >= -pi')
-        elif elevation_tuple[4] > np.pi:
+                'trunc_min >= -pi/2')
+        elif elevation_tuple[4] > np.pi/2.:
             raise ScaperError(
                 'A "truncnorm" distirbution tuple for azimuth must specify a '
-                'trunc_max value <= pi.')
+                'trunc_max value <= pi/2')
 
 def _validate_snr(snr_tuple):
     '''

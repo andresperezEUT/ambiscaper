@@ -524,7 +524,7 @@ def test_validate_elevation():
                       elevation_tuple)
 
     # bad consts
-    bad_ele_values = [None, -4, 2*np.pi, 1j, 'yes', [], [5]]
+    bad_ele_values = [None, -4, np.pi, 1j, 'yes', [], [5]]
     for bev in bad_ele_values:
         __test_bad_elevation_tuple(('const', bev))
 
@@ -922,7 +922,7 @@ def test_scaper_instantiate():
 
     jam = sc._instantiate(disable_instantiation_warnings=True)
     regjam = jams.load(REG_JAM_PATH)
-    print(jam)
+    # print(jam)
     # print(regjam)
 
     # Note: can't compare directly, since:
