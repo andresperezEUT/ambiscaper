@@ -15,6 +15,9 @@ from math import sin, cos, sqrt
 from scaper.scaper_exceptions import ScaperError
 from numbers import Number
 
+# TODO: change when implemented
+MAX_AMBISONICS_ORDER = 3
+
 def _validate_ambisonics_order(order):
 
     if (order<0):
