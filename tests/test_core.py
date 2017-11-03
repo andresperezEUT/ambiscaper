@@ -738,8 +738,8 @@ def test_scaper_instantiate_event():
                          source_time=('const', 0),
                          event_time=('uniform', 0, 9),
                          event_duration=('truncnorm', 2, 1, 1, 3),
-                         event_azimuth=('const', 0),
-                         event_elevation=('const', 0),
+                         event_azimuth=('truncnorm', np.pi, 1, 0, 2 * np.pi),
+                         event_elevation=('truncnorm', 0, 1, -np.pi/2, np.pi/2),
                          snr=('uniform', 10, 20),
                          role='foreground',
                          pitch_shift=('normal', 0, 1),
@@ -757,8 +757,8 @@ def test_scaper_instantiate_event():
     assert instantiated_event.source_time == 0
     assert 0 <= instantiated_event.event_time <= 9
     assert 1 <= instantiated_event.event_duration <= 3
-    assert instantiated_event.event_azimuth == 0
-    assert instantiated_event.event_elevation == 0
+    assert 0 <= instantiated_event.event_azimuth <= 2*np.pi
+    assert -np.pi/2 <= instantiated_event.event_elevation <= np.pi/2
     assert 10 <= instantiated_event.snr <= 20
     assert instantiated_event.role == 'foreground'
     assert scaper.util.is_real_number(instantiated_event.pitch_shift)
