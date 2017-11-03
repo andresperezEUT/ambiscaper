@@ -18,6 +18,15 @@
             "event_duration": {
               "type": "number"
             },
+            "event_azimuth": {
+              "type": "number"
+            },
+            "event_elevation": {
+              "type": "number"
+            },
+            "event_spread": {
+              "type": "number"
+            },
             "snr": {
               "type": "number"
             }
