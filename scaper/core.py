@@ -21,6 +21,7 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
+import scaper.ambisonics
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -439,6 +440,40 @@ def _validate_source_file(source_file_tuple, label_tuple):
     else:
         raise ScaperError(
             'Source file must be specified using a "const" or "choose" tuple.')
+
+
+# TODO do something with that code later when ambi order properly implemented
+
+# def _validate_ambisonics_order(ambisonics_order_tuple):
+#     '''
+#         Validate that the ambisonics order tuple is in the right format and that it's values
+#     are valid.
+#     '''
+#
+#     # Make sure it's a valid distribution tuple
+#     _validate_distribution(ambisonics_order_tuple)
+#
+#     # Make sure it's one of the allowed distributions for ambisonics order and that the
+#     # label value is one of the allowed labels.
+#     if ambisonics_order_tuple[0] == "const":
+#         if not isinstance(ambisonics_order_tuple[1],int):
+#             raise ScaperError(
+#                 'Ambisonics Order must be an Integer')
+#         elif (ambisonics_order_tuple[1] < 0 or ambisonics_order_tuple[1] > scaper.ambisonics.MAX_AMBISONICS_ORDER):
+#             raise ScaperError(
+#                 'Ambisonics Order must be in the range [0..' + scaper.ambisonics.MAX_AMBISONICS_ORDER)
+#
+#     elif ambisonics_order_tuple[0] == "choose":
+#         if ambisonics_order_tuple[1]:  # list is not empty
+#             if not all( isinstance(i,int) for i in ambisonics_order_tuple[1]):
+#                 raise ScaperError(
+#                     'Ambisonics Order must be an Integer')
+#             elif not all( i >=0 and i<=scaper.ambisonics.MAX_AMBISONICS_ORDER for i in ambisonics_order_tuple[i] ):
+#                 raise ScaperError(
+#                     'Ambisonics Order must be in the range [0..' + scaper.ambisonics.MAX_AMBISONICS_ORDER)
+#     else:
+#         raise ScaperError(
+#             'Ambisonics Order must be specified using a "const" or "choose" tuple.')
 
 
 def _validate_time(time_tuple):
