@@ -4,7 +4,7 @@
 Tests for functions in util.py
 '''
 
-from scaper.util import _close_temp_files
+from scaper.util import _close_temp_files, wrap_number, delta_kronecker
 from scaper.util import _set_temp_logging_level
 from scaper.util import _validate_folder_path
 from scaper.util import _get_sorted_files
@@ -311,3 +311,57 @@ def test_is_real_array():
         assert not is_real_array([nr])
     for yr in yes_reals:
         assert is_real_array([yr])
+
+
+def test_wrap_number():
+
+    # test incorrect values
+    def __test_bad_wrap_number(bad_entry):
+        pytest.raises(ScaperError, wrap_number, *bad_entry)
+
+    bad_entries = [
+        ['1',1j,3], # not a number
+        [1,3,2]    # min > max
+    ]
+    for bad_entry in bad_entries:
+        __test_bad_wrap_number(bad_entry)
+
+    # test correct values
+    def __test_correct_wrap_number(x, min, max, groundtruth):
+        assert(np.isclose([groundtruth],[wrap_number(x, min, max)] ))
+
+    correct_entries = [
+        # x, min, max, groundtruth
+        [0, 0, 2, 0 ],
+        [1, 0, 2, 1 ],
+        [2, 0, 2, 0 ],
+        [2.5, 0, 2, 0.5 ],
+        [-1, 0, 2, 1 ],
+        [-np.pi, 0, 2*np.pi, np.pi ],
+    ]
+    for correct_entry in correct_entries:
+        __test_correct_wrap_number(*correct_entry)
+
+def test_delta_kronecker():
+
+    # test incorrect values
+    def __test_bad_delta_number(bad_entry):
+        pytest.raises(ScaperError, delta_kronecker, bad_entry, bad_entry)
+
+    bad_entries = [
+        ['1',1.8,-2e-4,1j], # not a number
+    ]
+    for bad_entry in bad_entries:
+        __test_bad_delta_number(bad_entry)
+
+    #test correct values
+    def __test_correct_delta_kronecker(q1, q2, groundtruth):
+        assert (groundtruth == delta_kronecker(q1,q2))
+
+    correct_entries = [
+        # q1, q2, groundtruth
+        [0,0,1],
+        [0,1,0],
+        [-2,-2,1],
+        [0,-0,1]
+    ]

@@ -11,6 +11,7 @@ import glob
 from .scaper_exceptions import ScaperError
 import scipy
 import numpy as np
+from numbers import Number
 
 
 @contextmanager
@@ -347,3 +348,72 @@ def is_real_array(array):
             return False
         else:
             return True
+
+
+
+def wrap_number(x, x_min, x_max):
+    '''
+    Return the resulting value of wrapping the number in the range [x_min, x_max)
+
+    Parameters
+    ----------
+    x: Number
+        The nunber to wrap
+    x_min: Number
+        The minimum value of the range (included)
+    x_max: Number
+        The maximum value of the range (not included)
+
+    Returns
+    -------
+    wrap: Number
+        The wrapped number
+
+    Raises
+    ------
+    ScaperError
+        If the arguments are not valid numbers, or if min is greater than max
+
+    '''
+    if (not isinstance(x, Number)
+        or not isinstance(x_min, Number)
+        or not isinstance(x_max, Number)):
+        raise ScaperError(
+            'Error wrapping number: not a number')
+    if (x_min > x_max):
+        raise ScaperError(
+            'Error wrapping number: min greater than max'
+        )
+
+    return (((x - x_min) % (x_max - x_min)) + (x_max - x_min)) % (x_max - x_min) + x_min
+
+def delta_kronecker(q1,q2):
+    '''
+    Return 1 if q1==q2, 0 otherwise
+    see https://en.wikipedia.org/wiki/Kronecker_delta
+
+    Parameters
+    ----------
+    q1: int
+        First number
+    q2: int
+        Second number
+
+    Returns
+    -------
+    delta: int
+        The Kronecker delta evaluated on the arguments
+
+    Raises
+    ------
+    ScaperError
+        If the arguments are not valid numbers
+
+    '''
+    if (not isinstance(q1, int)
+        or not isinstance(q2, int)):
+        raise ScaperError(
+            'Error on Kronecker delta: argument not int')
+
+    if (q1==q2): return 1
+    else:        return 0

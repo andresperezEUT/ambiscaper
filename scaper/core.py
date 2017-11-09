@@ -21,7 +21,6 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
-from .ambisonics import MAX_AMBISONICS_ORDER
 from .ambisonics import get_number_of_ambisonics_channels
 
 SUPPORTED_DIST = {"const": lambda x: x,
@@ -1017,8 +1016,8 @@ class Scaper(object):
         # Validate ambisonics order
         if not isinstance(ambisonics_order,int):
             raise ScaperError('Ambisonics Order must be an integer')
-        elif ambisonics_order < 0 or ambisonics_order > MAX_AMBISONICS_ORDER :
-            raise ScaperError('Ambisonics Order must be in the range [0..' + str(MAX_AMBISONICS_ORDER) + ']')
+        elif ambisonics_order < 0 :
+            raise ScaperError('Ambisonics Order must be 0 or greater]')
         else:
             self.ambisonics_order = ambisonics_order
             self.num_channels = get_number_of_ambisonics_channels(ambisonics_order)
