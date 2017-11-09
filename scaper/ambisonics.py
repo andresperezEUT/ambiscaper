@@ -67,12 +67,12 @@ def get_ambisonics_coefs(azimuth,elevation,order):
         coefs[8] = (sqrt(3)/2.) * cos(2*a) * pow(cos(e),2)    # U
 
     if (order >= 3):
-        coefs[9] = (sqrt(5./8.)) * sin(3*a) * pow(cos(e),3)                    # Q
+        coefs[9] = (sqrt(5./8.)) * sin(3*a) * pow(cos(e),3)                   # Q
         coefs[10] = (sqrt(15)/2.) * sin(2*a) * sin(e) * pow(cos(e),2)         # O
-        coefs[11] = (sqrt(3./8.)) * sin(a) * cos(e) * (5*(pow(sin(e),2))-1)    # M
+        coefs[11] = (sqrt(3./8.)) * sin(a) * cos(e) * (5*(pow(sin(e),2))-1)   # M
         coefs[12] = 0.5 * ( sin(e) * (5*(pow(sin(e),2))-3) )                  # K
-        coefs[13] = (sqrt(3./8.)) * cos(a) * cos(e) * ((5*pow(sin(e),2))-1)    # L
+        coefs[13] = (sqrt(3./8.)) * cos(a) * cos(e) * ((5*pow(sin(e),2))-1)   # L
         coefs[14] = (sqrt(15)/2.) * cos(2*a) * sin(e) * pow(cos(e),2)         # N
-        coefs[15] = (sqrt(5./8.)) * cos(3*a) * pow(cos(e),3)                   # P
+        coefs[15] = (sqrt(5./8.)) * cos(3*a) * pow(cos(e),3)                  # P
 
     return coefs
