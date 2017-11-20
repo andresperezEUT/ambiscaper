@@ -3,6 +3,7 @@
 <img src="http://www.justinsalamon.com/uploads/4/3/9/4/4394963/scaper-logo_orig.png" width="400" height="108">
 
 A library for soundscape synthesis and augmentation
+Originally forked from [http://github.com/justinsalamon/scaper][http://github.com/justinsalamon/scaper]
 
 [![PyPI](https://img.shields.io/pypi/v/scaper.svg)](https://pypi.python.org/pypi/scaper)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
