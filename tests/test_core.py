@@ -679,7 +679,6 @@ def test_scaper_init():
 
     # bad ambisonics order
     sc = pytest.raises(ScaperError, scaper.Scaper, 1, -1, FG_PATH, BG_PATH)
-    sc = pytest.raises(ScaperError, scaper.Scaper, 1, 9, FG_PATH, BG_PATH)
     sc = pytest.raises(ScaperError, scaper.Scaper, 1, 1.3, FG_PATH, BG_PATH)
 
     # all args valid
