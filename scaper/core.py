@@ -22,6 +22,7 @@ from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
 from .ambisonics import get_number_of_ambisonics_channels
+from .ambisonics import get_ambisonics_coefs
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -989,6 +990,7 @@ class Scaper(object):
             Duration of the soundscape, in seconds.
         ambisonics_order: int
             Ambisonics Order
+        # TODO: num channels, but also all sr, ref_db etc... parameters??
         fg_path : str
             Path to foreground folder.
         bg_path : str
@@ -1771,40 +1773,56 @@ class Scaper(object):
                             tempfile.NamedTemporaryFile(
                                 suffix='.wav', delete=False))
 
+                        # TODO: do something here with ambisonics background...
+                        # maybe expand channels to num_ambi_channels and put only audio in W
+
                         cmb.build(
                             [e.value['source_file']] * ntiles,
                             tmpfiles[-1].name, 'concatenate')
 
                     elif e.value['role'] == 'foreground':
-                        # Create transformer
+
+                        # # First of all, ensure pre-downmix to mono, just in case
                         tfm = sox.Transformer()
-                        # Ensure consistent sampling rate and channels
-                        tfm.convert(samplerate=self.sr,
-                                    n_channels=get_number_of_ambisonics_channels(self.ambisonics_order),
+                        tfm.channels(1)
+                        downmix_tmpfile = tempfile.NamedTemporaryFile(suffix='.wav')
+                        tfm.build(e.value['source_file'],downmix_tmpfile.name)
+
+                        print(downmix_tmpfile.name)
+
+                        # Create combiner
+                        # note: Combiner inhereits from transformer, so we can still apply all audio transforms
+                        cmb = sox.Combiner()
+                        # Ensure consistent sampling rate
+                        cmb.convert(samplerate=self.sr,
+                                    # TODO: num_ambi_channels will be expanded at build command, but how to pre-downmix?
+                                    # n_channels=None, #just let the default (input)q number of channels for the moment
+                                    n_channels=self.num_channels,
                                     bitdepth=None)
+
                         # Trim
-                        tfm.trim(e.value['source_time'],
+                        cmb.trim(e.value['source_time'],
                                  e.value['source_time'] +
                                  e.value['event_duration'])
 
                         # Pitch shift
                         if e.value['pitch_shift'] is not None:
-                            tfm.pitch(e.value['pitch_shift'])
+                            cmb.pitch(e.value['pitch_shift'])
 
                         # Time stretch
                         if e.value['time_stretch'] is not None:
-                            tfm.tempo(1.0 / float(e.value['time_stretch']))
+                            cmb.tempo(1.0 / float(e.value['time_stretch']))
 
                         # Apply very short fade in and out
                         # (avoid unnatural sound onsets/offsets)
-                        tfm.fade(fade_in_len=self.fade_in_len,
+                        cmb.fade(fade_in_len=self.fade_in_len,
                                  fade_out_len=self.fade_out_len)
 
                         # Normalize to specified SNR with respect to
                         # self.ref_db
-                        fg_lufs = get_integrated_lufs(e.value['source_file'])
+                        fg_lufs = get_integrated_lufs(e.value['source_file']) # TODO: MAYBE TO THE DOWNMIXED VERSION?
                         gain = self.ref_db + e.value['snr'] - fg_lufs
-                        tfm.gain(gain_db=gain, normalize=False)
+                        cmb.gain(gain_db=gain, normalize=False)
 
                         # Pad with silence before/after event to match the
                         # soundscape duration
@@ -1818,13 +1836,25 @@ class Scaper(object):
                                 0, self.duration - (e.value['event_time'] +
                                                     e.value['event_duration'] *
                                                     e.value['time_stretch']))
-                        tfm.pad(prepad, postpad)
+                        cmb.pad(prepad, postpad)
+
+                        # Get the ambisonic encoding coefs (i.e. gains)
+                        ambisonics_gains = get_ambisonics_coefs(e.value['event_azimuth'],
+                                                                e.value['event_elevation'],
+                                                                self.ambisonics_order).tolist()
 
                         # Finally save result to a tmp file
                         tmpfiles.append(
                             tempfile.NamedTemporaryFile(
                                 suffix='.wav', delete=False))
-                        tfm.build(e.value['source_file'], tmpfiles[-1].name)
+
+                        print(self.num_channels)
+                        # Build by passing a list of the same file and 'merging' it with targed ambisonics gains
+                        cmb.build(input_filepath_list=[downmix_tmpfile.name for _ in range(self.num_channels)],
+                        # cmb.build(input_filepath_list=[e.value['source_file']],
+                                  output_filepath=tmpfiles[-1].name,
+                                  combine_type='merge',
+                                  input_volumes=ambisonics_gains)
 
                     else:
                         raise ScaperError(
