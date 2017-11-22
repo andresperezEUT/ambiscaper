@@ -1816,8 +1816,8 @@ class Scaper(object):
                                  fade_out_len=self.fade_out_len)
 
                         # Normalize to specified SNR with respect to
-                        # self.ref_db
-                        fg_lufs = get_integrated_lufs(e.value['source_file']) # TODO: MAYBE TO THE DOWNMIXED VERSION?
+                        # self.ref_db (from downmixed version)
+                        fg_lufs = get_integrated_lufs(downmix_tmpfile.name)
                         gain = self.ref_db + e.value['snr'] - fg_lufs
                         cmb.gain(gain_db=gain, normalize=False)
 
