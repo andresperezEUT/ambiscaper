@@ -1782,22 +1782,19 @@ class Scaper(object):
 
                     elif e.value['role'] == 'foreground':
 
-                        # # First of all, ensure pre-downmix to mono, just in case
+                        # First of all, ensure pre-downmix to mono
+                        # TODO: maybe ony do it if num_channels>1? (sox.file_info.channels())
                         tfm = sox.Transformer()
-                        tfm.channels(1)
+                        tfm.channels(1) # force mono
                         downmix_tmpfile = tempfile.NamedTemporaryFile(suffix='.wav')
                         tfm.build(e.value['source_file'],downmix_tmpfile.name)
-
-                        print(downmix_tmpfile.name)
 
                         # Create combiner
                         # note: Combiner inhereits from transformer, so we can still apply all audio transforms
                         cmb = sox.Combiner()
                         # Ensure consistent sampling rate
                         cmb.convert(samplerate=self.sr,
-                                    # TODO: num_ambi_channels will be expanded at build command, but how to pre-downmix?
-                                    # n_channels=None, #just let the default (input)q number of channels for the moment
-                                    n_channels=self.num_channels,
+                                    n_channels=self.num_channels,   # num_ambisonics_channels
                                     bitdepth=None)
 
                         # Trim
@@ -1848,10 +1845,8 @@ class Scaper(object):
                             tempfile.NamedTemporaryFile(
                                 suffix='.wav', delete=False))
 
-                        print(self.num_channels)
-                        # Build by passing a list of the same file and 'merging' it with targed ambisonics gains
+                        # Build by passing a list of the same downmixed file and 'merging' it with targed ambisonics gains
                         cmb.build(input_filepath_list=[downmix_tmpfile.name for _ in range(self.num_channels)],
-                        # cmb.build(input_filepath_list=[e.value['source_file']],
                                   output_filepath=tmpfiles[-1].name,
                                   combine_type='merge',
                                   input_volumes=ambisonics_gains)
