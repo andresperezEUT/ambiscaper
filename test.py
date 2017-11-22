@@ -9,12 +9,12 @@ outfolder = '/Volumes/Dinge/scaper/generated'
 foreground_folder = '~/audio/scaper/foreground/'
 background_folder = '~/audio/scaper/background/'
 
-n_soundscapes = 1
+n_soundscapes = 3
 ref_db = -50
 duration = 10.0
 ambisonics_order = 3
 
-num_events = 1
+num_events = 2
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -29,11 +29,13 @@ event_duration_dist = 'uniform'
 event_duration_min = 0.5
 event_duration_max = 4.0
 
-event_azimuth_dist = 'const'
-event_azimuth = 0
+event_azimuth_dist = 'uniform'
+event_azimuth_min = 0
+event_azimuth_max = 2*np.pi
 
-event_elevation_dist = 'const'
-event_elevation = 0
+event_elevation_dist = 'uniform'
+event_elevation_min = -np.pi/2
+event_elevation_max = np.pi/2
 
 event_spread_dist = 'const'
 event_spread = 0
@@ -62,7 +64,7 @@ for n in range(n_soundscapes):
     sc.ref_db = ref_db
 
     # add background
-    sc.add_background(label=('const', 'restaurant'),
+    sc.add_background(label=('choose', []),
                       source_file=('choose', []),
                       source_time=('const', 0))
 
@@ -73,8 +75,8 @@ for n in range(n_soundscapes):
                      source_time=(source_time_dist, source_time),
                      event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max),
                      event_duration=(event_duration_dist, event_duration_min, event_duration_max),
-                     event_azimuth=(event_azimuth_dist,event_azimuth),
-                     event_elevation=(event_elevation_dist,event_elevation),
+                     event_azimuth=(event_azimuth_dist,event_azimuth_min,event_azimuth_max),
+                     event_elevation=(event_elevation_dist,event_elevation_min,event_elevation_max),
                      event_spread=(event_spread_dist,event_spread),
                      snr=(snr_dist, snr_min, snr_max),
                      pitch_shift=(pitch_dist, pitch_min, pitch_max),
@@ -88,7 +90,7 @@ for n in range(n_soundscapes):
     sc.generate(audiofile, jamsfile,
                 allow_repeated_label=True,
                 allow_repeated_source=True,
-                reverb=0.1,
+                reverb=0,
                 disable_sox_warnings=True,
                 no_audio=False,
                 txt_path=txtfile)
