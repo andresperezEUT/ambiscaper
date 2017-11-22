@@ -1686,6 +1686,46 @@ class Scaper(object):
         # Return
         return jam
 
+
+    def _mono_downmix(self, file_path):
+        '''
+        Take the path to an audio file and produce a tmp file downmixed to mono,
+        and with system's sample rate
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the audio file to be downmixed
+
+        Returns
+        ------
+        downmix_tmpfile: tmp file
+            A reference to the created  tmpfile
+
+        Raises
+        TODO
+        ------
+        ScaperError
+            If annotation is not of the sound_event namespace.
+
+        '''
+
+        # Instanciate sox transformer to perform sr and channel conversion
+        downmix_transformer = sox.Transformer()
+        downmix_transformer.convert(samplerate=self.sr,
+            n_channels=1,
+            bitdepth=None)
+
+        # Create removable tmp file to store it. Don't store on the valid tmpfiles list
+        downmix_tmpfile = tempfile.NamedTemporaryFile(
+            suffix='.wav',
+            delete=False)
+
+        # Actual rendering
+        downmix_transformer.build(file_path,downmix_tmpfile.name)
+        return downmix_tmpfile
+
+
     def _generate_audio(self, audio_path, ann, reverb=None,
                         disable_sox_warnings=True):
         '''
@@ -1729,153 +1769,166 @@ class Scaper(object):
 
         with _set_temp_logging_level(temp_logging_level):
 
-            # Array for storing all tmp files (one for every event)
-            tmpfiles = []
-            with _close_temp_files(tmpfiles):
+            # We maintain two lists for handling convenience tmp audio files
+            # :downmix_tmpfiles: stores the downmixed and sr-adjusted versions
+            # for each sound. They are just needed for intermediate calculation
+            # of the actually valid :processed_tmpfiles:
+            # which arecreated iteratively and used at the end of the method
+            # to render the output
+            downmix_tmpfiles = []
+            processed_tmpfiles = []
 
+            # Delete processed_tmpfiles only at the end of the method's lifetime
+            with _close_temp_files(processed_tmpfiles):
+
+                # Iterate over all events specified in the annotation
                 for event in ann.data.iterrows():
 
                     # first item is index, second is event dictionary
                     e = event[1]
 
-                    if e.value['role'] == 'background':
-                        # Concatenate background if necessary. Right now we
-                        # always concatenate the background at least once,
-                        # since the pysox combiner raises an error if you try
-                        # to call build using an input_file_list with less than
-                        # 2 elements. In the future if the combiner is updated
-                        # to accept a list of length 1, then the max(..., 2)
-                        # statement can be removed from the calculation of
-                        # ntiles.
-                        source_duration = (
-                            sox.file_info.duration(e.value['source_file']))
-                        ntiles = int(
-                            max(self.duration // source_duration + 1, 2))
+                    #  Downmixed files are only needed until the corresponding
+                    # processed tmpfile is created. So they can be deleted on
+                    # each iteration and save some memory
+                    with _close_temp_files(downmix_tmpfiles):
 
-                        # Create combiner
-                        cmb = sox.Combiner()
-                        # Ensure consistent sampling rate and channels
-                        cmb.convert(samplerate=self.sr,
-                                    n_channels=get_number_of_ambisonics_channels(self.ambisonics_order),
-                                    bitdepth=None)
-                        # Then trim
-                        cmb.trim(e.value['source_time'],
-                                 e.value['source_time'] +
-                                 e.value['event_duration'])
+                        if e.value['role'] == 'background':
+                            # Let's treat background as omnidirectional/stationary/non-desired
+                            # audio. In ambisonics, we can implement it as completely diffused
+                            # audio, i.e. only W channel
 
-                        # After trimming, normalize background to reference DB.
-                        bg_lufs = get_integrated_lufs(e.value['source_file'])
-                        gain = self.ref_db - bg_lufs
-                        cmb.gain(gain_db=gain, normalize=False)
+                            # First of all, ensure pre-downmix to mono
+                            downmix_tmpfiles.append(
+                                self._mono_downmix(e.value['source_file']))
 
-                        # Prepare tmp file for output
-                        tmpfiles.append(
-                            tempfile.NamedTemporaryFile(
-                                suffix='.wav', delete=False))
+                            # Now, create another transformer for sr, gain, remix, etc...
+                            fx_transformer = sox.Transformer()
+                            # Ensure consistent sampling rate and channels
+                            fx_transformer.convert(samplerate=self.sr,
+                                                   n_channels=self.num_channels,   # num_ambisonics_channels
+                                                   bitdepth=None)
+                            # Then trim
+                            fx_transformer.trim(e.value['source_time'],
+                                                e.value['source_time'] +
+                                                e.value['event_duration'])
 
-                        # TODO: do something here with ambisonics background...
-                        # maybe expand channels to num_ambi_channels and put only audio in W
+                            # After trimming, normalize background to reference DB (from mono downmix)
+                            bg_lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
+                            gain = self.ref_db - bg_lufs
+                            fx_transformer.gain(gain_db=gain, normalize=False)
 
-                        cmb.build(
-                            [e.value['source_file']] * ntiles,
-                            tmpfiles[-1].name, 'concatenate')
+                            # We want a multichannel file with only W (first) channel,
+                            # and we can get it by not specifying channel routing
+                            # on the remix_dictionary
+                            remix_dictionary = {1:[1]}
+                            fx_transformer.remix(remix_dictionary,self.num_channels)
 
-                    elif e.value['role'] == 'foreground':
+                            # Prepare tmp file for output
+                            processed_tmpfiles.append(
+                                tempfile.NamedTemporaryFile(
+                                    suffix='.wav', delete=False))
 
-                        # First of all, ensure pre-downmix to mono
-                        # TODO: maybe ony do it if num_channels>1? (sox.file_info.channels())
-                        tfm = sox.Transformer()
-                        tfm.channels(1) # force mono
-                        downmix_tmpfile = tempfile.NamedTemporaryFile(suffix='.wav')
-                        tfm.build(e.value['source_file'],downmix_tmpfile.name)
+                            # Actual background file render
+                            fx_transformer.build(
+                                downmix_tmpfiles[-1].name,      # input
+                                processed_tmpfiles[-1].name)    # output
 
-                        # Create combiner
-                        # note: Combiner inhereits from transformer, so we can still apply all audio transforms
-                        cmb = sox.Combiner()
-                        # Ensure consistent sampling rate
-                        cmb.convert(samplerate=self.sr,
-                                    n_channels=self.num_channels,   # num_ambisonics_channels
-                                    bitdepth=None)
+                        elif e.value['role'] == 'foreground':
 
-                        # Trim
-                        cmb.trim(e.value['source_time'],
-                                 e.value['source_time'] +
-                                 e.value['event_duration'])
+                            # First of all, ensure pre-downmix to mono
+                            downmix_tmpfiles.append(
+                                self._mono_downmix(e.value['source_file']))
 
-                        # Pitch shift
-                        if e.value['pitch_shift'] is not None:
-                            cmb.pitch(e.value['pitch_shift'])
+                            # Create combiner
+                            # note: Combiner inhereits from transformer,
+                            # so we can still apply all audio transforms
+                            # note2: we cannot use a plain Transformer,
+                            # because volume controls are still not implemented
+                            # on the remix method
 
-                        # Time stretch
-                        if e.value['time_stretch'] is not None:
-                            cmb.tempo(1.0 / float(e.value['time_stretch']))
+                            fx_combiner = sox.Combiner()
+                            # Ensure consistent sampling rate
+                            fx_combiner.convert(samplerate=self.sr,
+                                                n_channels=self.num_channels,   # num_ambisonics_channels
+                                                bitdepth=None)
 
-                        # Apply very short fade in and out
-                        # (avoid unnatural sound onsets/offsets)
-                        cmb.fade(fade_in_len=self.fade_in_len,
-                                 fade_out_len=self.fade_out_len)
+                            # Trim
+                            fx_combiner.trim(e.value['source_time'],
+                                             e.value['source_time'] +
+                                             e.value['event_duration'])
 
-                        # Normalize to specified SNR with respect to
-                        # self.ref_db (from downmixed version)
-                        fg_lufs = get_integrated_lufs(downmix_tmpfile.name)
-                        gain = self.ref_db + e.value['snr'] - fg_lufs
-                        cmb.gain(gain_db=gain, normalize=False)
+                            # Pitch shift
+                            if e.value['pitch_shift'] is not None:
+                                fx_combiner.pitch(e.value['pitch_shift'])
 
-                        # Pad with silence before/after event to match the
-                        # soundscape duration
-                        prepad = e.value['event_time']
-                        if e.value['time_stretch'] is None:
-                            postpad = max(
-                                0, self.duration - (e.value['event_time'] +
-                                                    e.value['event_duration']))
+                            # Time stretch
+                            if e.value['time_stretch'] is not None:
+                                fx_combiner.tempo(1.0 / float(e.value['time_stretch']))
+
+                            # Apply very short fade in and out
+                            # (avoid unnatural sound onsets/offsets)
+                            fx_combiner.fade(fade_in_len=self.fade_in_len,
+                                             fade_out_len=self.fade_out_len)
+
+                            # Normalize to specified SNR with respect to
+                            # self.ref_db (from downmixed version)
+                            fg_lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
+                            gain = self.ref_db + e.value['snr'] - fg_lufs
+                            fx_combiner.gain(gain_db=gain, normalize=False)
+
+                            # Pad with silence before/after event to match the
+                            # soundscape duration
+                            prepad = e.value['event_time']
+                            if e.value['time_stretch'] is None:
+                                postpad = max(
+                                    0, self.duration - (e.value['event_time'] +
+                                                        e.value['event_duration']))
+                            else:
+                                postpad = max(
+                                    0, self.duration - (e.value['event_time'] +
+                                                        e.value['event_duration'] *
+                                                        e.value['time_stretch']))
+                            fx_combiner.pad(prepad, postpad)
+
+                            # Get the ambisonic encoding coefs (i.e. channel gains)
+                            ambisonics_gains = get_ambisonics_coefs(e.value['event_azimuth'],
+                                                                    e.value['event_elevation'],
+                                                                    self.ambisonics_order).tolist()
+
+                            # Prepare tmp file for output
+                            processed_tmpfiles.append(
+                                tempfile.NamedTemporaryFile(
+                                    suffix='.wav', delete=False))
+
+                            # Build by passing a list of duplicated downmixed files
+                            # and 'merging' it with targed ambisonics gains (one for each channel)
+                            fx_combiner.build(input_filepath_list=[downmix_tmpfiles[-1].name for _ in range(self.num_channels)],
+                                              output_filepath=processed_tmpfiles[-1].name,
+                                              combine_type='merge',
+                                              input_volumes=ambisonics_gains)
+
                         else:
-                            postpad = max(
-                                0, self.duration - (e.value['event_time'] +
-                                                    e.value['event_duration'] *
-                                                    e.value['time_stretch']))
-                        cmb.pad(prepad, postpad)
-
-                        # Get the ambisonic encoding coefs (i.e. gains)
-                        ambisonics_gains = get_ambisonics_coefs(e.value['event_azimuth'],
-                                                                e.value['event_elevation'],
-                                                                self.ambisonics_order).tolist()
-
-                        # Finally save result to a tmp file
-                        tmpfiles.append(
-                            tempfile.NamedTemporaryFile(
-                                suffix='.wav', delete=False))
-
-                        # Build by passing a list of the same downmixed file and 'merging' it with targed ambisonics gains
-                        cmb.build(input_filepath_list=[downmix_tmpfile.name for _ in range(self.num_channels)],
-                                  output_filepath=tmpfiles[-1].name,
-                                  combine_type='merge',
-                                  input_volumes=ambisonics_gains)
-
-                    else:
-                        raise ScaperError(
-                            'Unsupported event role: {:s}'.format(
-                                e.value['role']))
+                            raise ScaperError(
+                                'Unsupported event role: {:s}'.format(
+                                    e.value['role']))
 
                 # Finally combine all the files and optionally apply reverb
                 # If we have more than one tempfile (i.e.g background + at
                 # least one foreground event, we need a combiner. If there's
                 # only the background track, then we need a transformer!
-                if len(tmpfiles) == 0:
+                if len(processed_tmpfiles) == 0:
                     warnings.warn(
                         "No events to synthesize (silent soundscape), no audio "
                         "saved to disk.", ScaperWarning)
-                elif len(tmpfiles) == 1:
-                    tfm = sox.Transformer()
-                    if reverb is not None:
-                        tfm.reverb(reverberance=reverb * 100)
-                    # TODO: do we want to normalize the final output?
-                    tfm.build(tmpfiles[0].name, audio_path)
                 else:
-                    cmb = sox.Combiner()
-                    if reverb is not None:
-                        cmb.reverb(reverberance=reverb * 100)
-                    # TODO: do we want to normalize the final output?
-                    cmb.build([t.name for t in tmpfiles], audio_path, 'mix')
+                    # Let's use just a Combiner for all cases
+                    final_combiner = sox.Combiner()
+                    # TODO: REVERB
+                    # if reverb is not None:
+                    #   tfm.reverb(reverberance=reverb * 100)
+                    final_combiner.build([t.name for t in processed_tmpfiles], audio_path, 'mix')
+
+
 
     def generate(self, audio_path, jams_path, allow_repeated_label=True,
                  allow_repeated_source=True,
