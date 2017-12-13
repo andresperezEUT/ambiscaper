@@ -9,11 +9,16 @@
 import numpy as np
 from numpy import pi, sqrt
 import pytest
-from scaper.ambisonics import _validate_ambisonics_order, _validate_ambisonics_degree, get_spherical_harmonic, \
-    get_spherical_harmonic_normalization_coef
+from scaper.ambisonics import get_spherical_harmonic_normalization_coef
+from scaper.ambisonics import get_ambisonics_spread_coefs
 from scaper.ambisonics import get_number_of_ambisonics_channels
-from scaper.ambisonics import _validate_ambisonics_angle
 from scaper.ambisonics import get_ambisonics_coefs
+from scaper.ambisonics import _validate_ambisonics_order
+from scaper.ambisonics import _validate_ambisonics_degree
+from scaper.ambisonics import _validate_spread_coef
+from scaper.ambisonics import _validate_ambisonics_angle
+from scaper.ambisonics import _get_spread_gain
+from scaper.ambisonics import _get_spread_gain_weight
 from scaper.scaper_exceptions import ScaperError
 
 
@@ -103,9 +108,9 @@ def test_get_spherical_harmonic_normalization_coef():
 
 def test_get_ambisonics_coefs():
     def __assert_correct_ambisonics_coefs(azimuth,elevation,order,groundtruth):
-        print(azimuth, elevation)
-        print(groundtruth)
-        print(get_ambisonics_coefs(azimuth,elevation,order))
+        # print(azimuth, elevation)
+        # print(groundtruth)
+        # print(get_ambisonics_coefs(azimuth,elevation,order))
         assert np.allclose(groundtruth,get_ambisonics_coefs(azimuth,elevation,order),rtol=1e-4,atol=1e-4)
 
 
@@ -339,3 +344,187 @@ def test_get_ambisonics_coefs():
     # evaluate them
     for correct_arg in correct_args:
         __assert_correct_ambisonics_coefs(*correct_arg) # splat operator
+
+
+def test_validate_ambisonics_spread_coefs():
+
+    def __test_bad_ambisonics_spread_coefs(coef):
+        pytest.raises(ScaperError,_validate_spread_coef,coef)
+
+    bad_spread_coef_values = [-0.5,3,0,'1', None]
+    for bsv in bad_spread_coef_values:
+        __test_bad_ambisonics_spread_coefs(bsv)
+
+
+def test_get_spread_gain():
+
+    def __assert_correct_spread_gains(alpha, tau, ambisonics_order, max_ambisonics_order, value):
+        # print(alpha, tau, ambisonics_order, max_ambisonics_order, value)
+        assert (np.isclose(
+            [value],
+            [_get_spread_gain(alpha, tau, ambisonics_order, max_ambisonics_order)],
+            rtol=1e-3,
+            atol=1e-3))
+
+    L = 5
+
+    # with alpha=0 (no spread), all coefs to 1
+    alpha = 0.0
+    tau = 1.0
+    correct_args = [[alpha,tau,l,L,1.0] for l in range(L+1) ]
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg) # splat operator
+
+    tau = 0.5
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg) # splat operator
+
+    tau = 0.25
+    correct_args = [[alpha, tau, l, L, 1.0] for l in range(L)]
+    correct_args.append([alpha, tau, 5, L, 0.9847328461196255])
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+
+    # with alpha=1.0 (full spread), most coefs to 0
+    alpha = 1.0
+    tau = 1.0
+    correct_args = [[alpha, tau, 0, L, 0.5]]
+    [correct_args.append([alpha, tau, l+1, L, 0.0]) for l in range(L)]
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+    tau = 0.5
+    correct_args = [[alpha, tau, 0, L, 0.5]]
+    [correct_args.append([alpha, tau, l + 1, L, 0.0]) for l in range(L)]
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+    tau = 0.25
+    correct_args = [[alpha, tau, 0, L, 0.5]]
+    correct_args.append([alpha, tau, 1, L, 0.015267153880374473])
+    [correct_args.append([alpha, tau, l + 2, L, 0.0]) for l in range(L-1)]
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+
+    # alpha=0.5
+    alpha = 0.5
+    tau = 1.0
+    correct_args=[]
+    correct_args.append([alpha, tau, 0, L, 1.0])
+    correct_args.append([alpha, tau, 1, L, 1.0])
+    correct_args.append([alpha, tau, 2, L, 1.0])
+    correct_args.append([alpha, tau, 3, L, 0.5])
+    correct_args.append([alpha, tau, 4, L, 0.0])
+    correct_args.append([alpha, tau, 5, L, 0.0])
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+    tau = 0.5
+    correct_args = []
+    correct_args.append([alpha, tau, 0, L, 1.0])
+    correct_args.append([alpha, tau, 1, L, 1.0])
+    correct_args.append([alpha, tau, 2, L, 1.0])
+    correct_args.append([alpha, tau, 3, L, 0.5])
+    correct_args.append([alpha, tau, 4, L, 0.0])
+    correct_args.append([alpha, tau, 5, L, 0.0])
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+    tau = 0.25
+    correct_args = []
+    correct_args.append([alpha, tau, 0, L, 1.0])
+    correct_args.append([alpha, tau, 1, L, 1.0])
+    correct_args.append([alpha, tau, 2, L, 0.9847328461196255])
+    correct_args.append([alpha, tau, 3, L, 0.5])
+    correct_args.append([alpha, tau, 4, L, 0.015267153880374473])
+    correct_args.append([alpha, tau, 5, L, 0.0])
+    for correct_arg in correct_args:
+        __assert_correct_spread_gains(*correct_arg)  # splat operator
+
+
+def test_get_spread_gain_weight():
+
+    def __assert_correct_spread_gain_weights(alpha, tau, max_ambisonics_order, value):
+        # print(alpha, tau, max_ambisonics_order, value)
+        assert (np.isclose(
+            [value],
+            [_get_spread_gain_weight(alpha, tau, max_ambisonics_order)],
+            rtol=1e-1,
+            atol=1e-1))
+
+    L = 5
+
+    # with alpha=0 (no spread), all coefs to 1
+    alpha = 0.0
+    tau = 1.0
+    correct_args = [alpha,tau,L,1.0]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+    tau = 0.5
+    correct_args = [alpha,tau,L,1.0]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+    tau = 0.25
+    correct_args = [alpha,tau,L,1.0]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+
+    # alpha=1 (full spread): max value
+    alpha = 1.0
+    tau = 1.0
+    correct_args = [alpha,tau,L,7.4]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+    tau = 0.5
+    correct_args = [alpha,tau,L,7.4]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+    tau = 0.25
+    correct_args = [alpha,tau,L,7.4]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+
+    # alpha=0.7
+    alpha = 0.7
+    tau = 1.0
+    correct_args = [alpha,tau,L,2.2]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+    tau = 0.5
+    correct_args = [alpha,tau,L,2.2]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+    tau = 0.25
+    correct_args = [alpha,tau,L,2.2]
+    __assert_correct_spread_gain_weights(*correct_args) # splat operator
+
+
+def test_get_ambisonics_spread_coefs():
+
+    def __assert_correct_spread_coefs(alpha, tau, max_ambisonics_order, value):
+        assert(np.allclose(
+            value,
+            get_ambisonics_spread_coefs(alpha,tau,max_ambisonics_order),
+            rtol=1e-1,
+            atol=1e-1))
+
+    L = 5
+    num_channels = (pow((L+1),2))
+
+    # alpha 0, all channels to 1
+    alpha = 0.0
+    tau = 1.0
+    correct_args = [alpha, tau, L, [1.0 for _ in range(num_channels)]]
+    __assert_correct_spread_coefs(*correct_args)
+    tau = 0.5
+    correct_args = [alpha, tau, L, [1.0 for _ in range(num_channels)]]
+    __assert_correct_spread_coefs(*correct_args)
+    tau = 0.25
+    correct_args = [alpha, tau, L, [1.0 for _ in range(num_channels)]]
+    __assert_correct_spread_coefs(*correct_args)
+
+    # alpha 1, only W
+    alpha = 1.0
+    tau = 1.0
+    correct_args = [alpha, tau, L, [3.7]+[0.0 for _ in range(num_channels-1)]]
+    __assert_correct_spread_coefs(*correct_args)
+    tau = 0.5
+    correct_args = [alpha, tau, L, [3.7]+[0.1 for _ in range(num_channels-1)]]
+    __assert_correct_spread_coefs(*correct_args)
+    tau = 0.25
+    correct_args = [alpha, tau, L, [3.7]+[0.1 for _ in range(num_channels-1)]]
+    __assert_correct_spread_coefs(*correct_args)

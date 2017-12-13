@@ -9,12 +9,12 @@ outfolder = '/Volumes/Dinge/scaper/generated'
 foreground_folder = '~/audio/scaper/foreground/'
 background_folder = '~/audio/scaper/background/'
 
-n_soundscapes = 3
+n_soundscapes = 1
 ref_db = -50
 duration = 10.0
 ambisonics_order = 3
 
-num_events = 2
+num_events = 10
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0

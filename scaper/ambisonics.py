@@ -15,7 +15,7 @@ elevation [-pi/2..pi/2]
 '''
 import numpy as np
 from numpy import pi
-from math import sin, cos, sqrt, factorial
+from math import sin, cos, sqrt, factorial, exp
 from scaper.scaper_exceptions import ScaperError
 from numbers import Number
 from scipy.special import sph_harm
@@ -145,6 +145,86 @@ def get_imag_spherical_harmonic(azimuth, elevation, ambisonics_order, ambisonics
     # here, we use phi as azimuth and theta as elevation
     # furthermore, L is ambisonics order and M is ambisonics degree
     return np.asscalar(np.imag(sph_harm(ambisonics_degree,ambisonics_order,azimuth,elevation)))
+
+
+
+
+def _validate_spread_coef(alpha):
+    '''
+    Must be a float between 0.0 and 1.0
+    :param alpha:
+    :return:
+    '''
+    if (not 0.0 <= alpha <= 1.0):
+        raise ScaperError(
+            'Ambisonics spread coef must be in the range [0.0, 1.0]')
+    if (not isinstance(alpha,float)):
+        raise ScaperError(
+            'Ambisonics spread coef must be a float')
+
+
+# eq 16
+def get_ambisonics_spread_coefs(alpha, tau, max_ambisonics_order):
+    '''
+    This is an implementation of T. Carpentier's spread algorithm
+    as described in "Ambisonic Spatial Blur" (2017)
+    http://www.aes.org/e-lib/browse.cfm?elib=18606
+
+    # Equation 16
+
+    :param alpha:
+    :param tau:
+    :param max_ambisonics_order:
+    :return:
+    '''
+    a = alpha
+    t = tau
+    L = max_ambisonics_order
+
+    # perform data validation
+    _validate_spread_coef(a)
+    _validate_spread_coef(t)
+    _validate_ambisonics_order(L)
+
+    # Get the normalized spread coefs, one per order
+    spread_coefs = [_get_spread_gain(a,t,l,L) * _get_spread_gain_weight(a,t,L) for l in range(L+1)]
+    # Expand to one coef per chanel
+    spread_coefs_expanded = []
+    for l in range(L+1):
+        for _ in range(2*l+1):
+            spread_coefs_expanded.append(spread_coefs[l])
+
+    # Return as np.array
+    return np.asarray(spread_coefs_expanded)
+
+
+def _get_spread_gain(alpha, tau, ambisonics_order, max_ambisonics_order):
+    # Equation 14
+    a = alpha
+    t = tau
+    l = ambisonics_order
+    L = max_ambisonics_order
+
+    return 1 - (1.0 / (1.0 + exp(-t * 100 * (a - ((L - l + 1) / (float)(L + 1))))))
+
+def _get_spread_gain_weight(alpha, tau, max_ambisonics_order):
+    # Equation 18
+    a = alpha
+    t = tau
+    L = max_ambisonics_order
+
+    return sqrt(_energy_sum(0.0,t,L)/(float)(_energy_sum(a,t,L)))
+
+
+def _energy_sum(alpha, tau, max_ambisonics_order):
+    # Equation 13, 3D case
+    a = alpha
+    t = tau
+    L = max_ambisonics_order
+
+    # sqrt((2*n)+1) because we are working in SN3D
+    return sum([sqrt((2*n)+1) * (pow(_get_spread_gain(a, t, n, L), 2)) for n in range(L + 1)])
+
 
 
 ################################################
