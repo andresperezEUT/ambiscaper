@@ -351,7 +351,7 @@ def test_validate_ambisonics_spread_coefs():
     def __test_bad_ambisonics_spread_coefs(coef):
         pytest.raises(ScaperError,_validate_spread_coef,coef)
 
-    bad_spread_coef_values = [-0.5,3,0,'1', None]
+    bad_spread_coef_values = [-0.5,3,'1', None]
     for bsv in bad_spread_coef_values:
         __test_bad_ambisonics_spread_coefs(bsv)
 

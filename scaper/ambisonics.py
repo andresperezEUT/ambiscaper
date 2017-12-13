@@ -17,10 +17,9 @@ import numpy as np
 from numpy import pi
 from math import sin, cos, sqrt, factorial, exp
 from scaper.scaper_exceptions import ScaperError
-from numbers import Number
 from scipy.special import sph_harm
 
-from scaper.util import delta_kronecker
+from scaper.util import delta_kronecker, is_real_number
 
 
 def _validate_ambisonics_order(order):
@@ -50,7 +49,7 @@ def get_number_of_ambisonics_channels(order):
 
 
 def _validate_ambisonics_angle(angle):
-    if (not isinstance(angle,Number)):
+    if (not is_real_number(angle)):
             raise ScaperError(
                 'Ambisonics angle must be a number')
 
@@ -151,16 +150,17 @@ def get_imag_spherical_harmonic(azimuth, elevation, ambisonics_order, ambisonics
 
 def _validate_spread_coef(alpha):
     '''
-    Must be a float between 0.0 and 1.0
+    Must be a real number between 0.0 and 1.0
     :param alpha:
     :return:
     '''
+    if not is_real_number(alpha):
+        raise ScaperError(
+            'Ambisonics spread coef must be a real number')
+
     if (not 0.0 <= alpha <= 1.0):
         raise ScaperError(
             'Ambisonics spread coef must be in the range [0.0, 1.0]')
-    if (not isinstance(alpha,float)):
-        raise ScaperError(
-            'Ambisonics spread coef must be a float')
 
 
 # eq 16

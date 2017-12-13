@@ -222,7 +222,7 @@ def test_polyphony_gini():
     gini = pytest.raises(ScaperError, polyphony_gini, ann)
 
     # Annotation with no foreground events returns a gini of 0
-    sc = Scaper(10.0, FG_PATH, BG_PATH)
+    sc = Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
 
     # add background
     sc.add_background(label=('choose', []),
@@ -239,7 +239,7 @@ def test_polyphony_gini():
         print(event_time_list)
 
         # create scaper
-        sc = Scaper(10.0, FG_PATH, BG_PATH)
+        sc = Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
 
         # add background
         sc.add_background(label=('choose', []),
@@ -365,3 +365,5 @@ def test_delta_kronecker():
         [-2,-2,1],
         [0,-0,1]
     ]
+    for correct_entry in correct_entries:
+        __test_correct_delta_kronecker(*correct_entry)

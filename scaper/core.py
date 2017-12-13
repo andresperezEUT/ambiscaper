@@ -23,6 +23,7 @@ from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
 from .ambisonics import get_number_of_ambisonics_channels, get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
+from numbers import Number
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -130,8 +131,14 @@ def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
     # Create scaper object
     duration = ann.sandbox.scaper['duration']
     ambisonics_order = ann.sandbox.scaper['ambisonics_order']
+    tau = ann.sandbox.scaper['ambisonics_spread_slope']
     protected_labels = ann.sandbox.scaper['protected_labels']
-    sc = Scaper(duration, ambisonics_order, new_fg_path, new_bg_path, protected_labels)
+    sc = Scaper(duration,
+                ambisonics_order,
+                tau,
+                new_fg_path,
+                new_bg_path,
+                protected_labels)
 
     # Set synthesis parameters
     sc.ref_db = ann.sandbox.scaper['ref_db']
@@ -957,8 +964,10 @@ def _validate_soundscape_duration(duration):
     # TODO comments
 
     # Duration must be a positive real number
-    if not (np.isrealobj(duration) or duration > 0):
-        raise ScaperError('Duration must be a positive real value')
+    if not is_real_number(duration):
+        raise ScaperError('Duration must be a real value')
+    elif duration <= 0:
+        raise ScaperError('Duration must be a positive value')
 
 
 def _validate_ambisonics_order(ambisonics_order):
@@ -972,7 +981,7 @@ def _validate_ambisonics_order(ambisonics_order):
 def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
     # TODO comments
 
-    if not np.isrealobj(ambisonics_spread_slope):
+    if not is_real_number(ambisonics_spread_slope):
         raise ScaperError('Ambisonics Spread Slope must be a real value')
     elif not 0 <= ambisonics_spread_slope <=1:
         raise ScaperError('Ambisonics Order must be 0 located on the range [0,1]')
@@ -1005,7 +1014,13 @@ class Scaper(object):
 
     '''
 
-    def __init__(self, duration, ambisonics_order, ambisonics_spread_slope, fg_path, bg_path, protected_labels=[]):
+    def __init__(self,
+                 duration,
+                 ambisonics_order,
+                 ambisonics_spread_slope,
+                 fg_path,
+                 bg_path,
+                 protected_labels=[]):
         '''
         Create a Scaper object.
 
@@ -1037,6 +1052,7 @@ class Scaper(object):
 
         '''
         # Validate soundscape duration
+        _validate_soundscape_duration(duration)
         self.duration = duration
 
         # Validate ambisonics order
@@ -1046,7 +1062,7 @@ class Scaper(object):
 
         # Validate ambisonics spread slope
         _validate_ambisonics_spread_slope(ambisonics_spread_slope)
-        self.tau = ambisonics_spread_slope
+        self.ambisonics_spread_slope = ambisonics_spread_slope
 
         # Initialize parameters
         self.sr = 48000
@@ -1075,986 +1091,987 @@ class Scaper(object):
         # Copy list of protected labels
         self.protected_labels = protected_labels[:]
 
-        def add_background(self, label, source_file, source_time):
-            '''
-            Add a background recording to the background specification.
-
-            The background duration will be equal to the duration of the
-            soundscape ``Scaper.duration`` specified when initializing the Scaper
-            object. If the source file is shorter than this duration then it will
-            be concatenated to itself as many times as necessary to produce the
-            specified duration when calling ``Scaper.generate``.
-
-            Parameters
-            ----------
-            label : tuple
-                Specifies the label of the background. See Notes below for the
-                expected format of this tuple and the allowed values.
-                NOTE: The label specified by this tuple must match one
-                of the labels in the Scaper's background label list
-                ``Scaper.bg_labels``. Furthermore, if ``source_file`` is
-                specified using "const" (see Notes), then ``label`` must also be
-                specified using "const" and its value (see Notes) must
-                match the source file's parent folder's name.
-            source_file : tuple
-                Specifies the audio file to use as the source. See Notes below for
-                the expected format of this tuple and the allowed values.
-                NOTE: If ``source_file`` is specified using "const" (see Notes),
-                then ``label`` must also be specified using "const" and its
-                value (see Notes) must match the source file's parent folder's
-                name.
-            source_time : tuple
-                Specifies the desired start time in the source file. See Notes
-                below for the expected format of this tuple and the allowed values.
-                NOTE: the source time specified by this tuple should be equal to or
-                smaller than ``<source file duration> - <soundscape duration>``.
-                Larger values will be automatically changed to fulfill this
-                requirement when calling ``Scaper.generate``.
-
-            Notes
-            -----
-            Each parameter of this function is set by passing a distribution
-            tuple, whose first item is always the distribution name and subsequent
-            items are distribution specific. The supported distribution tuples are:
-
-            * ``("const", value)`` : a constant, given by ``value``.
-            * ``("choose", valuelist)`` : choose a value from
-              ``valuelist`` at random (uniformly). The ``label`` and
-              ``source_file`` parameters also support providing an empty
-              ``valuelist`` i.e. ``("choose", [])``, in which case the
-              value will be chosen at random from all available labels or files
-              as determined automatically by Scaper by examining the file
-              structure of ``bg_path`` provided during initialization.
-            * ``("uniform", min_value, max_value)`` : sample a random
-              value from a uniform distribution between ``min_value``
-              and ``max_value``.
-            * ``("normal", mean, stddev)`` : sample a random value from a
-              normal distribution defined by its mean ``mean`` and
-              standard deviation ``stddev``.
-
-            IMPORTANT: not all parameters support all distribution tuples. In
-            particular, ``label`` and ``source_file`` only support ``"const"`` and
-            ``"choose"``, whereas ``source_time`` supports all distribution tuples.
-            As noted above, only ``label`` and ``source_file`` support providing an
-            empty ``valuelist`` with ``"choose"``.
-            '''
-
-            # These values are fixed for the background sound
-            event_time = ("const", 0)
-            event_duration = ("const", self.duration)
-            event_azimuth = ("const", 0)
-            event_elevation = ("const", 0)
-            event_spread = ("const", 0)
-            snr = ("const", 0)
-            role = 'background'
-            pitch_shift = None
-            time_stretch = None
-
-            # Validate parameter format and values
-            _validate_event(label, source_file,
-                            source_time, event_time, event_duration,
-                            event_azimuth, event_elevation, event_spread,
-                            snr, self.bg_labels, None, None)
-
-            # Create background sound event
-            bg_event = EventSpec(label=label,
-                                 source_file=source_file,
-                                 source_time=source_time,
-                                 event_time=event_time,
-                                 event_duration=event_duration,
-                                 event_azimuth=event_azimuth,
-                                 event_elevation=event_elevation,
-                                 event_spread=event_spread,
-                                 snr=snr,
-                                 role=role,
-                                 pitch_shift=pitch_shift,
-                                 time_stretch=time_stretch)
-
-            # Add event to background spec
-            self.bg_spec.append(bg_event)
-
-        def add_event(self, label, source_file,
-                      source_time, event_time, event_duration,
-                      event_azimuth, event_elevation, event_spread,
-                      snr, pitch_shift, time_stretch):
-            '''
-            Add a foreground sound event to the foreground specification.
-
-            Parameters
-            ----------
-            label : tuple
-                Specifies the label of the sound event. See Notes below for the
-                expected format of this tuple and the allowed values.
-                NOTE: The label specified by this tuple must match one
-                of the labels in the Scaper's foreground label list
-                ``Scaper.fg_labels``. Furthermore, if ``source_file`` is
-                specified using "const" (see Notes), then ``label`` must also be
-                specified using "const" and its ``value `` (see Notes) must
-                match the source file's parent folder's name.
-            source_file : tuple
-                Specifies the audio file to use as the source. See Notes below for
-                the expected format of this tuple and the allowed values.
-                NOTE: If ``source_file`` is specified using "const" (see Notes),
-                then ``label`` must also be specified using "const" and its
-                ``value`` (see Notes) must match the source file's parent
-                folder's name.
-            source_time : tuple
-                Specifies the desired start time in the source file. See Notes
-                below for the expected format of this tuple and the allowed values.
-                NOTE: the source time specified by this tuple should be equal to or
-                smaller than ``<source file duration> - event_duration``. Larger
-                values will be automatically changed to fulfill this requirement
-                when calling ``Scaper.generate``.
-            event_time : tuple
-                Specifies the desired start time of the event in the soundscape.
-                See Notes below for the expected format of this tuple and the
-                allowed values.
-                NOTE: The value specified by this tuple should be equal to or
-                smaller than ``<soundscapes duration> - event_duration``, and
-                larger values will be automatically changed to fulfill this
-                requirement when calling ``Scaper.generate``.
-            event_duration : tuple
-                Specifies the desired duration of the event. See Notes below for
-                the expected format of this tuple and the allowed values.
-                NOTE: The value specified by this tuple should be equal to or
-                smaller than the source file's duration, and larger values will be
-                automatically changed to fulfill this requirement when calling
-                ``Scaper.generate``.
-            TODO event_azimuth
-            TODO event_elevation
-            TODO event_spread
-            snr : tuple
-                Specifies the desired signal to noise ratio (SNR) between the event
-                and the background. See Notes below for the expected format of
-                this tuple and the allowed values.
-            pitch_shift : tuple
-                Specifies the number of semitones to shift the event by. None means
-                no pitch shift.
-            time_stretch: tuple
-                Specifies the time stretch factor (value>1 will make it slower and
-                longer, value<1 will makes it faster and shorter).
-
-            Notes
-            -----
-            Each parameter of this function is set by passing a distribution
-            tuple, whose first item is always the distribution name and subsequent
-            items are distribution specific. The supported distribution tuples are:
-
-            * ``("const", value)`` : a constant, given by ``value``.
-            * ``("choose", valuelist)`` : choose a value from
-              ``valuelist`` at random (uniformly). The ``label`` and
-              ``source_file`` parameters also support providing an empty
-              ``valuelist`` i.e. ``("choose", [])``, in which case the
-              value will be chosen at random from all available labels or
-              source files as determined automatically by Scaper by examining
-              the file structure of ``fg_path`` provided during
-              initialization.
-            * ``("uniform", min_value, max_value)`` : sample a random
-              value from a uniform distribution between ``min_value``
-              and ``max_value`` (including ``max_value``).
-            * ``("normal", mean, stddev)`` : sample a random value from a
-              normal distribution defined by its mean ``mean`` and
-              standard deviation ``stddev``.
-
-            IMPORTANT: not all parameters support all distribution tuples. In
-            particular, ``label`` and ``source_file`` only support ``"const"`` and
-            ``"choose"``, whereas the remaining parameters support all distribution
-            tuples. As noted above, only ``label`` and ``source_file`` support
-            providing an empty ``valuelist`` with ``"choose"``.
-
-            See Also
-            --------
-            _validate_event : Check that event parameter values are valid.
-
-            Scaper.generate : Generate a soundscape based on the current
-                specification and save to disk as both an audio file and a JAMS file
-                describing the soundscape.
-
-            '''
-
-            # SAFETY CHECKS
-            _validate_event(label, source_file,
-                            source_time, event_time, event_duration,
-                            event_azimuth, event_elevation, event_spread,
-                            snr, self.fg_labels, pitch_shift, time_stretch)
-
-            # Create event
-            event = EventSpec(label=label,
-                              source_file=source_file,
-                              source_time=source_time,
-                              event_time=event_time,
-                              event_duration=event_duration,
-                              event_azimuth=event_azimuth,
-                              event_elevation=event_elevation,
-                              event_spread=event_spread,
-                              snr=snr,
-                              role='foreground',
-                              pitch_shift=pitch_shift,
-                              time_stretch=time_stretch)
-
-            # Add event to foreground specification
-            self.fg_spec.append(event)
-
-        def _instantiate_event(self, event, isbackground=False,
-                               allow_repeated_label=True,
-                               allow_repeated_source=True,
-                               used_labels=[],
-                               used_source_files=[],
-                               disable_instantiation_warnings=False):
-            '''
-            Instantiate an event specification.
-
-            Given an event specification containing distribution tuples,
-            instantiate the event, i.e. samples values for the label, source_file,
-            source_time, event_time, event_duration and snr from their respective
-            distribution tuples, and return the sampled values in as a new event
-            specification.
-
-            Parameters
-            ----------
-            event : EventSpec
-                Event specification containing distribution tuples.
-            isbackground : bool
-                Flag indicating whether the event to instantiate is a background
-                event or not (False implies it is a foreground event).
-            allow_repeated_label : bool
-                When True (default) any label can be used, including a label that
-                has already been used for another event. When False, only a label
-                that is not already in ``used_labels`` can be selected.
-            allow_repeated_source : bool
-                When True (default) any source file matching the selected label can
-                be used, including a source file that has already been used for
-                another event. When False, only a source file that is not already
-                in ``used_source_files`` can be selected.
-            used_labels : list
-                List labels that have already been used in the current soundscape
-                instantiation. The label selected for instantiating the event will
-                be appended to this list unless its already in it.
-            used_source_files : list
-                List of full paths to source files that have already been used in
-                the current soundscape instantiation. The source file selected for
-                instantiating the event will be appended to this list unless its
-                already in it.
-            disable_instantiation_warnings : bool
-                When True (default is False), warnings stemming from event
-                instantiation (primarily about automatic duration adjustments) are
-                disabled. Not recommended other than for testing purposes.
-
-            Returns
-            -------
-            instantiated_event : EventSpec
-                Event specification containing values sampled from the distribution
-                tuples of the input event specification.
-
-            Raises
-            ------
-            ScaperError
-                If allow_repeated_source is False and there is no valid source file
-                to select.
-
-            '''
-            # set paths and labels depending on whether its a foreground/background
-            # event
-            if isbackground:
-                file_path = self.bg_path
-                allowed_labels = self.bg_labels
-            else:
-                file_path = self.fg_path
-                allowed_labels = self.fg_labels
-
-            # determine label
-            if event.label[0] == "choose" and not event.label[1]:
-                label_tuple = list(event.label)
-                label_tuple[1] = allowed_labels
-                label_tuple = tuple(label_tuple)
-            else:
-                label_tuple = event.label
-            label = _get_value_from_dist(label_tuple)
-
-            # Make sure we can use this label
-            if (not allow_repeated_label) and (label in used_labels):
-                if (len(allowed_labels) == len(used_labels) or
-                            label_tuple[0] == "const"):
-                    raise ScaperError(
-                        "Cannot instantiate event {:s}: all available labels "
-                        "have already been used and "
-                        "allow_repeated_label=False.".format(label))
-                else:
-                    while label in used_labels:
-                        label = _get_value_from_dist(label_tuple)
-
-            # Update the used labels list
-            if label not in used_labels:
-                used_labels.append(label)
-
-            # determine source file
-            if event.source_file[0] == "choose" and not event.source_file[1]:
-                source_files = _get_sorted_files(
-                    os.path.join(file_path, label))
-                source_file_tuple = list(event.source_file)
-                source_file_tuple[1] = source_files
-                source_file_tuple = tuple(source_file_tuple)
-            else:
-                source_file_tuple = event.source_file
-
-            source_file = _get_value_from_dist(source_file_tuple)
-
-            # Make sure we can use this source file
-            if (not allow_repeated_source) and (source_file in used_source_files):
-                source_files = _get_sorted_files(os.path.join(file_path, label))
-                if (len(source_files) == len(used_source_files) or
-                            source_file_tuple[0] == "const"):
-                    raise ScaperError(
-                        "Cannot instantiate event {:s}: all available source "
-                        "files have already been used and "
-                        "allow_repeated_source=False.".format(label))
-                else:
-                    while source_file in used_source_files:
-                        source_file = _get_value_from_dist(source_file_tuple)
-
-            # Update the used source files list
-            if source_file not in used_source_files:
-                used_source_files.append(source_file)
-
-            # Get the duration of the source audio file
-            source_duration = sox.file_info.duration(source_file)
-
-            # If the foreground event's label is in the protected list, use the
-            # source file's duration without modification.
-            if label in self.protected_labels:
-                event_duration = source_duration
-            else:
-                # determine event duration
-                # For background events the duration is fixed to self.duration
-                # (which must be > 0), but for foreground events it could
-                # potentially be non-positive, hence the loop.
-                event_duration = -np.Inf
-                while event_duration <= 0:
-                    event_duration = _get_value_from_dist(event.event_duration)
-
-            # Check if chosen event duration is longer than the duration of the
-            # selected source file, if so adjust the event duration.
-            if (event_duration > source_duration):
-                old_duration = event_duration  # for warning
-                event_duration = source_duration
-                if not disable_instantiation_warnings:
-                    warnings.warn(
-                        "{:s} event duration ({:.2f}) is greater that source "
-                        "duration ({:.2f}), changing to {:.2f}".format(
-                            label, old_duration, source_duration, event_duration),
-                        ScaperWarning)
-
-            # Get the event azimuth
-            event_azimuth = _get_value_from_dist(event.event_azimuth)
-
-            # Get the event elevation
-            event_elevation = _get_value_from_dist(event.event_elevation)
-
-            # Get the event spread
-            event_spread = _get_value_from_dist(event.event_spread)
-
-            # Get time stretch value
-            if event.time_stretch is None:
-                time_stretch = None
-                event_duration_stretched = event_duration
-            else:
-                time_stretch = -np.Inf
-                while time_stretch <= 0:
-                    time_stretch = _get_value_from_dist(event.time_stretch)
-                # compute duration after stretching
-                event_duration_stretched = event_duration * time_stretch
-
-            # If the event duration is longer than the soundscape we can trim it
-            # without losing validity (since the event will end when the soundscape
-            # ends).
-            if time_stretch is None:
-                if (event_duration > self.duration):
-                    old_duration = event_duration  # for warning
-                    event_duration = self.duration
-                    if not disable_instantiation_warnings:
-                        warnings.warn(
-                            "{:s} event duration ({:.2f}) is greater than the "
-                            "soundscape duration ({:.2f}), changing to "
-                            "{:.2f}".format(
-                                label, old_duration, self.duration, self.duration),
-                            ScaperWarning)
-            else:
-                if (event_duration_stretched > self.duration):
-                    old_duration = event_duration  # for warning
-                    event_duration = self.duration / float(time_stretch)
-                    if not disable_instantiation_warnings:
-                        warnings.warn(
-                            "{:s} event duration ({:.2f}) with stretch factor "
-                            "{:.2f} gives {:.2f} which is greater than the "
-                            "soundscape duration ({:.2f}), changing to "
-                            "{:.2f}".format(
-                                label, old_duration, time_stretch,
-                                event_duration_stretched, self.duration,
-                                event_duration),
-                            ScaperWarning)
-
-            # determine source time
-            source_time = -np.Inf
-            while source_time < 0:
-                source_time = _get_value_from_dist(event.source_time)
-
-            # Make sure source time + event duration is not greater than the
-            # source duration, if it is, adjust the source time (i.e. duration
-            # takes precedences over start time).
-            if source_time + event_duration > source_duration:
-                old_source_time = source_time
-                source_time = source_duration - event_duration
-                if not disable_instantiation_warnings:
-                    warnings.warn(
-                        '{:s} source time ({:.2f}) is too great given event '
-                        'duration ({:.2f}) and source duration ({:.2f}), changed '
-                        'to {:.2f}.'.format(
-                            label, old_source_time, event_duration,
-                            source_duration, source_time),
-                        ScaperWarning)
-
-            # determine event time
-            # for background events the event time is fixed to 0, but for
-            # foreground events it's not.
-            event_time = -np.Inf
-            while event_time < 0:
-                event_time = _get_value_from_dist(event.event_time)
-
-            # Make sure the selected event time + event duration are is not greater
-            # than the total duration of the soundscape, if it is adjust the event
-            # time. This means event duration takes precedence over the event
-            # start time.
-            if time_stretch is None:
-                if event_time + event_duration > self.duration:
-                    old_event_time = event_time
-                    event_time = self.duration - event_duration
-                    if not disable_instantiation_warnings:
-                        warnings.warn(
-                            '{:s} event time ({:.2f}) is too great given event '
-                            'duration ({:.2f}) and soundscape duration ({:.2f}), '
-                            'changed to {:.2f}.'.format(
-                                label, old_event_time, event_duration,
-                                self.duration, event_time),
-                            ScaperWarning)
-            else:
-                if event_time + event_duration_stretched > self.duration:
-                    old_event_time = event_time
-                    event_time = self.duration - event_duration_stretched
-                    if not disable_instantiation_warnings:
-                        warnings.warn(
-                            '{:s} event time ({:.2f}) is too great given '
-                            'stretched event duration ({:.2f}) and soundscape '
-                            'duration ({:.2f}), changed to {:.2f}.'.format(
-                                label, old_event_time, event_duration_stretched,
-                                self.duration, event_time),
-                            ScaperWarning)
-
-            # determine snr
-            snr = _get_value_from_dist(event.snr)
-
-            # get role (which can only take "foreground" or "background" and
-            # is set internally, not by the user).
-            role = event.role
-
-            # determine pitch_shift
-            if event.pitch_shift is not None:
-                pitch_shift = _get_value_from_dist(event.pitch_shift)
-            else:
-                pitch_shift = None
-
-            # pack up instantiated values in an EventSpec
-            instantiated_event = EventSpec(label=label,
-                                           source_file=source_file,
-                                           source_time=source_time,
-                                           event_time=event_time,
-                                           event_duration=event_duration,
-                                           event_azimuth=event_azimuth,
-                                           event_elevation=event_elevation,
-                                           event_spread=event_spread,
-                                           snr=snr,
-                                           role=role,
-                                           pitch_shift=pitch_shift,
-                                           time_stretch=time_stretch)
-            # Return
-            return instantiated_event
-
-        def _instantiate(self, allow_repeated_label=True,
-                         allow_repeated_source=True, reverb=None,
-                         disable_instantiation_warnings=False):
-            '''
-            Instantiate a specific soundscape in JAMS format based on the current
-            specification.
-
-            Any non-deterministic event values (i.e. distribution tuples) will be
-            sampled randomly from based on the distribution parameters.
-
-            Parameters
-            ----------
-            allow_repeated_label : bool
-                When True (default) the same label can be used more than once
-                in a soundscape instantiation. When False every label can
-                only be used once.
-            allow_repeated_source : bool
-                When True (default) the same source file can be used more than once
-                in a soundscape instantiation. When False every source file can
-                only be used once.
-            reverb : float or None
-                Has no effect on this function other than being documented in the
-                instantiated annotation's sandbox. Passed by ``Scaper.generate``.
-            disable_instantiation_warnings : bool
-                When True (default is False), warnings stemming from event
-                instantiation (primarily about automatic duration adjustments) are
-                disabled. Not recommended other than for testing purposes.
-
-            Returns
-            -------
-            jam : JAMS object
-                A JAMS object containing a sound_event annotation representing the
-                instantiated soundscape.
-
-            See Also
-            --------
-            Scaper.generate
-
-            '''
-            jam = jams.JAMS()
-            ann = jams.Annotation(namespace='sound_event')
-
-            # Set annotation duration (might be changed later due to cropping)
-            ann.duration = self.duration
-
-            # INSTANTIATE BACKGROUND AND FOREGROUND EVENTS AND ADD TO ANNOTATION
-            # NOTE: logic for instantiating bg and fg events is NOT the same.
-
-            # Add background sounds
-            bg_labels = []
-            bg_source_files = []
-            for event in self.bg_spec:
-                value = self._instantiate_event(
-                    event,
-                    isbackground=True,
-                    allow_repeated_label=allow_repeated_label,
-                    allow_repeated_source=allow_repeated_source,
-                    used_labels=bg_labels,
-                    used_source_files=bg_source_files,
-                    disable_instantiation_warnings=disable_instantiation_warnings)
-
-                # Note: add_background doesn't allow to set a time_stretch, i.e.
-                # it's hardcoded to time_stretch=None, so we don't need to check
-                # if value.time_stretch is not None, since it always will be.
-                ann.append(time=value.event_time,
-                           duration=value.event_duration,
-                           value=value._asdict(),
-                           confidence=1.0)
-
-            # Add foreground events
-            fg_labels = []
-            fg_source_files = []
-            for event in self.fg_spec:
-                value = self._instantiate_event(
-                    event,
-                    isbackground=False,
-                    allow_repeated_label=allow_repeated_label,
-                    allow_repeated_source=allow_repeated_source,
-                    used_labels=fg_labels,
-                    used_source_files=fg_source_files,
-                    disable_instantiation_warnings=disable_instantiation_warnings)
-
-                if value.time_stretch is not None:
-                    event_duration_stretched = (
-                        value.event_duration * value.time_stretch)
-                else:
-                    event_duration_stretched = value.event_duration
-
-                ann.append(time=value.event_time,
-                           duration=event_duration_stretched,
-                           value=value._asdict(),
-                           confidence=1.0)
-
-            # Compute max polyphony
-            poly = max_polyphony(ann)
-
-            # Compute the number of foreground events
-            n_events = len(self.fg_spec)
-
-            # Compute gini
-            gini = polyphony_gini(ann)
-
-            # Add specs and other info to sandbox
-            ann.sandbox.scaper = jams.Sandbox(
-                duration=self.duration,
-                fg_path=self.fg_path,
-                bg_path=self.bg_path,
-                fg_spec=self.fg_spec,
-                bg_spec=self.bg_spec,
-                fg_labels=self.fg_labels,
-                bg_labels=self.bg_labels,
-                protected_labels=self.protected_labels,
-                ref_db=self.ref_db,
-                ambisonics_order=self.ambisonics_order,
-                fade_in_len=self.fade_in_len,
-                fade_out_len=self.fade_out_len,
-                n_events=n_events,
-                polyphony_max=poly,
-                polyphony_gini=gini,
-                allow_repeated_label=allow_repeated_label,
-                allow_repeated_source=allow_repeated_source,
-                reverb=reverb)
-
-            # Add annotation to jams
-            jam.annotations.append(ann)
-
-            # Set jam metadata
-            jam.file_metadata.duration = ann.duration
-
-            # Return
-            return jam
-
-
-        def _mono_downmix(self, file_path):
-            '''
-            Take the path to an audio file and produce a tmp file downmixed to mono,
-            and with system's sample rate
-
-            Parameters
-            ----------
-            file_path : str
-                Path to the audio file to be downmixed
-
-            Returns
-            ------
-            downmix_tmpfile: tmp file
-                A reference to the created  tmpfile
-
-            Raises
-            TODO
-            ------
-            ScaperError
-                If annotation is not of the sound_event namespace.
-
-            '''
-
-            # Instanciate sox transformer to perform sr and channel conversion
-            downmix_transformer = sox.Transformer()
-            downmix_transformer.convert(samplerate=self.sr,
-                                        n_channels=1,
-                                        bitdepth=None)
-
-            # Create removable tmp file to store it. Don't store on the valid tmpfiles list
-            downmix_tmpfile = tempfile.NamedTemporaryFile(
-                suffix='.wav',
-                delete=False)
-
-            # Actual rendering
-            downmix_transformer.build(file_path,downmix_tmpfile.name)
-            return downmix_tmpfile
-
-
-        def _generate_audio(self, audio_path, ann, reverb=None,
-                            disable_sox_warnings=True):
-            '''
-            Generate audio based on a sound_event annotation and save to disk.
-
-            Parameters
-            ----------
-            audio_path : str
-                Path for saving soundscape audio file.
-            ann : jams.Annotation
-                Annotation of the sound_event namespace.
-            reverb : float or None
-                Amount of reverb to apply to the generated soundscape between 0
-                (no reverberation) and 1 (maximum reverberation). Use None
-                (default) to prevent the soundscape from going through the reverb
-                module at all.
-            disable_sox_warnings : bool
-                When True (default), warnings from the pysox module are suppressed
-                unless their level is ``'CRITICAL'``.
-
-            Raises
-            ------
-            ScaperError
-                If annotation is not of the sound_event namespace.
-
-            See Also
-            --------
-            Scaper.generate
-
-            '''
-            if ann.namespace != 'sound_event':
+    def add_background(self, label, source_file, source_time):
+        '''
+        Add a background recording to the background specification.
+
+        The background duration will be equal to the duration of the
+        soundscape ``Scaper.duration`` specified when initializing the Scaper
+        object. If the source file is shorter than this duration then it will
+        be concatenated to itself as many times as necessary to produce the
+        specified duration when calling ``Scaper.generate``.
+
+        Parameters
+        ----------
+        label : tuple
+            Specifies the label of the background. See Notes below for the
+            expected format of this tuple and the allowed values.
+            NOTE: The label specified by this tuple must match one
+            of the labels in the Scaper's background label list
+            ``Scaper.bg_labels``. Furthermore, if ``source_file`` is
+            specified using "const" (see Notes), then ``label`` must also be
+            specified using "const" and its value (see Notes) must
+            match the source file's parent folder's name.
+        source_file : tuple
+            Specifies the audio file to use as the source. See Notes below for
+            the expected format of this tuple and the allowed values.
+            NOTE: If ``source_file`` is specified using "const" (see Notes),
+            then ``label`` must also be specified using "const" and its
+            value (see Notes) must match the source file's parent folder's
+            name.
+        source_time : tuple
+            Specifies the desired start time in the source file. See Notes
+            below for the expected format of this tuple and the allowed values.
+            NOTE: the source time specified by this tuple should be equal to or
+            smaller than ``<source file duration> - <soundscape duration>``.
+            Larger values will be automatically changed to fulfill this
+            requirement when calling ``Scaper.generate``.
+
+        Notes
+        -----
+        Each parameter of this function is set by passing a distribution
+        tuple, whose first item is always the distribution name and subsequent
+        items are distribution specific. The supported distribution tuples are:
+
+        * ``("const", value)`` : a constant, given by ``value``.
+        * ``("choose", valuelist)`` : choose a value from
+          ``valuelist`` at random (uniformly). The ``label`` and
+          ``source_file`` parameters also support providing an empty
+          ``valuelist`` i.e. ``("choose", [])``, in which case the
+          value will be chosen at random from all available labels or files
+          as determined automatically by Scaper by examining the file
+          structure of ``bg_path`` provided during initialization.
+        * ``("uniform", min_value, max_value)`` : sample a random
+          value from a uniform distribution between ``min_value``
+          and ``max_value``.
+        * ``("normal", mean, stddev)`` : sample a random value from a
+          normal distribution defined by its mean ``mean`` and
+          standard deviation ``stddev``.
+
+        IMPORTANT: not all parameters support all distribution tuples. In
+        particular, ``label`` and ``source_file`` only support ``"const"`` and
+        ``"choose"``, whereas ``source_time`` supports all distribution tuples.
+        As noted above, only ``label`` and ``source_file`` support providing an
+        empty ``valuelist`` with ``"choose"``.
+        '''
+
+        # These values are fixed for the background sound
+        event_time = ("const", 0)
+        event_duration = ("const", self.duration)
+        event_azimuth = ("const", 0)
+        event_elevation = ("const", 0)
+        event_spread = ("const", 0)
+        snr = ("const", 0)
+        role = 'background'
+        pitch_shift = None
+        time_stretch = None
+
+        # Validate parameter format and values
+        _validate_event(label, source_file,
+                        source_time, event_time, event_duration,
+                        event_azimuth, event_elevation, event_spread,
+                        snr, self.bg_labels, None, None)
+
+        # Create background sound event
+        bg_event = EventSpec(label=label,
+                             source_file=source_file,
+                             source_time=source_time,
+                             event_time=event_time,
+                             event_duration=event_duration,
+                             event_azimuth=event_azimuth,
+                             event_elevation=event_elevation,
+                             event_spread=event_spread,
+                             snr=snr,
+                             role=role,
+                             pitch_shift=pitch_shift,
+                             time_stretch=time_stretch)
+
+        # Add event to background spec
+        self.bg_spec.append(bg_event)
+
+    def add_event(self, label, source_file,
+                  source_time, event_time, event_duration,
+                  event_azimuth, event_elevation, event_spread,
+                  snr, pitch_shift, time_stretch):
+        '''
+        Add a foreground sound event to the foreground specification.
+
+        Parameters
+        ----------
+        label : tuple
+            Specifies the label of the sound event. See Notes below for the
+            expected format of this tuple and the allowed values.
+            NOTE: The label specified by this tuple must match one
+            of the labels in the Scaper's foreground label list
+            ``Scaper.fg_labels``. Furthermore, if ``source_file`` is
+            specified using "const" (see Notes), then ``label`` must also be
+            specified using "const" and its ``value `` (see Notes) must
+            match the source file's parent folder's name.
+        source_file : tuple
+            Specifies the audio file to use as the source. See Notes below for
+            the expected format of this tuple and the allowed values.
+            NOTE: If ``source_file`` is specified using "const" (see Notes),
+            then ``label`` must also be specified using "const" and its
+            ``value`` (see Notes) must match the source file's parent
+            folder's name.
+        source_time : tuple
+            Specifies the desired start time in the source file. See Notes
+            below for the expected format of this tuple and the allowed values.
+            NOTE: the source time specified by this tuple should be equal to or
+            smaller than ``<source file duration> - event_duration``. Larger
+            values will be automatically changed to fulfill this requirement
+            when calling ``Scaper.generate``.
+        event_time : tuple
+            Specifies the desired start time of the event in the soundscape.
+            See Notes below for the expected format of this tuple and the
+            allowed values.
+            NOTE: The value specified by this tuple should be equal to or
+            smaller than ``<soundscapes duration> - event_duration``, and
+            larger values will be automatically changed to fulfill this
+            requirement when calling ``Scaper.generate``.
+        event_duration : tuple
+            Specifies the desired duration of the event. See Notes below for
+            the expected format of this tuple and the allowed values.
+            NOTE: The value specified by this tuple should be equal to or
+            smaller than the source file's duration, and larger values will be
+            automatically changed to fulfill this requirement when calling
+            ``Scaper.generate``.
+        TODO event_azimuth
+        TODO event_elevation
+        TODO event_spread
+        snr : tuple
+            Specifies the desired signal to noise ratio (SNR) between the event
+            and the background. See Notes below for the expected format of
+            this tuple and the allowed values.
+        pitch_shift : tuple
+            Specifies the number of semitones to shift the event by. None means
+            no pitch shift.
+        time_stretch: tuple
+            Specifies the time stretch factor (value>1 will make it slower and
+            longer, value<1 will makes it faster and shorter).
+
+        Notes
+        -----
+        Each parameter of this function is set by passing a distribution
+        tuple, whose first item is always the distribution name and subsequent
+        items are distribution specific. The supported distribution tuples are:
+
+        * ``("const", value)`` : a constant, given by ``value``.
+        * ``("choose", valuelist)`` : choose a value from
+          ``valuelist`` at random (uniformly). The ``label`` and
+          ``source_file`` parameters also support providing an empty
+          ``valuelist`` i.e. ``("choose", [])``, in which case the
+          value will be chosen at random from all available labels or
+          source files as determined automatically by Scaper by examining
+          the file structure of ``fg_path`` provided during
+          initialization.
+        * ``("uniform", min_value, max_value)`` : sample a random
+          value from a uniform distribution between ``min_value``
+          and ``max_value`` (including ``max_value``).
+        * ``("normal", mean, stddev)`` : sample a random value from a
+          normal distribution defined by its mean ``mean`` and
+          standard deviation ``stddev``.
+
+        IMPORTANT: not all parameters support all distribution tuples. In
+        particular, ``label`` and ``source_file`` only support ``"const"`` and
+        ``"choose"``, whereas the remaining parameters support all distribution
+        tuples. As noted above, only ``label`` and ``source_file`` support
+        providing an empty ``valuelist`` with ``"choose"``.
+
+        See Also
+        --------
+        _validate_event : Check that event parameter values are valid.
+
+        Scaper.generate : Generate a soundscape based on the current
+            specification and save to disk as both an audio file and a JAMS file
+            describing the soundscape.
+
+        '''
+
+        # SAFETY CHECKS
+        _validate_event(label, source_file,
+                        source_time, event_time, event_duration,
+                        event_azimuth, event_elevation, event_spread,
+                        snr, self.fg_labels, pitch_shift, time_stretch)
+
+        # Create event
+        event = EventSpec(label=label,
+                          source_file=source_file,
+                          source_time=source_time,
+                          event_time=event_time,
+                          event_duration=event_duration,
+                          event_azimuth=event_azimuth,
+                          event_elevation=event_elevation,
+                          event_spread=event_spread,
+                          snr=snr,
+                          role='foreground',
+                          pitch_shift=pitch_shift,
+                          time_stretch=time_stretch)
+
+        # Add event to foreground specification
+        self.fg_spec.append(event)
+
+    def _instantiate_event(self, event, isbackground=False,
+                           allow_repeated_label=True,
+                           allow_repeated_source=True,
+                           used_labels=[],
+                           used_source_files=[],
+                           disable_instantiation_warnings=False):
+        '''
+        Instantiate an event specification.
+
+        Given an event specification containing distribution tuples,
+        instantiate the event, i.e. samples values for the label, source_file,
+        source_time, event_time, event_duration and snr from their respective
+        distribution tuples, and return the sampled values in as a new event
+        specification.
+
+        Parameters
+        ----------
+        event : EventSpec
+            Event specification containing distribution tuples.
+        isbackground : bool
+            Flag indicating whether the event to instantiate is a background
+            event or not (False implies it is a foreground event).
+        allow_repeated_label : bool
+            When True (default) any label can be used, including a label that
+            has already been used for another event. When False, only a label
+            that is not already in ``used_labels`` can be selected.
+        allow_repeated_source : bool
+            When True (default) any source file matching the selected label can
+            be used, including a source file that has already been used for
+            another event. When False, only a source file that is not already
+            in ``used_source_files`` can be selected.
+        used_labels : list
+            List labels that have already been used in the current soundscape
+            instantiation. The label selected for instantiating the event will
+            be appended to this list unless its already in it.
+        used_source_files : list
+            List of full paths to source files that have already been used in
+            the current soundscape instantiation. The source file selected for
+            instantiating the event will be appended to this list unless its
+            already in it.
+        disable_instantiation_warnings : bool
+            When True (default is False), warnings stemming from event
+            instantiation (primarily about automatic duration adjustments) are
+            disabled. Not recommended other than for testing purposes.
+
+        Returns
+        -------
+        instantiated_event : EventSpec
+            Event specification containing values sampled from the distribution
+            tuples of the input event specification.
+
+        Raises
+        ------
+        ScaperError
+            If allow_repeated_source is False and there is no valid source file
+            to select.
+
+        '''
+        # set paths and labels depending on whether its a foreground/background
+        # event
+        if isbackground:
+            file_path = self.bg_path
+            allowed_labels = self.bg_labels
+        else:
+            file_path = self.fg_path
+            allowed_labels = self.fg_labels
+
+        # determine label
+        if event.label[0] == "choose" and not event.label[1]:
+            label_tuple = list(event.label)
+            label_tuple[1] = allowed_labels
+            label_tuple = tuple(label_tuple)
+        else:
+            label_tuple = event.label
+        label = _get_value_from_dist(label_tuple)
+
+        # Make sure we can use this label
+        if (not allow_repeated_label) and (label in used_labels):
+            if (len(allowed_labels) == len(used_labels) or
+                        label_tuple[0] == "const"):
                 raise ScaperError(
-                    'Annotation namespace must be sound_event, found: {:s}'.format(
-                        ann.namespace))
-
-            # disable sox warnings
-            if disable_sox_warnings:
-                temp_logging_level = 'CRITICAL'  # only critical messages please
+                    "Cannot instantiate event {:s}: all available labels "
+                    "have already been used and "
+                    "allow_repeated_label=False.".format(label))
             else:
-                temp_logging_level = logging.getLogger().level
+                while label in used_labels:
+                    label = _get_value_from_dist(label_tuple)
 
-            with _set_temp_logging_level(temp_logging_level):
+        # Update the used labels list
+        if label not in used_labels:
+            used_labels.append(label)
 
-                # We maintain two lists for handling convenience tmp audio files
-                # :downmix_tmpfiles: stores the downmixed and sr-adjusted versions
-                # for each sound. They are just needed for intermediate calculation
-                # of the actually valid :processed_tmpfiles:
-                # which arecreated iteratively and used at the end of the method
-                # to render the output
-                downmix_tmpfiles = []
-                processed_tmpfiles = []
+        # determine source file
+        if event.source_file[0] == "choose" and not event.source_file[1]:
+            source_files = _get_sorted_files(
+                os.path.join(file_path, label))
+            source_file_tuple = list(event.source_file)
+            source_file_tuple[1] = source_files
+            source_file_tuple = tuple(source_file_tuple)
+        else:
+            source_file_tuple = event.source_file
 
-                # Delete processed_tmpfiles only at the end of the method's lifetime
-                with _close_temp_files(processed_tmpfiles):
+        source_file = _get_value_from_dist(source_file_tuple)
 
-                    # Iterate over all events specified in the annotation
-                    for event in ann.data.iterrows():
+        # Make sure we can use this source file
+        if (not allow_repeated_source) and (source_file in used_source_files):
+            source_files = _get_sorted_files(os.path.join(file_path, label))
+            if (len(source_files) == len(used_source_files) or
+                        source_file_tuple[0] == "const"):
+                raise ScaperError(
+                    "Cannot instantiate event {:s}: all available source "
+                    "files have already been used and "
+                    "allow_repeated_source=False.".format(label))
+            else:
+                while source_file in used_source_files:
+                    source_file = _get_value_from_dist(source_file_tuple)
 
-                        # first item is index, second is event dictionary
-                        e = event[1]
+        # Update the used source files list
+        if source_file not in used_source_files:
+            used_source_files.append(source_file)
 
-                        #  Downmixed files are only needed until the corresponding
-                        # processed tmpfile is created. So they can be deleted on
-                        # each iteration and save some memory
-                        with _close_temp_files(downmix_tmpfiles):
+        # Get the duration of the source audio file
+        source_duration = sox.file_info.duration(source_file)
 
-                            if e.value['role'] == 'background':
-                                # Let's treat background as omnidirectional/stationary/non-desired
-                                # audio. In ambisonics, we can implement it as completely diffused
-                                # audio, i.e. only W channel
+        # If the foreground event's label is in the protected list, use the
+        # source file's duration without modification.
+        if label in self.protected_labels:
+            event_duration = source_duration
+        else:
+            # determine event duration
+            # For background events the duration is fixed to self.duration
+            # (which must be > 0), but for foreground events it could
+            # potentially be non-positive, hence the loop.
+            event_duration = -np.Inf
+            while event_duration <= 0:
+                event_duration = _get_value_from_dist(event.event_duration)
 
-                                # First of all, ensure pre-downmix to mono
-                                downmix_tmpfiles.append(
-                                    self._mono_downmix(e.value['source_file']))
+        # Check if chosen event duration is longer than the duration of the
+        # selected source file, if so adjust the event duration.
+        if (event_duration > source_duration):
+            old_duration = event_duration  # for warning
+            event_duration = source_duration
+            if not disable_instantiation_warnings:
+                warnings.warn(
+                    "{:s} event duration ({:.2f}) is greater that source "
+                    "duration ({:.2f}), changing to {:.2f}".format(
+                        label, old_duration, source_duration, event_duration),
+                    ScaperWarning)
 
-                                # Now, create another transformer for sr, gain, remix, etc...
-                                fx_transformer = sox.Transformer()
-                                # Ensure consistent sampling rate and channels
-                                fx_transformer.convert(samplerate=self.sr,
-                                                       n_channels=self.num_channels,   # num_ambisonics_channels
-                                                       bitdepth=None)
-                                # Then trim
-                                fx_transformer.trim(e.value['source_time'],
-                                                    e.value['source_time'] +
-                                                    e.value['event_duration'])
+        # Get the event azimuth
+        event_azimuth = _get_value_from_dist(event.event_azimuth)
 
-                                # After trimming, normalize background to reference DB (from mono downmix)
-                                bg_lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
-                                gain = self.ref_db - bg_lufs
-                                fx_transformer.gain(gain_db=gain, normalize=False)
+        # Get the event elevation
+        event_elevation = _get_value_from_dist(event.event_elevation)
 
-                                # We want a multichannel file with only W (first) channel,
-                                # and we can get it by not specifying channel routing
-                                # on the remix_dictionary
-                                remix_dictionary = {1:[1]}
-                                fx_transformer.remix(remix_dictionary,self.num_channels)
+        # Get the event spread
+        event_spread = _get_value_from_dist(event.event_spread)
 
-                                # Prepare tmp file for output
-                                processed_tmpfiles.append(
-                                    tempfile.NamedTemporaryFile(
-                                        suffix='.wav', delete=False))
+        # Get time stretch value
+        if event.time_stretch is None:
+            time_stretch = None
+            event_duration_stretched = event_duration
+        else:
+            time_stretch = -np.Inf
+            while time_stretch <= 0:
+                time_stretch = _get_value_from_dist(event.time_stretch)
+            # compute duration after stretching
+            event_duration_stretched = event_duration * time_stretch
 
-                                # Actual background file render
-                                fx_transformer.build(
-                                    downmix_tmpfiles[-1].name,      # input
-                                    processed_tmpfiles[-1].name)    # output
+        # If the event duration is longer than the soundscape we can trim it
+        # without losing validity (since the event will end when the soundscape
+        # ends).
+        if time_stretch is None:
+            if (event_duration > self.duration):
+                old_duration = event_duration  # for warning
+                event_duration = self.duration
+                if not disable_instantiation_warnings:
+                    warnings.warn(
+                        "{:s} event duration ({:.2f}) is greater than the "
+                        "soundscape duration ({:.2f}), changing to "
+                        "{:.2f}".format(
+                            label, old_duration, self.duration, self.duration),
+                        ScaperWarning)
+        else:
+            if (event_duration_stretched > self.duration):
+                old_duration = event_duration  # for warning
+                event_duration = self.duration / float(time_stretch)
+                if not disable_instantiation_warnings:
+                    warnings.warn(
+                        "{:s} event duration ({:.2f}) with stretch factor "
+                        "{:.2f} gives {:.2f} which is greater than the "
+                        "soundscape duration ({:.2f}), changing to "
+                        "{:.2f}".format(
+                            label, old_duration, time_stretch,
+                            event_duration_stretched, self.duration,
+                            event_duration),
+                        ScaperWarning)
 
-                            elif e.value['role'] == 'foreground':
+        # determine source time
+        source_time = -np.Inf
+        while source_time < 0:
+            source_time = _get_value_from_dist(event.source_time)
 
-                                # First of all, ensure pre-downmix to mono
-                                downmix_tmpfiles.append(
-                                    self._mono_downmix(e.value['source_file']))
+        # Make sure source time + event duration is not greater than the
+        # source duration, if it is, adjust the source time (i.e. duration
+        # takes precedences over start time).
+        if source_time + event_duration > source_duration:
+            old_source_time = source_time
+            source_time = source_duration - event_duration
+            if not disable_instantiation_warnings:
+                warnings.warn(
+                    '{:s} source time ({:.2f}) is too great given event '
+                    'duration ({:.2f}) and source duration ({:.2f}), changed '
+                    'to {:.2f}.'.format(
+                        label, old_source_time, event_duration,
+                        source_duration, source_time),
+                    ScaperWarning)
 
-                                # Create combiner
-                                # note: Combiner inhereits from transformer,
-                                # so we can still apply all audio transforms
-                                # note2: we cannot use a plain Transformer,
-                                # because volume controls are still not implemented
-                                # on the remix method
+        # determine event time
+        # for background events the event time is fixed to 0, but for
+        # foreground events it's not.
+        event_time = -np.Inf
+        while event_time < 0:
+            event_time = _get_value_from_dist(event.event_time)
 
-                                fx_combiner = sox.Combiner()
-                                # Ensure consistent sampling rate
-                                fx_combiner.convert(samplerate=self.sr,
-                                                    n_channels=self.num_channels,   # num_ambisonics_channels
-                                                    bitdepth=None)
+        # Make sure the selected event time + event duration are is not greater
+        # than the total duration of the soundscape, if it is adjust the event
+        # time. This means event duration takes precedence over the event
+        # start time.
+        if time_stretch is None:
+            if event_time + event_duration > self.duration:
+                old_event_time = event_time
+                event_time = self.duration - event_duration
+                if not disable_instantiation_warnings:
+                    warnings.warn(
+                        '{:s} event time ({:.2f}) is too great given event '
+                        'duration ({:.2f}) and soundscape duration ({:.2f}), '
+                        'changed to {:.2f}.'.format(
+                            label, old_event_time, event_duration,
+                            self.duration, event_time),
+                        ScaperWarning)
+        else:
+            if event_time + event_duration_stretched > self.duration:
+                old_event_time = event_time
+                event_time = self.duration - event_duration_stretched
+                if not disable_instantiation_warnings:
+                    warnings.warn(
+                        '{:s} event time ({:.2f}) is too great given '
+                        'stretched event duration ({:.2f}) and soundscape '
+                        'duration ({:.2f}), changed to {:.2f}.'.format(
+                            label, old_event_time, event_duration_stretched,
+                            self.duration, event_time),
+                        ScaperWarning)
 
-                                # Trim
-                                fx_combiner.trim(e.value['source_time'],
-                                                 e.value['source_time'] +
-                                                 e.value['event_duration'])
+        # determine snr
+        snr = _get_value_from_dist(event.snr)
 
-                                # Pitch shift
-                                if e.value['pitch_shift'] is not None:
-                                    fx_combiner.pitch(e.value['pitch_shift'])
+        # get role (which can only take "foreground" or "background" and
+        # is set internally, not by the user).
+        role = event.role
 
-                                # Time stretch
-                                if e.value['time_stretch'] is not None:
-                                    fx_combiner.tempo(1.0 / float(e.value['time_stretch']))
+        # determine pitch_shift
+        if event.pitch_shift is not None:
+            pitch_shift = _get_value_from_dist(event.pitch_shift)
+        else:
+            pitch_shift = None
 
-                                # Apply very short fade in and out
-                                # (avoid unnatural sound onsets/offsets)
-                                fx_combiner.fade(fade_in_len=self.fade_in_len,
-                                                 fade_out_len=self.fade_out_len)
+        # pack up instantiated values in an EventSpec
+        instantiated_event = EventSpec(label=label,
+                                       source_file=source_file,
+                                       source_time=source_time,
+                                       event_time=event_time,
+                                       event_duration=event_duration,
+                                       event_azimuth=event_azimuth,
+                                       event_elevation=event_elevation,
+                                       event_spread=event_spread,
+                                       snr=snr,
+                                       role=role,
+                                       pitch_shift=pitch_shift,
+                                       time_stretch=time_stretch)
+        # Return
+        return instantiated_event
 
-                                # Normalize to specified SNR with respect to
-                                # self.ref_db (from downmixed version)
-                                fg_lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
-                                gain = self.ref_db + e.value['snr'] - fg_lufs
-                                fx_combiner.gain(gain_db=gain, normalize=False)
-
-                                # Pad with silence before/after event to match the
-                                # soundscape duration
-                                prepad = e.value['event_time']
-                                if e.value['time_stretch'] is None:
-                                    postpad = max(
-                                        0, self.duration - (e.value['event_time'] +
-                                                            e.value['event_duration']))
-                                else:
-                                    postpad = max(
-                                        0, self.duration - (e.value['event_time'] +
-                                                            e.value['event_duration'] *
-                                                            e.value['time_stretch']))
-                                fx_combiner.pad(prepad, postpad)
-
-                                # Get the ambisonic encoding coefs (i.e. channel gains)
-                                ambisonics_gains = get_ambisonics_coefs(e.value['event_azimuth'],
-                                                                        e.value['event_elevation'],
-                                                                        self.ambisonics_order)
-
-                                # Get the ambisonic spread coefs (also channel gains)
-                                ambisonics_spread_gains = get_ambisonics_spread_coefs(
-                                                                        e.value['event_spread'],
-                                                                        self.tau,
-                                                                        self.ambisonics_order)
-
-                                # Prepare tmp file for output
-                                processed_tmpfiles.append(
-                                    tempfile.NamedTemporaryFile(
-                                        suffix='.wav', delete=False))
-
-                                # Build by passing a list of duplicated downmixed files
-                                # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
-                                fx_combiner.build(input_filepath_list=[downmix_tmpfiles[-1].name for _ in range(self.num_channels)],
-                                                  output_filepath=processed_tmpfiles[-1].name,
-                                                  combine_type='merge',
-                                                  input_volumes=(ambisonics_gains*ambisonics_spread_gains).tolist())
-
-                            else:
-                                raise ScaperError(
-                                    'Unsupported event role: {:s}'.format(
-                                        e.value['role']))
-
-                    # Finally combine all the files and optionally apply reverb
-                    # If we have more than one tempfile (i.e.g background + at
-                    # least one foreground event, we need a combiner. If there's
-                    # only the background track, then we need a transformer!
-                    if len(processed_tmpfiles) == 0:
-                        warnings.warn(
-                            "No events to synthesize (silent soundscape), no audio "
-                            "saved to disk.", ScaperWarning)
-                    else:
-                        # Let's use just a Combiner for all cases
-                        final_combiner = sox.Combiner()
-                        # TODO: REVERB
-                        # if reverb is not None:
-                        #   tfm.reverb(reverberance=reverb * 100)
-                        final_combiner.build([t.name for t in processed_tmpfiles], audio_path, 'mix')
-
-
-
-        def generate(self, audio_path, jams_path, allow_repeated_label=True,
-                     allow_repeated_source=True,
-                     reverb=None, disable_sox_warnings=True, no_audio=False,
-                     txt_path=None, txt_sep='\t',
+    def _instantiate(self, allow_repeated_label=True,
+                     allow_repeated_source=True, reverb=None,
                      disable_instantiation_warnings=False):
-            '''
-            Generate a soundscape based on the current specification and save to
-            disk as both an audio file and a JAMS file describing the soundscape.
+        '''
+        Instantiate a specific soundscape in JAMS format based on the current
+        specification.
 
-            Parameters
-            ----------
-            audio_path : str
-                Path for saving soundscape audio
-            jams_path : str
-                Path for saving soundscape jams
-            allow_repeated_label : bool
-                When True (default) the same label can be used more than once
-                in a soundscape instantiation. When False every label can
-                only be used once.
-            allow_repeated_source : bool
-                When True (default) the same source file can be used more than once
-                in a soundscape instantiation. When False every source file can
-                only be used once.
-            reverb : float or None
-                Amount of reverb to apply to the generated soundscape between 0
-                (no reverberation) and 1 (maximum reverberation). Use None
-                (default) to prevent the soundscape from going through the reverb
-                module at all.
-            disable_sox_warnings : bool
-                When True (default), warnings from the pysox module are suppressed
-                unless their level is ``'CRITICAL'``.
-            no_audio : bool
-                If true only generates a JAMS file and no audio is saved to disk.
-            txt_path: str or None
-                If not None, in addition to the JAMS file output a simplified
-                annotation in a space separated format [onset  offset  label],
-                saved to the provided path (good for loading labels in audacity).
-            test_sep: str
-                The separator to use when saving a simplified annotation as a text
-                file (default is tab for compatibility with Audacity label files).
-                Only relevant if txt_path is not None.
-            disable_instantiation_warnings : bool
-                When True (default is False), warnings stemming from event
-                instantiation (primarily about automatic duration adjustments) are
-                disabled. Not recommended other than for testing purposes.
+        Any non-deterministic event values (i.e. distribution tuples) will be
+        sampled randomly from based on the distribution parameters.
 
-            Raises
-            ------
-            ScaperError
-                If the reverb parameter is passed an invalid value.
+        Parameters
+        ----------
+        allow_repeated_label : bool
+            When True (default) the same label can be used more than once
+            in a soundscape instantiation. When False every label can
+            only be used once.
+        allow_repeated_source : bool
+            When True (default) the same source file can be used more than once
+            in a soundscape instantiation. When False every source file can
+            only be used once.
+        reverb : float or None
+            Has no effect on this function other than being documented in the
+            instantiated annotation's sandbox. Passed by ``Scaper.generate``.
+        disable_instantiation_warnings : bool
+            When True (default is False), warnings stemming from event
+            instantiation (primarily about automatic duration adjustments) are
+            disabled. Not recommended other than for testing purposes.
 
-            See Also
-            --------
-            Scaper._instantiate
+        Returns
+        -------
+        jam : JAMS object
+            A JAMS object containing a sound_event annotation representing the
+            instantiated soundscape.
 
-            Scaper._generate_audio
+        See Also
+        --------
+        Scaper.generate
 
-            '''
-            # Check parameter validity
-            if reverb is not None:
-                if not (0 <= reverb <= 1):
-                    raise ScaperError(
-                        'Invalid value for reverb: must be in range [0, 1] or '
-                        'None.')
+        '''
+        jam = jams.JAMS()
+        ann = jams.Annotation(namespace='sound_event')
 
-            # Create specific instance of a soundscape based on the spec
-            jam = self._instantiate(
+        # Set annotation duration (might be changed later due to cropping)
+        ann.duration = self.duration
+
+        # INSTANTIATE BACKGROUND AND FOREGROUND EVENTS AND ADD TO ANNOTATION
+        # NOTE: logic for instantiating bg and fg events is NOT the same.
+
+        # Add background sounds
+        bg_labels = []
+        bg_source_files = []
+        for event in self.bg_spec:
+            value = self._instantiate_event(
+                event,
+                isbackground=True,
                 allow_repeated_label=allow_repeated_label,
                 allow_repeated_source=allow_repeated_source,
-                reverb=reverb,
+                used_labels=bg_labels,
+                used_source_files=bg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
-            ann = jam.annotations.search(namespace='sound_event')[0]
 
-            # Generate the audio and save to disk
-            if not no_audio:
-                self._generate_audio(audio_path, ann, reverb=reverb,
-                                     disable_sox_warnings=disable_sox_warnings)
+            # Note: add_background doesn't allow to set a time_stretch, i.e.
+            # it's hardcoded to time_stretch=None, so we don't need to check
+            # if value.time_stretch is not None, since it always will be.
+            ann.append(time=value.event_time,
+                       duration=value.event_duration,
+                       value=value._asdict(),
+                       confidence=1.0)
 
-            # Finally save JAMS to disk too
-            jam.save(jams_path)
+        # Add foreground events
+        fg_labels = []
+        fg_source_files = []
+        for event in self.fg_spec:
+            value = self._instantiate_event(
+                event,
+                isbackground=False,
+                allow_repeated_label=allow_repeated_label,
+                allow_repeated_source=allow_repeated_source,
+                used_labels=fg_labels,
+                used_source_files=fg_source_files,
+                disable_instantiation_warnings=disable_instantiation_warnings)
 
-            # Optionally save to CSV as well
-            if txt_path is not None:
+            if value.time_stretch is not None:
+                event_duration_stretched = (
+                    value.event_duration * value.time_stretch)
+            else:
+                event_duration_stretched = value.event_duration
 
-                df = pd.DataFrame(columns=['onset', 'offset', 'label'])
+            ann.append(time=value.event_time,
+                       duration=event_duration_stretched,
+                       value=value._asdict(),
+                       confidence=1.0)
 
-                for idx, row in ann.data.iterrows():
-                    if row.value['role'] == 'foreground':
-                        newrow = ([row.time.total_seconds(),
-                                   row.time.total_seconds() +
-                                   row.duration.total_seconds(),
-                                   row.value['label']])
-                        df.loc[len(df)] = newrow
+        # Compute max polyphony
+        poly = max_polyphony(ann)
 
-                # sort events by onset time
-                df = df.sort_values('onset')
-                df.reset_index(inplace=True, drop=True)
-                df.to_csv(txt_path, index=False, header=False, sep=txt_sep)
+        # Compute the number of foreground events
+        n_events = len(self.fg_spec)
+
+        # Compute gini
+        gini = polyphony_gini(ann)
+
+        # Add specs and other info to sandbox
+        ann.sandbox.scaper = jams.Sandbox(
+            duration=self.duration,
+            fg_path=self.fg_path,
+            bg_path=self.bg_path,
+            fg_spec=self.fg_spec,
+            bg_spec=self.bg_spec,
+            fg_labels=self.fg_labels,
+            bg_labels=self.bg_labels,
+            protected_labels=self.protected_labels,
+            ref_db=self.ref_db,
+            ambisonics_order=self.ambisonics_order,
+            ambisonics_spread_slope=self.ambisonics_spread_slope,
+            fade_in_len=self.fade_in_len,
+            fade_out_len=self.fade_out_len,
+            n_events=n_events,
+            polyphony_max=poly,
+            polyphony_gini=gini,
+            allow_repeated_label=allow_repeated_label,
+            allow_repeated_source=allow_repeated_source,
+            reverb=reverb)
+
+        # Add annotation to jams
+        jam.annotations.append(ann)
+
+        # Set jam metadata
+        jam.file_metadata.duration = ann.duration
+
+        # Return
+        return jam
+
+
+    def _mono_downmix(self, file_path):
+        '''
+        Take the path to an audio file and produce a tmp file downmixed to mono,
+        and with system's sample rate
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the audio file to be downmixed
+
+        Returns
+        ------
+        downmix_tmpfile: tmp file
+            A reference to the created  tmpfile
+
+        Raises
+        TODO
+        ------
+        ScaperError
+            If annotation is not of the sound_event namespace.
+
+        '''
+
+        # Instanciate sox transformer to perform sr and channel conversion
+        downmix_transformer = sox.Transformer()
+        downmix_transformer.convert(samplerate=self.sr,
+                                    n_channels=1,
+                                    bitdepth=None)
+
+        # Create removable tmp file to store it. Don't store on the valid tmpfiles list
+        downmix_tmpfile = tempfile.NamedTemporaryFile(
+            suffix='.wav',
+            delete=False)
+
+        # Actual rendering
+        downmix_transformer.build(file_path,downmix_tmpfile.name)
+        return downmix_tmpfile
+
+
+    def _generate_audio(self, audio_path, ann, reverb=None,
+                        disable_sox_warnings=True):
+        '''
+        Generate audio based on a sound_event annotation and save to disk.
+
+        Parameters
+        ----------
+        audio_path : str
+            Path for saving soundscape audio file.
+        ann : jams.Annotation
+            Annotation of the sound_event namespace.
+        reverb : float or None
+            Amount of reverb to apply to the generated soundscape between 0
+            (no reverberation) and 1 (maximum reverberation). Use None
+            (default) to prevent the soundscape from going through the reverb
+            module at all.
+        disable_sox_warnings : bool
+            When True (default), warnings from the pysox module are suppressed
+            unless their level is ``'CRITICAL'``.
+
+        Raises
+        ------
+        ScaperError
+            If annotation is not of the sound_event namespace.
+
+        See Also
+        --------
+        Scaper.generate
+
+        '''
+        if ann.namespace != 'sound_event':
+            raise ScaperError(
+                'Annotation namespace must be sound_event, found: {:s}'.format(
+                    ann.namespace))
+
+        # disable sox warnings
+        if disable_sox_warnings:
+            temp_logging_level = 'CRITICAL'  # only critical messages please
+        else:
+            temp_logging_level = logging.getLogger().level
+
+        with _set_temp_logging_level(temp_logging_level):
+
+            # We maintain two lists for handling convenience tmp audio files
+            # :downmix_tmpfiles: stores the downmixed and sr-adjusted versions
+            # for each sound. They are just needed for intermediate calculation
+            # of the actually valid :processed_tmpfiles:
+            # which arecreated iteratively and used at the end of the method
+            # to render the output
+            downmix_tmpfiles = []
+            processed_tmpfiles = []
+
+            # Delete processed_tmpfiles only at the end of the method's lifetime
+            with _close_temp_files(processed_tmpfiles):
+
+                # Iterate over all events specified in the annotation
+                for event in ann.data.iterrows():
+
+                    # first item is index, second is event dictionary
+                    e = event[1]
+
+                    #  Downmixed files are only needed until the corresponding
+                    # processed tmpfile is created. So they can be deleted on
+                    # each iteration and save some memory
+                    with _close_temp_files(downmix_tmpfiles):
+
+                        if e.value['role'] == 'background':
+                            # Let's treat background as omnidirectional/stationary/non-desired
+                            # audio. In ambisonics, we can implement it as completely diffused
+                            # audio, i.e. only W channel
+
+                            # First of all, ensure pre-downmix to mono
+                            downmix_tmpfiles.append(
+                                self._mono_downmix(e.value['source_file']))
+
+                            # Now, create another transformer for sr, gain, remix, etc...
+                            fx_transformer = sox.Transformer()
+                            # Ensure consistent sampling rate and channels
+                            fx_transformer.convert(samplerate=self.sr,
+                                                   n_channels=self.num_channels,   # num_ambisonics_channels
+                                                   bitdepth=None)
+                            # Then trim
+                            fx_transformer.trim(e.value['source_time'],
+                                                e.value['source_time'] +
+                                                e.value['event_duration'])
+
+                            # After trimming, normalize background to reference DB (from mono downmix)
+                            bg_lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
+                            gain = self.ref_db - bg_lufs
+                            fx_transformer.gain(gain_db=gain, normalize=False)
+
+                            # We want a multichannel file with only W (first) channel,
+                            # and we can get it by not specifying channel routing
+                            # on the remix_dictionary
+                            remix_dictionary = {1:[1]}
+                            fx_transformer.remix(remix_dictionary,self.num_channels)
+
+                            # Prepare tmp file for output
+                            processed_tmpfiles.append(
+                                tempfile.NamedTemporaryFile(
+                                    suffix='.wav', delete=False))
+
+                            # Actual background file render
+                            fx_transformer.build(
+                                downmix_tmpfiles[-1].name,      # input
+                                processed_tmpfiles[-1].name)    # output
+
+                        elif e.value['role'] == 'foreground':
+
+                            # First of all, ensure pre-downmix to mono
+                            downmix_tmpfiles.append(
+                                self._mono_downmix(e.value['source_file']))
+
+                            # Create combiner
+                            # note: Combiner inhereits from transformer,
+                            # so we can still apply all audio transforms
+                            # note2: we cannot use a plain Transformer,
+                            # because volume controls are still not implemented
+                            # on the remix method
+
+                            fx_combiner = sox.Combiner()
+                            # Ensure consistent sampling rate
+                            fx_combiner.convert(samplerate=self.sr,
+                                                n_channels=self.num_channels,   # num_ambisonics_channels
+                                                bitdepth=None)
+
+                            # Trim
+                            fx_combiner.trim(e.value['source_time'],
+                                             e.value['source_time'] +
+                                             e.value['event_duration'])
+
+                            # Pitch shift
+                            if e.value['pitch_shift'] is not None:
+                                fx_combiner.pitch(e.value['pitch_shift'])
+
+                            # Time stretch
+                            if e.value['time_stretch'] is not None:
+                                fx_combiner.tempo(1.0 / float(e.value['time_stretch']))
+
+                            # Apply very short fade in and out
+                            # (avoid unnatural sound onsets/offsets)
+                            fx_combiner.fade(fade_in_len=self.fade_in_len,
+                                             fade_out_len=self.fade_out_len)
+
+                            # Normalize to specified SNR with respect to
+                            # self.ref_db (from downmixed version)
+                            fg_lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
+                            gain = self.ref_db + e.value['snr'] - fg_lufs
+                            fx_combiner.gain(gain_db=gain, normalize=False)
+
+                            # Pad with silence before/after event to match the
+                            # soundscape duration
+                            prepad = e.value['event_time']
+                            if e.value['time_stretch'] is None:
+                                postpad = max(
+                                    0, self.duration - (e.value['event_time'] +
+                                                        e.value['event_duration']))
+                            else:
+                                postpad = max(
+                                    0, self.duration - (e.value['event_time'] +
+                                                        e.value['event_duration'] *
+                                                        e.value['time_stretch']))
+                            fx_combiner.pad(prepad, postpad)
+
+                            # Get the ambisonic encoding coefs (i.e. channel gains)
+                            ambisonics_gains = get_ambisonics_coefs(e.value['event_azimuth'],
+                                                                    e.value['event_elevation'],
+                                                                    self.ambisonics_order)
+
+                            # Get the ambisonic spread coefs (also channel gains)
+                            ambisonics_spread_gains = get_ambisonics_spread_coefs(
+                                                                    e.value['event_spread'],
+                                                                    self.ambisonics_spread_slope,
+                                                                    self.ambisonics_order)
+
+                            # Prepare tmp file for output
+                            processed_tmpfiles.append(
+                                tempfile.NamedTemporaryFile(
+                                    suffix='.wav', delete=False))
+
+                            # Build by passing a list of duplicated downmixed files
+                            # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
+                            fx_combiner.build(input_filepath_list=[downmix_tmpfiles[-1].name for _ in range(self.num_channels)],
+                                              output_filepath=processed_tmpfiles[-1].name,
+                                              combine_type='merge',
+                                              input_volumes=(ambisonics_gains*ambisonics_spread_gains).tolist())
+
+                        else:
+                            raise ScaperError(
+                                'Unsupported event role: {:s}'.format(
+                                    e.value['role']))
+
+                # Finally combine all the files and optionally apply reverb
+                # If we have more than one tempfile (i.e.g background + at
+                # least one foreground event, we need a combiner. If there's
+                # only the background track, then we need a transformer!
+                if len(processed_tmpfiles) == 0:
+                    warnings.warn(
+                        "No events to synthesize (silent soundscape), no audio "
+                        "saved to disk.", ScaperWarning)
+                else:
+                    # Let's use just a Combiner for all cases
+                    final_combiner = sox.Combiner()
+                    # TODO: REVERB
+                    # if reverb is not None:
+                    #   tfm.reverb(reverberance=reverb * 100)
+                    final_combiner.build([t.name for t in processed_tmpfiles], audio_path, 'mix')
+
+
+
+    def generate(self, audio_path, jams_path, allow_repeated_label=True,
+                 allow_repeated_source=True,
+                 reverb=None, disable_sox_warnings=True, no_audio=False,
+                 txt_path=None, txt_sep='\t',
+                 disable_instantiation_warnings=False):
+        '''
+        Generate a soundscape based on the current specification and save to
+        disk as both an audio file and a JAMS file describing the soundscape.
+
+        Parameters
+        ----------
+        audio_path : str
+            Path for saving soundscape audio
+        jams_path : str
+            Path for saving soundscape jams
+        allow_repeated_label : bool
+            When True (default) the same label can be used more than once
+            in a soundscape instantiation. When False every label can
+            only be used once.
+        allow_repeated_source : bool
+            When True (default) the same source file can be used more than once
+            in a soundscape instantiation. When False every source file can
+            only be used once.
+        reverb : float or None
+            Amount of reverb to apply to the generated soundscape between 0
+            (no reverberation) and 1 (maximum reverberation). Use None
+            (default) to prevent the soundscape from going through the reverb
+            module at all.
+        disable_sox_warnings : bool
+            When True (default), warnings from the pysox module are suppressed
+            unless their level is ``'CRITICAL'``.
+        no_audio : bool
+            If true only generates a JAMS file and no audio is saved to disk.
+        txt_path: str or None
+            If not None, in addition to the JAMS file output a simplified
+            annotation in a space separated format [onset  offset  label],
+            saved to the provided path (good for loading labels in audacity).
+        test_sep: str
+            The separator to use when saving a simplified annotation as a text
+            file (default is tab for compatibility with Audacity label files).
+            Only relevant if txt_path is not None.
+        disable_instantiation_warnings : bool
+            When True (default is False), warnings stemming from event
+            instantiation (primarily about automatic duration adjustments) are
+            disabled. Not recommended other than for testing purposes.
+
+        Raises
+        ------
+        ScaperError
+            If the reverb parameter is passed an invalid value.
+
+        See Also
+        --------
+        Scaper._instantiate
+
+        Scaper._generate_audio
+
+        '''
+        # Check parameter validity
+        if reverb is not None:
+            if not (0 <= reverb <= 1):
+                raise ScaperError(
+                    'Invalid value for reverb: must be in range [0, 1] or '
+                    'None.')
+
+        # Create specific instance of a soundscape based on the spec
+        jam = self._instantiate(
+            allow_repeated_label=allow_repeated_label,
+            allow_repeated_source=allow_repeated_source,
+            reverb=reverb,
+            disable_instantiation_warnings=disable_instantiation_warnings)
+        ann = jam.annotations.search(namespace='sound_event')[0]
+
+        # Generate the audio and save to disk
+        if not no_audio:
+            self._generate_audio(audio_path, ann, reverb=reverb,
+                                 disable_sox_warnings=disable_sox_warnings)
+
+        # Finally save JAMS to disk too
+        jam.save(jams_path)
+
+        # Optionally save to CSV as well
+        if txt_path is not None:
+
+            df = pd.DataFrame(columns=['onset', 'offset', 'label'])
+
+            for idx, row in ann.data.iterrows():
+                if row.value['role'] == 'foreground':
+                    newrow = ([row.time.total_seconds(),
+                               row.time.total_seconds() +
+                               row.duration.total_seconds(),
+                               row.value['label']])
+                    df.loc[len(df)] = newrow
+
+            # sort events by onset time
+            df = df.sort_values('onset')
+            df.reset_index(inplace=True, drop=True)
+            df.to_csv(txt_path, index=False, header=False, sep=txt_sep)
