@@ -1236,9 +1236,15 @@ class Scaper(object):
             smaller than the source file's duration, and larger values will be
             automatically changed to fulfill this requirement when calling
             ``Scaper.generate``.
-        TODO event_azimuth
-        TODO event_elevation
-        TODO event_spread
+        event_azimuth : tuple
+            Specifies the horizontal angular position of the event. See Notes below for
+            the expected format of this tuple and the allowed values.
+        event_elevation : tuple
+            Specifies the vertical angular position of the event. See Notes below for
+            the expected format of this tuple and the allowed values.
+        event_spread : tuple
+            Specifies the apparent sound source width. See Notes below for
+            the expected format of this tuple and the allowed values.
         snr : tuple
             Specifies the desired signal to noise ratio (SNR) between the event
             and the background. See Notes below for the expected format of
@@ -1820,122 +1826,130 @@ class Scaper(object):
             processed_tmpfiles = []
 
             # Delete processed_tmpfiles only at the end of the method's lifetime
-            with _close_temp_files(processed_tmpfiles):
+            # with _close_temp_files(processed_tmpfiles):
 
-                # Iterate over all events specified in the annotation
-                for event in ann.data.iterrows():
+            # Iterate over all events specified in the annotation
+            for event in ann.data.iterrows():
 
-                    # first item is index, second is event dictionary
-                    e = event[1]
+                # first item is index, second is event dictionary
+                e = event[1]
 
-                    #  Downmixed files are only needed until the corresponding
-                    # processed tmpfile is created. So they can be deleted on
-                    # each iteration and save some memory
-                    with _close_temp_files(downmix_tmpfiles):
+                #  Downmixed files are only needed until the corresponding
+                # processed tmpfile is created. So they can be deleted on
+                # each iteration and save some memory
+                # with _close_temp_files(downmix_tmpfiles):
+                if (True):
 
-                        def is_background(event):
-                            return e.value['role'] == 'background'
+                    def is_background(event):
+                        return e.value['role'] == 'background'
 
-                        def is_foreground(event):
-                            return e.value['role'] == 'foreground'
+                    def is_foreground(event):
+                        return e.value['role'] == 'foreground'
 
-                        # First of all, ensure pre-downmix to mono
-                        downmix_tmpfiles.append(
-                            self._mono_downmix(e.value['source_file']))
+                    if is_background(event):
+                        print('BACKGROUND')
+                    else:
+                        print('FOREGROUND')
 
-                        # Create combiner
-                        # note: Combiner inhereits from transformer,
-                        # so we can still apply all audio transforms
-                        # note2: we cannot use a plain Transformer,
-                        # because volume controls are still not implemented
-                        # on the remix method
+                    # First of all, ensure pre-downmix to mono
+                    downmix_tmpfiles.append(
+                        self._mono_downmix(e.value['source_file']))
+                    print(['DOWNMIXED', downmix_tmpfiles[-1].name])
 
-                        fx_combiner = sox.Combiner()
-                        # Ensure consistent sampling rate
-                        fx_combiner.convert(samplerate=self.sr,
-                                            n_channels=self.num_channels,   # num_ambisonics_channels
-                                            bitdepth=None)
+                    # Create combiner
+                    # note: Combiner inhereits from transformer,
+                    # so we can still apply all audio transforms
+                    # note2: we cannot use a plain Transformer,
+                    # because volume controls are still not implemented
+                    # on the remix method
 
-                        # Trim
-                        fx_combiner.trim(e.value['source_time'],
-                                         e.value['source_time'] +
-                                         e.value['event_duration'])
+                    fx_combiner = sox.Combiner()
+                    # Ensure consistent sampling rate
+                    fx_combiner.convert(samplerate=self.sr,
+                                        n_channels=self.num_channels,   # num_ambisonics_channels
+                                        bitdepth=None)
 
-                        if is_foreground(e):
-                            # Pitch shift
-                            if e.value['pitch_shift'] is not None:
-                                fx_combiner.pitch(e.value['pitch_shift'])
+                    # Trim
+                    fx_combiner.trim(e.value['source_time'],
+                                     e.value['source_time'] +
+                                     e.value['event_duration'])
 
-                            # Time stretch
-                            if e.value['time_stretch'] is not None:
-                                fx_combiner.tempo(1.0 / float(e.value['time_stretch']))
+                    if is_foreground(e):
+                        # Pitch shift
+                        if e.value['pitch_shift'] is not None:
+                            fx_combiner.pitch(e.value['pitch_shift'])
 
-                            # Apply very short fade in and out
-                            # (avoid unnatural sound onsets/offsets)
-                            fx_combiner.fade(fade_in_len=self.fade_in_len,
-                                             fade_out_len=self.fade_out_len)
+                        # Time stretch
+                        if e.value['time_stretch'] is not None:
+                            fx_combiner.tempo(1.0 / float(e.value['time_stretch']))
 
-                            # Pad with silence before/after event to match the
-                            # soundscape duration
-                            prepad = e.value['event_time']
-                            if e.value['time_stretch'] is None:
-                                postpad = max(
-                                    0, self.duration - (e.value['event_time'] +
-                                                        e.value['event_duration']))
-                            else:
-                                postpad = max(
-                                    0, self.duration - (e.value['event_time'] +
-                                                        e.value['event_duration'] *
-                                                        e.value['time_stretch']))
-                            fx_combiner.pad(prepad, postpad)
+                        # Apply very short fade in and out
+                        # (avoid unnatural sound onsets/offsets)
+                        fx_combiner.fade(fade_in_len=self.fade_in_len,
+                                         fade_out_len=self.fade_out_len)
 
-                        # Normalize to specified SNR with respect to
-                        # self.ref_db (from downmixed version)
-                        lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
-                        if is_foreground(e):
-                            gain = self.ref_db + e.value['snr'] - lufs
-                        elif is_background(e):
-                            gain = self.ref_db - lufs
+                        # Pad with silence before/after event to match the
+                        # soundscape duration
+                        prepad = e.value['event_time']
+                        if e.value['time_stretch'] is None:
+                            postpad = max(
+                                0, self.duration - (e.value['event_time'] +
+                                                    e.value['event_duration']))
                         else:
-                            raise ScaperError(
-                                'Unsupported event role: {:s}'.format(
-                                    e.value['role']))
-                        fx_combiner.gain(gain_db=gain, normalize=False)
+                            postpad = max(
+                                0, self.duration - (e.value['event_time'] +
+                                                    e.value['event_duration'] *
+                                                    e.value['time_stretch']))
+                        fx_combiner.pad(prepad, postpad)
 
-                        # ambisonics
-                        if is_foreground(e):
-                            # if foreground, apply both ambi coefs and spread
-                            input_volumes = get_ambisonics_coefs(e.value['event_azimuth'],
-                                                                e.value['event_elevation'],
-                                                                self.ambisonics_order)
-                            input_volumes *= get_ambisonics_spread_coefs(
-                                                                e.value['event_spread'],
-                                                                self.ambisonics_spread_slope,
-                                                                self.ambisonics_order)
-                        elif is_background(e):
-                            # Apply just maximum spread (W gain is 1 in SN3D)
-                            input_volumes = get_ambisonics_spread_coefs(
-                                                                1.0,
-                                                                self.ambisonics_spread_slope,
-                                                                self.ambisonics_order)
-                        else:
-                            raise ScaperError(
-                                'Unsupported event role: {:s}'.format(
-                                    e.value['role']))
+                    # Normalize to specified SNR with respect to
+                    # self.ref_db (from downmixed version)
+                    lufs = get_integrated_lufs(downmix_tmpfiles[-1].name)
+                    if is_foreground(e):
+                        gain = self.ref_db + e.value['snr'] - lufs
+                    elif is_background(e):
+                        gain = self.ref_db - lufs
+                    else:
+                        raise ScaperError(
+                            'Unsupported event role: {:s}'.format(
+                                e.value['role']))
+                    fx_combiner.gain(gain_db=gain, normalize=False)
+
+                    # ambisonics
+                    if is_foreground(e):
+                        # if foreground, apply both ambi coefs and spread
+                        input_volumes = get_ambisonics_coefs(e.value['event_azimuth'],
+                                                            e.value['event_elevation'],
+                                                            self.ambisonics_order)
+                        input_volumes *= get_ambisonics_spread_coefs(
+                                                            e.value['event_spread'],
+                                                            self.ambisonics_spread_slope,
+                                                            self.ambisonics_order)
+                    elif is_background(e):
+                        # Apply just maximum spread (W gain is 1 in SN3D)
+                        input_volumes = get_ambisonics_spread_coefs(
+                                                            1.0,
+                                                            self.ambisonics_spread_slope,
+                                                            self.ambisonics_order)
+                    else:
+                        raise ScaperError(
+                            'Unsupported event role: {:s}'.format(
+                                e.value['role']))
 
 
-                        # Prepare tmp file for output
-                        processed_tmpfiles.append(
-                            tempfile.NamedTemporaryFile(
-                                suffix='.wav', delete=False))
+                    # Prepare tmp file for output
+                    processed_tmpfiles.append(
+                        tempfile.NamedTemporaryFile(
+                            suffix='.wav', delete=False))
+                    print(['PROCESSED', processed_tmpfiles[-1].name])
 
 
-                        # Build by passing a list of duplicated downmixed files
-                        # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
-                        fx_combiner.build(input_filepath_list=[downmix_tmpfiles[-1].name for _ in range(self.num_channels)],
-                                          output_filepath=processed_tmpfiles[-1].name,
-                                          combine_type='merge',
-                                          input_volumes=input_volumes.tolist())
+                    # Build by passing a list of duplicated downmixed files
+                    # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
+                    fx_combiner.build(input_filepath_list=[downmix_tmpfiles[-1].name for _ in range(self.num_channels)],
+                                      output_filepath=processed_tmpfiles[-1].name,
+                                      combine_type='merge',
+                                      input_volumes=input_volumes.tolist())
 
                 # Finally combine all the files and optionally apply reverb
                 # If we have more than one tempfile (i.e.g background + at

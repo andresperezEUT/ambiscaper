@@ -15,7 +15,7 @@ duration = 10.0
 ambisonics_order = 3
 ambisonics_spread_slope = 1.0
 
-num_events = 3
+num_events = 1
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -45,13 +45,11 @@ snr_dist = 'uniform'
 snr_min = 6
 snr_max = 30
 
-pitch_dist = 'uniform'
-pitch_min = -3.0
-pitch_max = 3.0
+pitch_dist = 'const'
+pitch = 1
 
-time_stretch_dist = 'uniform'
-time_stretch_min = 0.8
-time_stretch_max = 1.2
+time_stretch_dist = 'const'
+time_stretch = 2
 
 # Generate 1000 soundscapes using a truncated normal distribution of start times
 
@@ -65,9 +63,9 @@ for n in range(n_soundscapes):
     sc.ref_db = ref_db
 
     # add background
-    # sc.add_background(label=('choose', []),
-    #                   source_file=('choose', []),
-    #                   source_time=('const', 0))
+    sc.add_background(label=('choose', []),
+                      source_file=('choose', []),
+                      source_time=('const', 0))
 
     n_events = num_events
     for _ in range(n_events):
@@ -80,8 +78,8 @@ for n in range(n_soundscapes):
                      event_elevation=(event_elevation_dist,event_elevation_min,event_elevation_max),
                      event_spread=(event_spread_dist,event_spread),
                      snr=(snr_dist, snr_min, snr_max),
-                     pitch_shift=(pitch_dist, pitch_min, pitch_max),
-                     time_stretch=(time_stretch_dist, time_stretch_min, time_stretch_max))
+                     pitch_shift=(pitch_dist, pitch),
+                     time_stretch=(time_stretch_dist, time_stretch))
 
     # generate
     audiofile = os.path.join(outfolder, "soundscape_unimodal{:d}.wav".format(n))
