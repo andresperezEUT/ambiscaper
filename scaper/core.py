@@ -1773,15 +1773,17 @@ class Scaper(object):
         return downmix_tmpfile
 
 
-    def _generate_audio(self, audio_path, ann, reverb=None,
+    def _generate_audio(self, destination_path, audio_filename, ann, reverb=None,
                         disable_sox_warnings=True):
         '''
         Generate audio based on a sound_event annotation and save to disk.
 
         Parameters
         ----------
-        audio_path : str
-            Path for saving soundscape audio file.
+        destination_path: str
+            Path to the folder where to produce results
+        audio_filename : str
+            File name of the audio soundscape, stored at destination_path
         ann : jams.Annotation
             Annotation of the sound_event namespace.
         reverb : float or None
@@ -1816,15 +1818,35 @@ class Scaper(object):
 
         with _set_temp_logging_level(temp_logging_level):
 
-            # We maintain two lists for handling convenience tmp audio files
+            # We maintain three lists for handling convenience audio files
             # :downmix_tmpfiles: stores the downmixed and sr-adjusted versions
-            # for each sound. They are just needed for intermediate calculation
-            # of the actually valid :processed_tmpfiles:
-            # which arecreated iteratively and used at the end of the method
-            # to render the output
+            #   for each sound. Not really needed afterwards, so they get deleted
+            # :preprocessed_files: the previous mono signal, with some transformations
+            #   (trim, gain correction, and pitch shift and time strecth in the case of foreground)
+            #   The actual sound content of these files will be inserted in the general
+            #   ambisonics scene, so that we need to keep them to be able to validate separation
+            # :processed_tmpfiles: the preprocessed files with zero-padding to adjust start/end
+            #   and ambisonics encoding. Only needed until forming the ambisonics soundscene
             downmix_tmpfiles = []
-            preprocessed_tmpfiles = []
+            preprocessed_files = []
             processed_tmpfiles = []
+
+            # Create a dir for the separated sources
+            # if audio_filename has a file extension, remove it for the dir
+            audio_filename_without_extension = os.path.splitext(audio_filename)[0]
+            destination_source_path = os.path.join(destination_path, audio_filename_without_extension)
+            os.mkdir(destination_source_path)
+
+            # Keep track of the different events appearing
+            bg_events = []
+            fg_events = []
+
+            # Define functions to handle the type of event
+            def is_background(event):
+                return e.value['role'] == 'background'
+
+            def is_foreground(event):
+                return e.value['role'] == 'foreground'
 
             # Delete processed_tmpfiles only at the end of the method's lifetime
             # with _close_temp_files(processed_tmpfiles):
@@ -1841,29 +1863,30 @@ class Scaper(object):
                 # with _close_temp_files(downmix_tmpfiles):
                 if (True):
 
-                    def is_background(event):
-                        return e.value['role'] == 'background'
-
-                    def is_foreground(event):
-                        return e.value['role'] == 'foreground'
-
                     if is_background(event):
                         print('BACKGROUND')
-                    else:
+                        audio_event_name = 'bg.wav'
+                        bg_events.append(event)
+                        if len(bg_events) > 1:
+                            raise ScaperError('Too many background files')
+
+                    elif is_foreground(event):
                         print('FOREGROUND')
+                        audio_event_name = 'fg_' + str(len(fg_events)) + '.wav'
+                        fg_events.append(event)
+
+                    else:
+                        raise ScaperError(
+                            'Unsupported event role: {:s}'.format(
+                                e.value['role']))
 
                     # First of all, ensure pre-downmix to mono
                     downmix_tmpfiles.append(
                         self._mono_downmix(e.value['source_file']))
                     print(['DOWNMIXED', downmix_tmpfiles[-1].name])
 
-                    # Create combiner
-                    # note: Combiner inhereits from transformer,
-                    # so we can still apply all audio transforms
-                    # note2: we cannot use a plain Transformer,
-                    # because volume controls are still not implemented
-                    # on the remix method
 
+                    # Create transformer
                     fx_transformer = sox.Transformer()
                     # Ensure consistent sampling rate
                     fx_transformer.convert(samplerate=self.sr,
@@ -1907,19 +1930,23 @@ class Scaper(object):
                     # Here we got the final mono file with transformations
                     # but before time padding and ambisonics transformation
                     # So this is the signal we should save for the separation validation
-                    preprocessed_tmpfiles.append(
-                        tempfile.NamedTemporaryFile(
-                            suffix='.wav', delete=False))
-                    print(['PREPROCESSED', preprocessed_tmpfiles[-1].name])
+
+                    preprocessed_files.append(
+                        os.path.join(destination_source_path, audio_event_name))
+                    print(['PREPROCESSED', preprocessed_files[-1]])
 
                     # Build
                     fx_transformer.build(input_filepath=downmix_tmpfiles[-1].name,
-                                         output_filepath=preprocessed_tmpfiles[-1].name,
+                                         output_filepath=preprocessed_files[-1],
                                          extra_args=None,
                                          return_output=False)
 
-
-                    # now reuse the fx_combiner for the time and ambi stuff
+                    # Create combiner
+                    # note: Combiner inhereits from transformer,
+                    # so we can still apply all audio transforms
+                    # note2: we cannot use a plain Transformer,
+                    # because volume controls are still not implemented
+                    # on the remix method
                     fx_combiner = sox.Combiner()
                     fx_combiner.convert(samplerate=self.sr,
                                         n_channels=self.num_channels,   # num_ambisonics_channels
@@ -1957,10 +1984,7 @@ class Scaper(object):
                                                             1.0,
                                                             self.ambisonics_spread_slope,
                                                             self.ambisonics_order)
-                    else:
-                        raise ScaperError(
-                            'Unsupported event role: {:s}'.format(
-                                e.value['role']))
+
 
 
                     # Prepare tmp file for output
@@ -1972,7 +1996,7 @@ class Scaper(object):
 
                     # Build by passing a list of duplicated downmixed files
                     # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
-                    fx_combiner.build(input_filepath_list=[preprocessed_tmpfiles[-1].name for _ in range(self.num_channels)],
+                    fx_combiner.build(input_filepath_list=[preprocessed_files[-1] for _ in range(self.num_channels)],
                                       output_filepath=processed_tmpfiles[-1].name,
                                       combine_type='merge',
                                       input_volumes=input_volumes.tolist())
@@ -1991,19 +2015,24 @@ class Scaper(object):
                     # if reverb is not None:
                     #     tfm.reverb(reverberance=reverb * 100)
                     # TODO: do we want to normalize the final output?
-                    final_transformer.build(processed_tmpfiles[0].name, audio_path)
+                    final_transformer.build(processed_tmpfiles[0].name,
+                                            os.path.join(destination_path, audio_filename))
                 else:
                     # Combiner needed for more than one file
                     final_combiner = sox.Combiner()
                     # TODO: REVERB
                     # if reverb is not None:
                     #   tfm.reverb(reverberance=reverb * 100)
-                    final_combiner.build([t.name for t in processed_tmpfiles], audio_path, 'mix')
+                    final_combiner.build([t.name for t in processed_tmpfiles],
+                                         os.path.join(destination_path, audio_filename),
+                                         'mix')
+
+            # TODO: CLEAR TMP FILES!
 
 
 
-    def generate(self, audio_path, jams_path, allow_repeated_label=True,
-                 allow_repeated_source=True,
+    def generate(self, destination_path, audio_filename, jams_filename,
+                 allow_repeated_label=True, allow_repeated_source=True,
                  reverb=None, disable_sox_warnings=True, no_audio=False,
                  txt_path=None, txt_sep='\t',
                  disable_instantiation_warnings=False):
@@ -2013,10 +2042,12 @@ class Scaper(object):
 
         Parameters
         ----------
-        audio_path : str
-            Path for saving soundscape audio
-        jams_path : str
-            Path for saving soundscape jams
+        destination_path: str
+            Path to the folder where to produce results
+        audio_filename : str
+            File name of the audio soundscape, stored at destination_path
+        jams_filename : str
+            File name of the audio soundscape, stored at destination_path
         allow_repeated_label : bool
             When True (default) the same label can be used more than once
             in a soundscape instantiation. When False every label can
@@ -2077,11 +2108,11 @@ class Scaper(object):
 
         # Generate the audio and save to disk
         if not no_audio:
-            self._generate_audio(audio_path, ann, reverb=reverb,
+            self._generate_audio(destination_path, audio_filename, ann, reverb=reverb,
                                  disable_sox_warnings=disable_sox_warnings)
 
         # Finally save JAMS to disk too
-        jam.save(jams_path)
+        jam.save(os.path.join(destination_path, jams_filename))
 
         # Optionally save to CSV as well
         if txt_path is not None:
@@ -2099,4 +2130,7 @@ class Scaper(object):
             # sort events by onset time
             df = df.sort_values('onset')
             df.reset_index(inplace=True, drop=True)
-            df.to_csv(txt_path, index=False, header=False, sep=txt_sep)
+            df.to_csv(os.path.join(destination_path,txt_path),
+                      index=False,
+                      header=False,
+                      sep=txt_sep)
