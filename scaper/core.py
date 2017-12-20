@@ -1831,11 +1831,18 @@ class Scaper(object):
             preprocessed_files = []
             processed_tmpfiles = []
 
-            # Create a dir for the separated sources
-            # if audio_filename has a file extension, remove it for the dir
-            audio_filename_without_extension = os.path.splitext(audio_filename)[0]
-            destination_source_path = os.path.join(destination_path, audio_filename_without_extension)
-            os.mkdir(destination_source_path)
+            # Create the separated source subfolder
+            # Again, if already exists, will be overrided
+            source_folder_name = 'source'
+            destination_source_path = os.path.join(destination_path, source_folder_name)
+            try:
+                os.mkdir(destination_source_path)
+            except OSError as err:
+                if err.errno != 17: # folder exists
+                    raise
+                # If we arrived here because the folder already existed,
+                # don't warn again, since the parent folder also existed
+                # and the user already received a warning
 
             # Keep track of the different events appearing
             bg_events = []
@@ -2027,23 +2034,21 @@ class Scaper(object):
 
 
 
-    def generate(self, destination_path, audio_filename, jams_filename,
+    def generate(self, destination_path,
                  allow_repeated_label=True, allow_repeated_source=True,
                  reverb=None, disable_sox_warnings=True, no_audio=False,
-                 txt_path=None, txt_sep='\t',
+                 generate_txt=False, txt_sep='\t',
                  disable_instantiation_warnings=False):
         '''
         Generate a soundscape based on the current specification and save to
         disk as both an audio file and a JAMS file describing the soundscape.
+        Both audio and annotation files will be contained in :destination_path:
+        with the same name and adequate file extension
 
         Parameters
         ----------
         destination_path: str
             Path to the folder where to produce results
-        audio_filename : str
-            File name of the audio soundscape, stored at destination_path
-        jams_filename : str
-            File name of the audio soundscape, stored at destination_path
         allow_repeated_label : bool
             When True (default) the same label can be used more than once
             in a soundscape instantiation. When False every label can
@@ -2062,10 +2067,10 @@ class Scaper(object):
             unless their level is ``'CRITICAL'``.
         no_audio : bool
             If true only generates a JAMS file and no audio is saved to disk.
-        txt_path: str or None
-            If not None, in addition to the JAMS file output a simplified
+        generate: bool
+            If True, in addition to the JAMS file output a simplified
             annotation in a space separated format [onset  offset  label],
-            saved to the provided path (good for loading labels in audacity).
+            saved in the same path path (good for loading labels in audacity).
         test_sep: str
             The separator to use when saving a simplified annotation as a text
             file (default is tab for compatibility with Audacity label files).
@@ -2079,6 +2084,8 @@ class Scaper(object):
         ------
         ScaperError
             If the reverb parameter is passed an invalid value.
+        ScaperWarning
+            If the destination folder already exists
 
         See Also
         --------
@@ -2102,16 +2109,32 @@ class Scaper(object):
             disable_instantiation_warnings=disable_instantiation_warnings)
         ann = jam.annotations.search(namespace='sound_event')[0]
 
+        # Generate the folder structure
+        # We will use the same file name as the folder
+        # for the audio and annotation files
+        filename = os.path.split(destination_path)[-1]
+
+        # Create the top folder
+        # If it exists, the content will be overrided
+        if os.path.exists(destination_path):
+            warnings.warn('Destination path exists: ' + destination_path,ScaperWarning)
+        else:
+            os.mkdir(destination_path)
+
         # Generate the audio and save to disk
         if not no_audio:
-            self._generate_audio(destination_path, audio_filename, ann, reverb=reverb,
+            self._generate_audio(destination_path,
+                                 filename+'.wav',
+                                 ann,
+                                 reverb=reverb,
                                  disable_sox_warnings=disable_sox_warnings)
 
         # Finally save JAMS to disk too
-        jam.save(os.path.join(destination_path, jams_filename))
+        jam.save(os.path.join(destination_path, filename+'.jams'))
 
         # Optionally save to CSV as well
-        if txt_path is not None:
+        if generate_txt:
+            txt_path = os.path.join(destination_path,filename+'.txt')
 
             df = pd.DataFrame(columns=['onset', 'offset', 'label'])
 

@@ -3,19 +3,19 @@ import numpy as np
 import os
 
 # OUTPUT FOLDER
-outfolder = '/Volumes/Dinge/scaper/generated'
+outfolder = '/Volumes/Dinge/scaper/generated/'
 
 # SCAPER SETTINGS
 foreground_folder = '~/audio/scaper/foreground/'
 background_folder = '~/audio/scaper/background/'
 
-n_soundscapes = 1
+n_soundscapes = 3
 ref_db = -50
 duration = 10.0
 ambisonics_order = 3
 ambisonics_spread_slope = 1.0
 
-num_events = 3
+num_events = 4
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -82,14 +82,12 @@ for n in range(n_soundscapes):
                      time_stretch=(time_stretch_dist, time_stretch))
 
     # generate
-    audiofile = os.path.join(outfolder, "soundscape_unimodal{:d}.wav".format(n))
-    jamsfile = os.path.join(outfolder, "soundscape_unimodal{:d}.jams".format(n))
-    txtfile = os.path.join(outfolder, "soundscape_unimodal{:d}.txt".format(n))
+    destination_path = os.path.join(outfolder,"soundscape{:d}".format(n))
 
-    sc.generate(audiofile, jamsfile,
+    sc.generate(destination_path=destination_path,
                 allow_repeated_label=True,
                 allow_repeated_source=True,
                 reverb=0,
                 disable_sox_warnings=True,
                 no_audio=False,
-                txt_path=txtfile)
+                generate_txt=True)
