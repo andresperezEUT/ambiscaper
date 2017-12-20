@@ -1865,15 +1865,13 @@ class Scaper(object):
                 e = event[1]
 
                 if is_background(event):
-                    print('BACKGROUND')
                     audio_event_name = 'bg.wav'
                     bg_events.append(event)
                     if len(bg_events) > 1:
                         raise ScaperError('Too many background files')
 
                 elif is_foreground(event):
-                    print('FOREGROUND')
-                    audio_event_name = 'fg_' + str(len(fg_events)) + '.wav'
+                    audio_event_name = 'fg' + str(len(fg_events)) + '.wav'
                     fg_events.append(event)
 
                 else:
@@ -1884,8 +1882,6 @@ class Scaper(object):
                 # First of all, ensure pre-downmix to mono
                 downmix_tmpfiles.append(
                     self._mono_downmix(e.value['source_file']))
-                print(['DOWNMIXED', downmix_tmpfiles[-1].name])
-
 
                 # Create transformer
                 fx_transformer = sox.Transformer()
@@ -1934,7 +1930,6 @@ class Scaper(object):
 
                 preprocessed_files.append(
                     os.path.join(destination_source_path, audio_event_name))
-                print(['PREPROCESSED', preprocessed_files[-1]])
 
                 # Build
                 fx_transformer.build(input_filepath=downmix_tmpfiles[-1].name,
@@ -1987,13 +1982,10 @@ class Scaper(object):
                                                         self.ambisonics_order)
 
 
-
                 # Prepare tmp file for output
                 processed_tmpfiles.append(
                     tempfile.NamedTemporaryFile(
                         suffix='.wav', delete=False))
-                print(['PROCESSED', processed_tmpfiles[-1].name])
-
 
                 # Build by passing a list of duplicated downmixed files
                 # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
@@ -2001,6 +1993,7 @@ class Scaper(object):
                                   output_filepath=processed_tmpfiles[-1].name,
                                   combine_type='merge',
                                   input_volumes=input_volumes.tolist())
+
 
             # Finally combine all the files and optionally apply reverb
             # If we have more than one tempfile (i.e.g background + at
@@ -2140,10 +2133,18 @@ class Scaper(object):
 
             for idx, row in ann.data.iterrows():
                 if row.value['role'] == 'foreground':
+                    # Since we are using the same :ann.data.iterrows(): method
+                    # to parse the annotation values, the order in which the
+                    # events will appear remains.
+                    # Therefore is safe to name the text labels in the following
+                    # manner, because it will always fit with the order given
+                    # by the :_generate_audio(): method
+                    # Just make sure that the nomenclature remains
+                    name = 'fg' + str(idx-1)
                     newrow = ([row.time.total_seconds(),
                                row.time.total_seconds() +
                                row.duration.total_seconds(),
-                               row.value['label']])
+                               name])
                     df.loc[len(df)] = newrow
 
             # sort events by onset time
