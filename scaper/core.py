@@ -1823,6 +1823,7 @@ class Scaper(object):
             # which arecreated iteratively and used at the end of the method
             # to render the output
             downmix_tmpfiles = []
+            preprocessed_tmpfiles = []
             processed_tmpfiles = []
 
             # Delete processed_tmpfiles only at the end of the method's lifetime
@@ -1863,44 +1864,31 @@ class Scaper(object):
                     # because volume controls are still not implemented
                     # on the remix method
 
-                    fx_combiner = sox.Combiner()
+                    fx_transformer = sox.Transformer()
                     # Ensure consistent sampling rate
-                    fx_combiner.convert(samplerate=self.sr,
-                                        n_channels=self.num_channels,   # num_ambisonics_channels
+                    fx_transformer.convert(samplerate=self.sr,
+                                        n_channels=None,   # mono
                                         bitdepth=None)
 
                     # Trim
-                    fx_combiner.trim(e.value['source_time'],
-                                     e.value['source_time'] +
-                                     e.value['event_duration'])
+                    fx_transformer.trim(e.value['source_time'],
+                                        e.value['source_time'] +
+                                        e.value['event_duration'])
 
                     if is_foreground(e):
                         # Pitch shift
                         if e.value['pitch_shift'] is not None:
-                            fx_combiner.pitch(e.value['pitch_shift'])
+                            fx_transformer.pitch(e.value['pitch_shift'])
 
                         # Time stretch
                         if e.value['time_stretch'] is not None:
-                            fx_combiner.tempo(1.0 / float(e.value['time_stretch']))
+                            fx_transformer.tempo(1.0 / float(e.value['time_stretch']))
 
                         # Apply very short fade in and out
                         # (avoid unnatural sound onsets/offsets)
-                        fx_combiner.fade(fade_in_len=self.fade_in_len,
+                            fx_transformer.fade(fade_in_len=self.fade_in_len,
                                          fade_out_len=self.fade_out_len)
 
-                        # Pad with silence before/after event to match the
-                        # soundscape duration
-                        prepad = e.value['event_time']
-                        if e.value['time_stretch'] is None:
-                            postpad = max(
-                                0, self.duration - (e.value['event_time'] +
-                                                    e.value['event_duration']))
-                        else:
-                            postpad = max(
-                                0, self.duration - (e.value['event_time'] +
-                                                    e.value['event_duration'] *
-                                                    e.value['time_stretch']))
-                        fx_combiner.pad(prepad, postpad)
 
                     # Normalize to specified SNR with respect to
                     # self.ref_db (from downmixed version)
@@ -1913,7 +1901,45 @@ class Scaper(object):
                         raise ScaperError(
                             'Unsupported event role: {:s}'.format(
                                 e.value['role']))
-                    fx_combiner.gain(gain_db=gain, normalize=False)
+                    fx_transformer.gain(gain_db=gain, normalize=False)
+
+
+                    # Here we got the final mono file with transformations
+                    # but before time padding and ambisonics transformation
+                    # So this is the signal we should save for the separation validation
+                    preprocessed_tmpfiles.append(
+                        tempfile.NamedTemporaryFile(
+                            suffix='.wav', delete=False))
+                    print(['PREPROCESSED', preprocessed_tmpfiles[-1].name])
+
+                    # Build
+                    fx_transformer.build(input_filepath=downmix_tmpfiles[-1].name,
+                                         output_filepath=preprocessed_tmpfiles[-1].name,
+                                         extra_args=None,
+                                         return_output=False)
+
+
+                    # now reuse the fx_combiner for the time and ambi stuff
+                    fx_combiner = sox.Combiner()
+                    fx_combiner.convert(samplerate=self.sr,
+                                        n_channels=self.num_channels,   # num_ambisonics_channels
+                                        bitdepth=None)
+
+                    # Pad with silence before/after event to match the
+                    # soundscape duration
+                    if is_foreground(e):
+                        prepad = e.value['event_time']
+                        if e.value['time_stretch'] is None:
+                            postpad = max(
+                                0, self.duration - (e.value['event_time'] +
+                                                    e.value['event_duration']))
+                        else:
+                            postpad = max(
+                                0, self.duration - (e.value['event_time'] +
+                                                    e.value['event_duration'] *
+                                                    e.value['time_stretch']))
+                        fx_combiner.pad(prepad, postpad)
+
 
                     # ambisonics
                     if is_foreground(e):
@@ -1946,7 +1972,7 @@ class Scaper(object):
 
                     # Build by passing a list of duplicated downmixed files
                     # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
-                    fx_combiner.build(input_filepath_list=[downmix_tmpfiles[-1].name for _ in range(self.num_channels)],
+                    fx_combiner.build(input_filepath_list=[preprocessed_tmpfiles[-1].name for _ in range(self.num_channels)],
                                       output_filepath=processed_tmpfiles[-1].name,
                                       combine_type='merge',
                                       input_volumes=input_volumes.tolist())

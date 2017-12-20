@@ -15,7 +15,7 @@ duration = 10.0
 ambisonics_order = 3
 ambisonics_spread_slope = 1.0
 
-num_events = 1
+num_events = 3
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
