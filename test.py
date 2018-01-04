@@ -8,14 +8,16 @@ outfolder = '/Volumes/Dinge/scaper/generated/'
 # SCAPER SETTINGS
 foreground_folder = '~/audio/scaper/foreground/'
 background_folder = '~/audio/scaper/background/'
+smir_reverb_path  = '~/Documents/MATLAB/SMIR-Generator-master'
+s3a_reverb_path   = '~/source/scaper/IRs/S3A'
 
-n_soundscapes = 3
+n_soundscapes = 1
 ref_db = -50
 duration = 10.0
 ambisonics_order = 3
 ambisonics_spread_slope = 1.0
 
-num_events = 4
+num_events = 2
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -63,9 +65,9 @@ for n in range(n_soundscapes):
     sc.ref_db = ref_db
 
     # add background
-    sc.add_background(label=('choose', []),
-                      source_file=('choose', []),
-                      source_time=('const', 0))
+    # sc.add_background(label=('choose', []),
+    #                   source_file=('choose', []),
+    #                   source_time=('const', 0))
 
     n_events = num_events
     for _ in range(n_events):
@@ -81,13 +83,30 @@ for n in range(n_soundscapes):
                      pitch_shift=(pitch_dist, pitch),
                      time_stretch=(time_stretch_dist, time_stretch))
 
+
+
+    # configure reverb
+    # reverb_config = scaper.core.SmirReverbSpec(
+    #     path = smir_reverb_path,
+    #     IRlength=1024,
+    #     room_dimensions=[3,3,3],
+    #     T_60= 0.3,
+    #     mic='soundfield'
+    # )
+
+    reverb_config = scaper.core.S3aReverbSpec(
+        path= s3a_reverb_path,
+        name = 'MainChurch'
+    )
+
+    sc.set_reverb(reverb_config)
+
     # generate
     destination_path = os.path.join(outfolder,"soundscape{:d}".format(n))
 
     sc.generate(destination_path=destination_path,
                 allow_repeated_label=True,
                 allow_repeated_source=True,
-                reverb=0,
                 disable_sox_warnings=True,
                 no_audio=False,
                 generate_txt=True)

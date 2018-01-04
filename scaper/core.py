@@ -1,3 +1,5 @@
+import soundfile as sf
+import scipy.signal
 import sox
 import random
 import os
@@ -11,7 +13,7 @@ import shutil
 import pandas as pd
 from .scaper_exceptions import ScaperError
 from .scaper_warnings import ScaperWarning
-from .util import _close_temp_files
+from .util import _close_temp_files, cartesian_to_spherical
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -21,9 +23,12 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
-from .ambisonics import get_number_of_ambisonics_channels, get_ambisonics_spread_coefs
+from .ambisonics import get_number_of_ambisonics_channels, get_ambisonics_spread_coefs, SUPPORTED_VIRTUAL_MICS
 from .ambisonics import get_ambisonics_coefs
-from numbers import Number
+import glob
+import csv
+# import matlab.engine
+
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -43,6 +48,36 @@ Container for storing event specifications, either probabilistic (i.e. using
 distribution tuples to specify possible values) or instantiated (i.e. storing
 constants directly).
 '''
+
+
+SmirReverbSpec = namedtuple(
+    'SmirReverbSpec',
+    ['path',
+     'IRlength',
+     'room_dimensions',
+     'T_60',
+     'mic'],verbose=False)
+'''
+Container for storing specfic smir reverb configuration values
+'''
+
+S3aReverbSpec = namedtuple(
+    'S3aReverbSpec',
+    ['path',
+     'name'],verbose=False)
+'''
+Container for storing specfic s3a reverb configuration values
+'''
+
+# TODO: MAYBE MOVE THIS OR PUT IT TOGETHER OR SOMETHING
+
+s3a_loudspeaker_positions_txtfile = "LsPos.txt"
+
+# Filters are named by 'lsX.wav', with X the speaker number
+s3a_filter_name = 'ls'
+s3a_filter_extension = '.wav'
+
+s3a_folder_name = 'Soundfield'
 
 
 def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
@@ -252,6 +287,50 @@ def trim(audio_infile, jams_infile, audio_outfile, jams_outfile, start_time,
                 tfm.build(audio_infile, tmpfiles[-1].name)
                 # Copy result back to original file
                 shutil.copyfile(tmpfiles[-1].name, audio_outfile)
+
+
+
+def _generate_RIR_path(s3a_reverg_config):
+    '''
+    TODO
+    :param s3a_reverg_config:
+    :return:
+    '''
+    return os.path.expanduser(os.path.join(s3a_reverg_config.path,s3a_reverg_config.name,s3a_folder_name))
+
+def retrieve_RIR_positions(s3a_reverg_config):
+    '''
+    TODO
+
+    Folder structure should be something like:
+    - S3A_top_folder (:path: in the config struct)
+        - reverb_name (:name: in the config struct)
+            - (maybe a pdf)
+            - "Soundfield"
+                - "lsN.wav" with the N actual impulse responses, starting from 1
+                - "LsPos.txt" with the loudspeaker positions
+                - (maybe a "Metadata_SoundField.txt")
+
+    :param s3a_reverg_config:
+    :return:
+    '''
+
+    # Go to Soundfield folder
+    # todo: maybe better implementation for txt file open?
+
+    speakers_positions_file = os.path.join(_generate_RIR_path(s3a_reverg_config),s3a_loudspeaker_positions_txtfile)
+
+    # Retrieve the file content into speaker_positions
+    speaker_positions_cartesian = []
+    with open(os.path.expanduser(speakers_positions_file)) as tsv:
+        for line in csv.reader(tsv, delimiter='\t'):  # You can also use delimiter="\t" rather than giving a dialect.
+            speaker_positions_cartesian.append([float(element) for element in line])
+
+    # Convert speaker_positions to spherical coordinates
+    speaker_positions_spherical = [cartesian_to_spherical(pos) for pos in speaker_positions_cartesian]
+
+    return speaker_positions_spherical
+
 
 
 def _get_value_from_dist(dist_tuple):
@@ -987,6 +1066,127 @@ def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
         raise ScaperError('Ambisonics Order must be 0 located on the range [0,1]')
 
 
+def _validate_smir_reverb_spec(reverb_config):
+
+    # path: str
+    if reverb_config.path is None:
+        raise ScaperError(
+            'reverb_config: path is None')
+    elif type(reverb_config.path) is not str:
+        raise ScaperError(
+            'reverb path not a string')
+
+    # IR length: positive integer
+    if reverb_config.IRlength is None:
+        raise ScaperError(
+            'reverb_config: IR length is None')
+    elif not isinstance(reverb_config.IRlength,int) or reverb_config.IRlength <=0:
+        raise ScaperError(
+            'reverb_config: IR length must be a positive integer')
+
+    # room_dimensions: list of 3 elements
+    if reverb_config.room_dimensions is None:
+        raise ScaperError(
+            'reverb_config: room_dimensions is None')
+    elif not isinstance(reverb_config.room_dimensions,list):
+        raise ScaperError(
+            'reverb_config: room_dimensions is not a List')
+    elif len(reverb_config.room_dimensions) is not 3:
+        raise ScaperError(
+            'reverb_config: room_dimensions must have 3 elements')
+
+    # T_60: float >0
+    if reverb_config.T_60 is None:
+        raise ScaperError(
+            'reverb_config: T_60 is None')
+    elif not is_real_number(reverb_config.T_60) or reverb_config.T_60 <= 0:
+        raise ScaperError(
+            'reverb_config: T_60 must be a positive number')
+
+    # mic type:
+    if reverb_config.mic is None:
+        raise ScaperError(
+            'reverb_config: mic is None')
+    else:
+        if not SUPPORTED_VIRTUAL_MICS.has_key(reverb_config.mic):
+            raise ScaperError(
+                'reverb_config: unsupported mic: ' + reverb_config.mic)
+
+
+def _validate_s3a_reverb_spec(reverb_config):
+
+    # Folder structure should be something like:
+    # - S3A_top_folder (:path: in the config struct)
+    #     - reverb_name (:name: in the config struct)
+    #         - (maybe a pdf)
+    #         - "Soundfield"
+    #             - "lsN.wav" with the N actual impulse responses, starting from 1
+    #             - "LsPos.txt" with the loudspeaker positions
+    #             - (maybe a "Metadata_SoundField.txt")
+
+    # Check that path is str
+    if reverb_config.path is None:
+        raise ScaperError(
+            'reverb_config: path is None')
+    elif type(reverb_config.path) is not str:
+        raise ScaperError(
+            'reverb path not a string')
+
+    # Check that reverb name is str
+    if reverb_config.name is None:
+        raise ScaperError(
+            'reverb_config: path is None')
+    elif type(reverb_config.name) is not str:
+        raise ScaperError(
+            'reverb path not a string')
+
+    # The provided name should exist in path/
+    path = os.path.join(reverb_config.path, reverb_config.name)
+    if not os.path.exists(os.path.expanduser(path)):
+        raise ScaperError(
+            'reverb_config: folder does not exist: ' + path)
+
+    # Inside the reverb folder should be a "Soundfield" folder
+    soundfield_path = os.path.join(path,s3a_folder_name)
+    if not os.path.exists(os.path.expanduser(soundfield_path)):
+        raise ScaperError(
+            'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(path))
+
+    # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
+
+    # Count number of audio files (the actual IRs)
+    num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
+
+    # Count number of lines in speakers file
+    speakers_positions_file = os.path.join(soundfield_path,s3a_loudspeaker_positions_txtfile);
+    num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
+
+    # Check
+    if num_wav_files is not num_lines:
+        raise ScaperError(
+            'reverb_config: the number of audio files does not match with the speaker description')
+
+
+def _validate_reverb_config(reverb_config):
+
+    if reverb_config is None:
+        raise ScaperError(
+         'reverb_config is None')
+
+    # Check all different supported reverb types
+
+    # smir
+    if type(reverb_config) is SmirReverbSpec:
+        _validate_smir_reverb_spec(reverb_config)
+    # s3a
+    elif type(reverb_config) is S3aReverbSpec:
+        _validate_s3a_reverb_spec(reverb_config)
+    else:
+        raise ScaperError(
+            'reverb_config of unknown type: ' + str(type(reverb_config)))
+
+
+
 class Scaper(object):
     '''
     Create a Scaper object.
@@ -1090,6 +1290,9 @@ class Scaper(object):
 
         # Copy list of protected labels
         self.protected_labels = protected_labels[:]
+
+        # Configure reverb to None by default
+        self.reverb_config = None
 
     def add_background(self, label, source_file, source_time):
         '''
@@ -1773,7 +1976,8 @@ class Scaper(object):
         return downmix_tmpfile
 
 
-    def _generate_audio(self, destination_path, audio_filename, ann, reverb=None,
+
+    def _generate_audio(self, destination_path, audio_filename, ann,
                         disable_sox_warnings=True):
         '''
         Generate audio based on a sound_event annotation and save to disk.
@@ -1859,10 +2063,13 @@ class Scaper(object):
             # with _close_temp_files(processed_tmpfiles):
 
             # Iterate over all events specified in the annotation
+            fg_event_idx = -1
             for event in ann.data.iterrows():
 
                 # first item is index, second is event dictionary
                 e = event[1]
+
+                # e.value['time_stretch'] = 666
 
                 if is_background(event):
                     audio_event_name = 'bg.wav'
@@ -1871,6 +2078,7 @@ class Scaper(object):
                         raise ScaperError('Too many background files')
 
                 elif is_foreground(event):
+                    fg_event_idx += 1
                     audio_event_name = 'fg' + str(len(fg_events)) + '.wav'
                     fg_events.append(event)
 
@@ -1927,6 +2135,7 @@ class Scaper(object):
                 # Here we got the final mono file with transformations
                 # but before time padding and ambisonics transformation
                 # So this is the signal we should save for the separation validation
+                # (which can be found in this loop as "preprocessed_files[-1]")
 
                 preprocessed_files.append(
                     os.path.join(destination_source_path, audio_event_name))
@@ -1964,35 +2173,109 @@ class Scaper(object):
                     fx_combiner.pad(prepad, postpad)
 
 
-                # ambisonics
-                if is_foreground(e):
-                    # if foreground, apply both ambi coefs and spread
-                    input_volumes = get_ambisonics_coefs(e.value['event_azimuth'],
-                                                        e.value['event_elevation'],
-                                                        self.ambisonics_order)
-                    input_volumes *= get_ambisonics_spread_coefs(
-                                                        e.value['event_spread'],
-                                                        self.ambisonics_spread_slope,
-                                                        self.ambisonics_order)
-                elif is_background(e):
-                    # Apply just maximum spread (W gain is 1 in SN3D)
-                    input_volumes = get_ambisonics_spread_coefs(
-                                                        1.0,
-                                                        self.ambisonics_spread_slope,
-                                                        self.ambisonics_order)
+                # Ambisonics
+                #
+                # Two main methods of operation here:
+                # 1.)   If there is no reverb, then compute the ambisonics encoding for each source
+                #       and combine them together.
+                #       That should be equivalent to convolving with deltas,
+                #       so maybe in the future we implement it in that way to make it more consistent
+                # 2.)   If there is reverb, then compute or retrieve the IRs according to the source positions,
+                #       and then convolve them with the sources
+
+                if self.reverb_config is None:
+
+                    if is_foreground(e):
+                        # if foreground, apply both ambi coefs and spread
+                        input_volumes = get_ambisonics_coefs(e.value['event_azimuth'],
+                                                            e.value['event_elevation'],
+                                                            self.ambisonics_order)
+                        input_volumes *= get_ambisonics_spread_coefs(
+                                                            e.value['event_spread'],
+                                                            self.ambisonics_spread_slope,
+                                                            self.ambisonics_order)
+                    elif is_background(e):
+                        # Apply just maximum spread (W gain is 1 in SN3D)
+                        input_volumes = get_ambisonics_spread_coefs(
+                                                            1.0,
+                                                            self.ambisonics_spread_slope,
+                                                            self.ambisonics_order)
 
 
-                # Prepare tmp file for output
-                processed_tmpfiles.append(
-                    tempfile.NamedTemporaryFile(
-                        suffix='.wav', delete=False))
+                    # Prepare tmp file for output
+                    processed_tmpfiles.append(
+                        tempfile.NamedTemporaryFile(
+                            suffix='.wav', delete=False))
 
-                # Build by passing a list of duplicated downmixed files
-                # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
-                fx_combiner.build(input_filepath_list=[preprocessed_files[-1] for _ in range(self.num_channels)],
-                                  output_filepath=processed_tmpfiles[-1].name,
-                                  combine_type='merge',
-                                  input_volumes=input_volumes.tolist())
+                    # Build by passing a list of duplicated downmixed files
+                    # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
+                    fx_combiner.build(input_filepath_list=[preprocessed_files[-1] for _ in range(self.num_channels)],
+                                      output_filepath=processed_tmpfiles[-1].name,
+                                      combine_type='merge',
+                                      input_volumes=input_volumes.tolist())
+
+                elif (type(self.reverb_config) is SmirReverbSpec):
+
+                    if is_foreground(e):
+                    # Call matlab stuff and compute IRs
+                    # TODO
+                        1
+
+
+
+                elif (type(self.reverb_config) is S3aReverbSpec):
+
+                    # Get the IRs associated to the source position
+                    # They are stored at the chosen_IR_indices list
+                    # Watch out with the indices (wav files numbering starting at 1)
+
+                    if is_foreground(e):
+                        # Construct the filter name given the speaker index
+                        ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
+                        filter_name = s3a_filter_name + str(ir_idx) + s3a_filter_extension
+
+                        filter_path = os.path.join(_generate_RIR_path(self.reverb_config), filter_name)
+
+                        # Open the filter
+                        # filter_data is deinterleaved. e.g. channel 0 is filter_data[:, 0], etc
+                        # TODO: check sr and change it in case
+                        filter_data, filter_sample_rate = sf.read(filter_path)
+
+                        # Ensure that num channels is what it should be according to ambisonics order..
+                        # TODO!
+                        num_channels = np.shape(filter_data)[1]
+
+                        # Open the preprocessed file
+                        # TODO: check sr of file and filter...
+                        file_data, file_sample_rate = sf.read(preprocessed_files[-1])
+                        print(np.shape(file_data))
+
+
+                        # fftconvolve will try to convolve the signals in every dimension
+                        # i.e., if we have two files with 4 channels, the result will have 7 channel
+                        # Obviously that's not what we want, so the provisional workaround
+                        # is to convolve each filter channel individually,
+                        # and then put all them together when wav rendering
+                        output_signal_list = []
+                        for i in range(num_channels):
+                            output_signal_list.append(scipy.signal.fftconvolve(file_data,filter_data[:,i]))
+
+                        output_signal = np.transpose(np.array(output_signal_list))
+
+                        print(np.shape(output_signal))
+
+                        # The convolved signal is already in ambisonics format
+                        # What we can do now is to process it as a wavfile
+                        # and store it with the processed_tmpfiles
+                        # So we reuse the code for the anechoic case
+
+                        # Prepare tmp file for output
+                        processed_tmpfiles.append(
+                            tempfile.NamedTemporaryFile(
+                                suffix='.wav', delete=False))
+
+                        # Change here the subtype for other format types
+                        sf.write(processed_tmpfiles[-1].name,output_signal,self.sr,subtype='PCM_16')
 
 
             # Finally combine all the files and optionally apply reverb
@@ -2027,9 +2310,26 @@ class Scaper(object):
 
 
 
+
+    def set_reverb(self, reverb_config):
+        '''
+        TODO
+        :param reverb_config:
+        :return:
+        '''
+
+        # Check reverb validity
+        _validate_reverb_config(reverb_config)
+
+        # If ok, store it
+        self.reverb_config = reverb_config
+
+
     def generate(self, destination_path,
                  allow_repeated_label=True, allow_repeated_source=True,
-                 reverb=None, disable_sox_warnings=True, no_audio=False,
+                 reverb_type=None,
+                 reverb_config=None,
+                 disable_sox_warnings=True, no_audio=False,
                  generate_txt=False, txt_sep='\t',
                  disable_instantiation_warnings=False):
         '''
@@ -2050,11 +2350,6 @@ class Scaper(object):
             When True (default) the same source file can be used more than once
             in a soundscape instantiation. When False every source file can
             only be used once.
-        reverb : float or None
-            Amount of reverb to apply to the generated soundscape between 0
-            (no reverberation) and 1 (maximum reverberation). Use None
-            (default) to prevent the soundscape from going through the reverb
-            module at all.
         disable_sox_warnings : bool
             When True (default), warnings from the pysox module are suppressed
             unless their level is ``'CRITICAL'``.
@@ -2087,22 +2382,77 @@ class Scaper(object):
         Scaper._generate_audio
 
         '''
-        # Check parameter validity
-        if reverb is not None:
-            if not (0 <= reverb <= 1):
-                raise ScaperError(
-                    'Invalid value for reverb: must be in range [0, 1] or '
-                    'None.')
+
+        # First, we will check reverb config.
+        # Currently we support two types of ambisonics reverb:
+        # - smir: matlab-simulated RIR (todo: link)
+        # - s3a: recorded IR (todo: link)
+        # In the case of recorded IRs, we are limited on the number of different
+        # source locations.
+        # Therefore, we must impose the source location limitation before the actual
+        # value instanciation.
+        # The audio generation process will also probably vary depending on the
+        # reverb type selected...
+
+        if (type(self.reverb_config) is S3aReverbSpec):
+
+            # Retrieve valid azimuth/elevation values
+            imposed_source_positions = retrieve_RIR_positions(self.reverb_config)
+
+            # todo! impose the ambisonics order!
+            print (imposed_source_positions)
+
+
+            # We are going to modify the foreground specs, in order to impose source positions
+            # Since we cannot modify directly an EventSpec (todo: why?)
+            # we will copy all valid args from each event, and create a new set of events
+            # which will be attached to the fg_spec list
+            imposed_fg_spec = []
+            self.chosen_IR_indices = []
+
+            for e in self.fg_spec:
+                # For the moment, just choose random on the imposed positions for each event
+                # TODO: do we want
+                random_index = random.randint(0,len(imposed_source_positions)-1)
+                random_position = imposed_source_positions[random_index]
+                imposed_azimuth=('const',random_position[0])
+                imposed_elevation=('const',random_position[1])
+                imposed_spread = ('const',0.0)
+
+                # Store the random indinces, so later in the generate_audio method we can
+                # easily retrieve the associated IRs
+                # Achtung! indices start at 0, but audio files start at 1...
+                self.chosen_IR_indices.append(random_index)
+                print(['chose index: ',random_index])
+
+                # Create a new event copying the other relevant informationo
+                imposed_fg_spec.append(EventSpec(label=e.label,
+                                             source_file=e.source_file,
+                                             source_time=e.source_time,
+                                             event_time=e.event_time,
+                                             event_duration=e.event_duration,
+                                             event_azimuth=imposed_azimuth,     # changed!
+                                             event_elevation=imposed_elevation, # changed!
+                                             event_spread=imposed_spread,       # changed!
+                                             snr=e.snr,
+                                             role=e.role,
+                                             pitch_shift=e.pitch_shift,
+                                             time_stretch=e.time_stretch))
+
+            # Actually substitute the old events for the new imposed ones
+            self.fg_spec = []
+            [self.fg_spec.append(e) for e in imposed_fg_spec]
+
 
         # Create specific instance of a soundscape based on the spec
         jam = self._instantiate(
             allow_repeated_label=allow_repeated_label,
             allow_repeated_source=allow_repeated_source,
-            reverb=reverb,
+            reverb=0.69696969696969696969, #todo
             disable_instantiation_warnings=disable_instantiation_warnings)
         ann = jam.annotations.search(namespace='sound_event')[0]
 
-        # Generate the folder structure
+        # Generate the output folder structure
         # We will use the same file name as the folder
         # for the audio and annotation files
         filename = os.path.split(destination_path)[-1]
@@ -2119,7 +2469,6 @@ class Scaper(object):
             self._generate_audio(destination_path,
                                  filename+'.wav',
                                  ann,
-                                 reverb=reverb,
                                  disable_sox_warnings=disable_sox_warnings)
 
         # Finally save JAMS to disk too

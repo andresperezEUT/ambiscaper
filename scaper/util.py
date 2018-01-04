@@ -417,3 +417,37 @@ def delta_kronecker(q1,q2):
 
     if (q1==q2): return 1
     else:        return 0
+
+
+def cartesian_to_spherical(cartesian_list):
+    '''
+    TODO
+    :param cartesian:
+    :param spherical:
+    :return:
+    '''
+
+    # Both arguments should be lists of 3 floats
+    def _validate_args(list_arg):
+        if not isinstance(list_arg,list):
+            raise ScaperError(
+                'Error on Cartesian to Spherical conversion: argument not a list ' + list_arg)
+        if len(list_arg) is not 3:
+            raise ScaperError(
+                'Error on Cartesian to Spherical conversion: argument should have lenght of 3' + list_arg)
+        if not any([isinstance(f,float) for f in list_arg]):
+            raise ScaperError(
+                'Error on Cartesian to Spherical conversion: argument should contain floats' + list_arg)
+
+    _validate_args(cartesian_list)
+
+    # Perform actual conversion
+    x = cartesian_list[0]
+    y = cartesian_list[1]
+    z = cartesian_list[2]
+
+    r = np.sqrt((x*x)+(y*y)+(z*z))
+    azimuth = np.arctan2(y,x)
+    elevation = np.arcsin((z/r))
+
+    return [azimuth,elevation,r]

@@ -1,0 +1,47 @@
+Author: Luca Remaggi
+
+AuthorContact: 'l.remaggi@surrey.ac.uk'
+
+Comment: 'Global coordinate system at microphone array centre'
+
+License: 'Please see license terms at http://dx.doi.org/10.15126/surreydata.00808465'
+
+Organization: 'University of Surrey, Guildford, Surrey, GU2 7XH, UK'
+
+RoomType: 'reverberant'
+
+DateCreated: '2015-09-15 17:01:19'
+
+DateModified: '2015-09-15 17:01:19'
+
+Title: 'Emmanuel Main Church RIR Dataset (EMCRD) Sounfield Microphone'
+
+References: 'Please see license terms at http://dx.doi.org/10.15126/surreydata.00808465'
+
+Origin: 'RIR measured using Swept-Sine method, 16th July 2015'
+
+RoomDescription: 'Emmanuel Church, Guildford, UK; Size = ;  RT_60 = 1.5--1.3s calculated for the 500Hz and 2kHz octave band respectively'
+
+ListenerPosition: [0 0 0]
+
+ListenerPosition_Type: 'cartesian'
+
+ListenerPosition_Units: 'metre'
+
+ReceiverPosition: [W X Y Z]
+
+ReceiverPosition_Type: 'B-format'
+
+SourcePosition: [0 0 0]
+
+SourcePosition_Type: 'cartesian'
+
+SourcePosition_Units: 'meter'
+
+EmitterPosition: Reported in the text file 'LsPos.txt'
+
+EmitterPosition_Type: 'cartesian'
+
+EmitterPosition_Units: 'metre'
+
+                             
