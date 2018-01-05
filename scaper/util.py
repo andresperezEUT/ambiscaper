@@ -451,3 +451,50 @@ def cartesian_to_spherical(cartesian_list):
     elevation = np.arcsin((z/r))
 
     return [azimuth,elevation,r]
+
+def spherical_to_cartesian(spherical_list):
+    '''
+    TODO
+    :param cartesian:
+    :param spherical:
+    :return:
+    '''
+
+    # Both arguments should be lists of 3 floats
+    def _validate_args(list_arg):
+        if not isinstance(list_arg,list):
+            raise ScaperError(
+                'Error on Spherical to Cartesian conversion: argument not a list ' + list_arg)
+        if len(list_arg) is not 3:
+            raise ScaperError(
+                'Error on Spherical to Cartesian conversion: argument should have lenght of 3' + list_arg)
+        if not any([isinstance(f,float) for f in list_arg]):
+            raise ScaperError(
+                'Error on Spherical to Cartesian conversion: argument should contain floats' + str(list_arg))
+
+    _validate_args(spherical_list)
+
+    # Perform actual conversion
+    azi = spherical_list[0]
+    ele = spherical_list[1]
+    r = spherical_list[2]
+
+    x = r * np.cos(ele) * np.cos(azi)
+    y = r * np.cos(ele) * np.sin(azi)
+    z = r * np.sin(ele)
+
+    return [x,y,z]
+
+
+def find(element, list_element):
+    '''
+    TODO
+    :param element:
+    :param list_element:
+    :return: index, or None if not found
+    '''
+    try:
+        index_element = list_element.index(element)
+        return index_element
+    except ValueError:
+        return None

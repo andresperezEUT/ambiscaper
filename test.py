@@ -8,7 +8,7 @@ outfolder = '/Volumes/Dinge/scaper/generated/'
 # SCAPER SETTINGS
 foreground_folder = '~/audio/scaper/foreground/'
 background_folder = '~/audio/scaper/background/'
-smir_reverb_path  = '~/Documents/MATLAB/SMIR-Generator-master'
+# smir_reverb_path  = '~/Documents/MATLAB/SMIR-Generator-master'
 s3a_reverb_path   = '~/source/scaper/IRs/S3A'
 
 n_soundscapes = 1
@@ -32,13 +32,19 @@ event_duration_dist = 'uniform'
 event_duration_min = 0.5
 event_duration_max = 4.0
 
-event_azimuth_dist = 'uniform'
-event_azimuth_min = 0
-event_azimuth_max = 2*np.pi
+# event_azimuth_dist = 'uniform'
+# event_azimuth_min = 0
+# event_azimuth_max = 2*np.pi
+#
+# event_elevation_dist = 'uniform'
+# event_elevation_min = -np.pi/2
+# event_elevation_max = np.pi/2
 
-event_elevation_dist = 'uniform'
-event_elevation_min = -np.pi/2
-event_elevation_max = np.pi/2
+event_azimuth_dist = 'const'
+event_azimuth = 0
+
+event_elevation_dist = 'const'
+event_elevation = 0
 
 event_spread_dist = 'const'
 event_spread = 0
@@ -76,8 +82,10 @@ for n in range(n_soundscapes):
                      source_time=(source_time_dist, source_time),
                      event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max),
                      event_duration=(event_duration_dist, event_duration_min, event_duration_max),
-                     event_azimuth=(event_azimuth_dist,event_azimuth_min,event_azimuth_max),
-                     event_elevation=(event_elevation_dist,event_elevation_min,event_elevation_max),
+                     # event_azimuth=(event_azimuth_dist,event_azimuth_min,event_azimuth_max),
+                     event_azimuth=(event_azimuth_dist,event_azimuth),
+                     # event_elevation=(event_elevation_dist,event_elevation_min,event_elevation_max),
+                     event_elevation=(event_elevation_dist,event_elevation),
                      event_spread=(event_spread_dist,event_spread),
                      snr=(snr_dist, snr_min, snr_max),
                      pitch_shift=(pitch_dist, pitch),
@@ -86,18 +94,32 @@ for n in range(n_soundscapes):
 
 
     # configure reverb
-    # reverb_config = scaper.core.SmirReverbSpec(
-    #     path = smir_reverb_path,
-    #     IRlength=1024,
-    #     room_dimensions=[3,3,3],
-    #     T_60= 0.3,
-    #     mic='soundfield'
-    # )
-
-    reverb_config = scaper.core.S3aReverbSpec(
-        path= s3a_reverb_path,
-        name = 'MainChurch'
+    reverb_config = scaper.core.SmirReverbSpec(
+        # path = smir_reverb_path,
+        IRlength=1024,
+        room_dimensions=[30,30,30],
+        beta= [1, 0.7, 0.7, 0.5, 0.2, 1],
+        source_type='o',
+        microphone_type='soundfield'
     )
+
+    # SmirReverbSpec = namedtuple(
+    #     'SmirReverbSpec',
+    #     ['IRlength',
+    #      'room_dimensions',
+    #      'beta',
+    #      'source_location',
+    #      'source_type',
+    #      'receiver_location',
+    #      'sphere_radius',
+    #      'sphere_type',
+    #      'capsule_positions'
+    #      ], verbose=False)
+
+    # reverb_config = scaper.core.S3aReverbSpec(
+    #     path= s3a_reverb_path,
+    #     name = 'MainChurch'
+    # )
 
     sc.set_reverb(reverb_config)
 

@@ -1,3 +1,5 @@
+from numbers import Number
+
 import soundfile as sf
 import scipy.signal
 import sox
@@ -13,7 +15,7 @@ import shutil
 import pandas as pd
 from .scaper_exceptions import ScaperError
 from .scaper_warnings import ScaperWarning
-from .util import _close_temp_files, cartesian_to_spherical
+from .util import _close_temp_files, cartesian_to_spherical, spherical_to_cartesian, find
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -27,8 +29,8 @@ from .ambisonics import get_number_of_ambisonics_channels, get_ambisonics_spread
 from .ambisonics import get_ambisonics_coefs
 import glob
 import csv
-# import matlab.engine
-
+# import matlab_wrapper
+import matlab.engine
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -49,14 +51,14 @@ distribution tuples to specify possible values) or instantiated (i.e. storing
 constants directly).
 '''
 
-
 SmirReverbSpec = namedtuple(
     'SmirReverbSpec',
-    ['path',
-     'IRlength',
+    ['IRlength',
      'room_dimensions',
-     'T_60',
-     'mic'],verbose=False)
+     'beta',
+     'source_type',
+     'microphone_type'
+     ], verbose=False)
 '''
 Container for storing specfic smir reverb configuration values
 '''
@@ -64,10 +66,13 @@ Container for storing specfic smir reverb configuration values
 S3aReverbSpec = namedtuple(
     'S3aReverbSpec',
     ['path',
-     'name'],verbose=False)
+     'name'], verbose=False)
 '''
 Container for storing specfic s3a reverb configuration values
 '''
+
+# omnidirectional/subcardioid/cardioid/hypercardioid/bidirectional
+s3a_allowed_source_types = ['o', 'c', 's', 'h', 'b']
 
 # TODO: MAYBE MOVE THIS OR PUT IT TOGETHER OR SOMETHING
 
@@ -78,6 +83,13 @@ s3a_filter_name = 'ls'
 s3a_filter_extension = '.wav'
 
 s3a_folder_name = 'Soundfield'
+
+# TODO MATLAB STUFF CONFIG
+
+matlab_root = "/Applications/MATLAB_R2017b.app"
+
+smir_folder_name = "SMIR-Generator-master"
+smir_folder_path = os.path.join(os.getcwd(), smir_folder_name)
 
 
 def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
@@ -289,14 +301,14 @@ def trim(audio_infile, jams_infile, audio_outfile, jams_outfile, start_time,
                 shutil.copyfile(tmpfiles[-1].name, audio_outfile)
 
 
-
 def _generate_RIR_path(s3a_reverg_config):
     '''
     TODO
     :param s3a_reverg_config:
     :return:
     '''
-    return os.path.expanduser(os.path.join(s3a_reverg_config.path,s3a_reverg_config.name,s3a_folder_name))
+    return os.path.expanduser(os.path.join(s3a_reverg_config.path, s3a_reverg_config.name, s3a_folder_name))
+
 
 def retrieve_RIR_positions(s3a_reverg_config):
     '''
@@ -318,7 +330,7 @@ def retrieve_RIR_positions(s3a_reverg_config):
     # Go to Soundfield folder
     # todo: maybe better implementation for txt file open?
 
-    speakers_positions_file = os.path.join(_generate_RIR_path(s3a_reverg_config),s3a_loudspeaker_positions_txtfile)
+    speakers_positions_file = os.path.join(_generate_RIR_path(s3a_reverg_config), s3a_loudspeaker_positions_txtfile)
 
     # Retrieve the file content into speaker_positions
     speaker_positions_cartesian = []
@@ -330,7 +342,6 @@ def retrieve_RIR_positions(s3a_reverg_config):
     speaker_positions_spherical = [cartesian_to_spherical(pos) for pos in speaker_positions_cartesian]
 
     return speaker_positions_spherical
-
 
 
 def _get_value_from_dist(dist_tuple):
@@ -414,7 +425,7 @@ def _validate_distribution(dist_tuple):
         if (len(dist_tuple) != 3 or
                 not is_real_number(dist_tuple[1]) or
                 not is_real_number(dist_tuple[2]) or
-                dist_tuple[1] > dist_tuple[2]):
+                    dist_tuple[1] > dist_tuple[2]):
             raise ScaperError(
                 'The "uniform" distribution tuple be of length 2, where the '
                 '2nd item is a real number and the 3rd item is a real number '
@@ -425,7 +436,7 @@ def _validate_distribution(dist_tuple):
         if (len(dist_tuple) != 3 or
                 not is_real_number(dist_tuple[1]) or
                 not is_real_number(dist_tuple[2]) or
-                dist_tuple[2] < 0):
+                    dist_tuple[2] < 0):
             raise ScaperError(
                 'The "normal" distribution tuple must be of length 3, where '
                 'the 2nd item (mean) is a real number and the 3rd item (std '
@@ -436,8 +447,8 @@ def _validate_distribution(dist_tuple):
                 not is_real_number(dist_tuple[2]) or
                 not is_real_number(dist_tuple[3]) or
                 not is_real_number(dist_tuple[4]) or
-                dist_tuple[2] < 0 or
-                dist_tuple[4] < dist_tuple[3]):
+                    dist_tuple[2] < 0 or
+                    dist_tuple[4] < dist_tuple[3]):
             raise ScaperError(
                 'The "truncnorm" distribution tuple must be of length 5, '
                 'where the 2nd item (mean) is a real number, the 3rd item '
@@ -530,7 +541,6 @@ def _validate_source_file(source_file_tuple, label_tuple):
             'Source file must be specified using a "const" or "choose" tuple.')
 
 
-
 # def _validate_ambisonics_order(ambisonics_order_tuple):
 #     '''
 #         Validate that the ambisonics order tuple is in the right format and that it's values
@@ -586,7 +596,7 @@ def _validate_time(time_tuple):
     if time_tuple[0] == "const":
         if (time_tuple[1] is None or
                 not is_real_number(time_tuple[1]) or
-                time_tuple[1] < 0):
+                    time_tuple[1] < 0):
             raise ScaperError(
                 'Time must be a real non-negative number.')
     elif time_tuple[0] == "choose":
@@ -638,7 +648,7 @@ def _validate_duration(duration_tuple):
     # Ensure the values are valid for duration
     if duration_tuple[0] == "const":
         if (not is_real_number(duration_tuple[1]) or
-                duration_tuple[1] <= 0):
+                    duration_tuple[1] <= 0):
             raise ScaperError(
                 'Duration must be a real number greater than zero.')
     elif duration_tuple[0] == "choose":
@@ -666,6 +676,7 @@ def _validate_duration(duration_tuple):
                 'A "truncnorm" distirbution tuple for time must specify a '
                 'positive trunc_min value.')
 
+
 def _validate_azimuth(azimuth_tuple):
     '''
     Validate that an azimuth tuple has the right format and that the
@@ -687,14 +698,14 @@ def _validate_azimuth(azimuth_tuple):
 
     # Ensure the values are valid for duration
     if azimuth_tuple[0] == "const":
-        if (not is_real_number(azimuth_tuple[1]) or azimuth_tuple[1] < 0 or azimuth_tuple[1] > 2*np.pi) :
+        if (not is_real_number(azimuth_tuple[1]) or azimuth_tuple[1] < 0 or azimuth_tuple[1] > 2 * np.pi):
             raise ScaperError(
                 'Azimuth must be a real number in the range [0..2pi].')
     elif azimuth_tuple[0] == "choose":
         if (not azimuth_tuple[1] or
                 not is_real_array(azimuth_tuple[1]) or
                 not all(x >= 0 for x in azimuth_tuple[1]) or
-                not all(x <= (2*np.pi) for x in azimuth_tuple[1])):
+                not all(x <= (2 * np.pi) for x in azimuth_tuple[1])):
             raise ScaperError(
                 'Azimuth list must be a non-empty list of real '
                 'numbers in the range [0..2pi].')
@@ -703,7 +714,7 @@ def _validate_azimuth(azimuth_tuple):
             raise ScaperError(
                 'A "uniform" distribution tuple for azimuth must have '
                 'min_value >= 0')
-        elif azimuth_tuple[2] > (2*np.pi):
+        elif azimuth_tuple[2] > (2 * np.pi):
             raise ScaperError(
                 'A "uniform" distribution tuple for azimuth must have '
                 'max_value <= 2pi')
@@ -719,10 +730,11 @@ def _validate_azimuth(azimuth_tuple):
             raise ScaperError(
                 'A "truncnorm" distirbution tuple for azimuth must specify a '
                 'trunc_min >= 0.')
-        elif azimuth_tuple[4] > (2*np.pi):
+        elif azimuth_tuple[4] > (2 * np.pi):
             raise ScaperError(
                 'A "truncnorm" distirbution tuple for azimuth must specify a '
                 'trunc_max value <= 2pi.')
+
 
 def _validate_elevation(elevation_tuple):
     '''
@@ -745,23 +757,24 @@ def _validate_elevation(elevation_tuple):
 
     # Ensure the values are valid for duration
     if elevation_tuple[0] == "const":
-        if (not is_real_number(elevation_tuple[1]) or elevation_tuple[1] < -np.pi/2. or elevation_tuple[1] > np.pi/2.) :
+        if (not is_real_number(elevation_tuple[1]) or elevation_tuple[1] < -np.pi / 2. or elevation_tuple[
+            1] > np.pi / 2.):
             raise ScaperError(
                 'Elevation must be a real number in the range [-pi/2..pi/2].')
     elif elevation_tuple[0] == "choose":
         if (not elevation_tuple[1] or
                 not is_real_array(elevation_tuple[1]) or
-                not all(x >= -np.pi/2. for x in elevation_tuple[1]) or
-                not all(x <= np.pi/2. for x in elevation_tuple[1])):
+                not all(x >= -np.pi / 2. for x in elevation_tuple[1]) or
+                not all(x <= np.pi / 2. for x in elevation_tuple[1])):
             raise ScaperError(
                 'Elevation list must be a non-empty list of real '
                 'numbers in the range [-pi/2..pi/2]')
     elif elevation_tuple[0] == "uniform":
-        if elevation_tuple[1] < -np.pi/2.:
+        if elevation_tuple[1] < -np.pi / 2.:
             raise ScaperError(
                 'A "uniform" distribution tuple for elevation must have '
                 'min_value >= -pi/2')
-        elif elevation_tuple[2] > np.pi/2.:
+        elif elevation_tuple[2] > np.pi / 2.:
             raise ScaperError(
                 'A "uniform" distribution tuple for elevation must have '
                 'max_value <= pi/2')
@@ -773,14 +786,15 @@ def _validate_elevation(elevation_tuple):
             'in an infinite loop!',
             ScaperWarning)
     elif elevation_tuple[0] == "truncnorm":
-        if elevation_tuple[3] < -np.pi/2.:
+        if elevation_tuple[3] < -np.pi / 2.:
             raise ScaperError(
                 'A "truncnorm" distirbution tuple for elevation must specify a '
                 'trunc_min >= -pi/2')
-        elif elevation_tuple[4] > np.pi/2.:
+        elif elevation_tuple[4] > np.pi / 2.:
             raise ScaperError(
                 'A "truncnorm" distirbution tuple for elevation must specify a '
                 'trunc_max value <= pi/2')
+
 
 def _validate_spread(spread_tuple):
     '''
@@ -840,6 +854,7 @@ def _validate_spread(spread_tuple):
                 'A "truncnorm" distirbution tuple for spread must specify a '
                 'trunc_max value <= 1')
 
+
 def _validate_snr(snr_tuple):
     '''
     Validate that an snr distribution tuple has the right format.
@@ -869,9 +884,9 @@ def _validate_snr(snr_tuple):
             raise ScaperError(
                 'SNR list must be a non-empty list of real numbers.')
 
-    # No need to check for "uniform" and "normal" since they must produce a
-    # real number and technically speaking any real number is a valid SNR.
-    # TODO: do we want to impose limits on the possible SNR values?
+            # No need to check for "uniform" and "normal" since they must produce a
+            # real number and technically speaking any real number is a valid SNR.
+            # TODO: do we want to impose limits on the possible SNR values?
 
 
 def _validate_pitch_shift(pitch_shift_tuple):
@@ -906,10 +921,10 @@ def _validate_pitch_shift(pitch_shift_tuple):
                     'Pitch shift list must be a non-empty list of real '
                     'numbers.')
 
-        # No need to check for "uniform" and "normal" since they must produce a
-        # real number and technically speaking any real number is a valid pitch
-        # shift
-        # TODO: do we want to impose limits on the possible pitch shift values?
+                # No need to check for "uniform" and "normal" since they must produce a
+                # real number and technically speaking any real number is a valid pitch
+                # shift
+                # TODO: do we want to impose limits on the possible pitch shift values?
 
 
 def _validate_time_stretch(time_stretch_tuple):
@@ -935,7 +950,7 @@ def _validate_time_stretch(time_stretch_tuple):
         # Ensure the values are valid for time stretch
         if time_stretch_tuple[0] == "const":
             if (not is_real_number(time_stretch_tuple[1]) or
-                    time_stretch_tuple[1] <= 0):
+                        time_stretch_tuple[1] <= 0):
                 raise ScaperError(
                     'Time stretch must be a real number greater than zero.')
         elif time_stretch_tuple[0] == "choose":
@@ -963,8 +978,8 @@ def _validate_time_stretch(time_stretch_tuple):
                     'A "truncnorm" distirbution tuple for time stretch must '
                     'specify a positive trunc_min value.')
 
-        # TODO: do we want to impose limits on the possible time stretch
-        # values?
+                # TODO: do we want to impose limits on the possible time stretch
+                # values?
 
 
 def _validate_event(label, source_file,
@@ -1057,30 +1072,22 @@ def _validate_ambisonics_order(ambisonics_order):
     elif ambisonics_order < 0:
         raise ScaperError('Ambisonics Order must be 0 or greater')
 
+
 def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
     # TODO comments
 
     if not is_real_number(ambisonics_spread_slope):
         raise ScaperError('Ambisonics Spread Slope must be a real value')
-    elif not 0 <= ambisonics_spread_slope <=1:
+    elif not 0 <= ambisonics_spread_slope <= 1:
         raise ScaperError('Ambisonics Order must be 0 located on the range [0,1]')
 
 
 def _validate_smir_reverb_spec(reverb_config):
-
-    # path: str
-    if reverb_config.path is None:
-        raise ScaperError(
-            'reverb_config: path is None')
-    elif type(reverb_config.path) is not str:
-        raise ScaperError(
-            'reverb path not a string')
-
     # IR length: positive integer
     if reverb_config.IRlength is None:
         raise ScaperError(
             'reverb_config: IR length is None')
-    elif not isinstance(reverb_config.IRlength,int) or reverb_config.IRlength <=0:
+    elif not isinstance(reverb_config.IRlength, int) or reverb_config.IRlength <= 0:
         raise ScaperError(
             'reverb_config: IR length must be a positive integer')
 
@@ -1088,33 +1095,74 @@ def _validate_smir_reverb_spec(reverb_config):
     if reverb_config.room_dimensions is None:
         raise ScaperError(
             'reverb_config: room_dimensions is None')
-    elif not isinstance(reverb_config.room_dimensions,list):
+    elif not isinstance(reverb_config.room_dimensions, list):
         raise ScaperError(
             'reverb_config: room_dimensions is not a List')
     elif len(reverb_config.room_dimensions) is not 3:
         raise ScaperError(
             'reverb_config: room_dimensions must have 3 elements')
 
-    # T_60: float >0
-    if reverb_config.T_60 is None:
+    # beta: float > 0 (T_60) or list of 6 floats
+    if reverb_config.beta is None:
         raise ScaperError(
-            'reverb_config: T_60 is None')
-    elif not is_real_number(reverb_config.T_60) or reverb_config.T_60 <= 0:
-        raise ScaperError(
-            'reverb_config: T_60 must be a positive number')
+            'reverb_config: beta is None')
 
-    # mic type:
-    if reverb_config.mic is None:
-        raise ScaperError(
-            'reverb_config: mic is None')
-    else:
-        if not SUPPORTED_VIRTUAL_MICS.has_key(reverb_config.mic):
+    # If it's T_60, it should be bigger than 0
+    if isinstance(reverb_config.beta, Number):
+
+        if reverb_config.beta <= 0:
             raise ScaperError(
-                'reverb_config: unsupported mic: ' + reverb_config.mic)
+                'reverb_config: beta (T_60) must be a positive number')
+
+    # If list, it should be a list of 6 numbers
+    elif isinstance(reverb_config.beta, list):
+
+        if len(reverb_config.beta) is not 6:
+            raise ScaperError(
+                'reverb_config: beta must have 6 elements; found '
+                + str(len(reverb_config.beta)))
+
+        if not all([isinstance(e, Number) for e in reverb_config.beta]):
+            raise ScaperError(
+                'reverb_config: beta must contain numbers')
+
+    # If none of them, wrong type
+    else:
+        raise ScaperError(
+            'reverb_config: beta must be a T_60 value, or '
+            'the walls reflectivity (list of 6 numbers)')
+
+    # Valid source types: 'o','c','s','h','b'
+    if reverb_config.source_type is None:
+        raise ScaperError(
+            'reverb_config: source_type is None')
+
+    elif not isinstance(reverb_config.source_type, str):
+        ScaperError(
+            'reverb_config: source_type must be a string')
+
+    elif find(reverb_config.source_type, s3a_allowed_source_types) is None:
+        ScaperError(
+            'reverb_config: source_type not known: '
+            + reverb_config.source_type)
+
+    # Mic type: defined SUPPORTED_VIRTUAL_MICS
+    if reverb_config.microphone_type is None:
+        raise ScaperError(
+            'reverb_config: microphone_type is None')
+
+    elif not isinstance(reverb_config.microphone_type, str):
+        ScaperError(
+            'reverb_config: microphone_type must be a string')
+
+    else:
+        if not SUPPORTED_VIRTUAL_MICS.has_key(reverb_config.microphone_type):
+            raise ScaperError(
+                'reverb_config: unsupported microphone_type: '
+                + reverb_config.microphone_type)
 
 
 def _validate_s3a_reverb_spec(reverb_config):
-
     # Folder structure should be something like:
     # - S3A_top_folder (:path: in the config struct)
     #     - reverb_name (:name: in the config struct)
@@ -1147,7 +1195,7 @@ def _validate_s3a_reverb_spec(reverb_config):
             'reverb_config: folder does not exist: ' + path)
 
     # Inside the reverb folder should be a "Soundfield" folder
-    soundfield_path = os.path.join(path,s3a_folder_name)
+    soundfield_path = os.path.join(path, s3a_folder_name)
     if not os.path.exists(os.path.expanduser(soundfield_path)):
         raise ScaperError(
             'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(path))
@@ -1158,7 +1206,7 @@ def _validate_s3a_reverb_spec(reverb_config):
     num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
 
     # Count number of lines in speakers file
-    speakers_positions_file = os.path.join(soundfield_path,s3a_loudspeaker_positions_txtfile);
+    speakers_positions_file = os.path.join(soundfield_path, s3a_loudspeaker_positions_txtfile);
     num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
 
     # Check
@@ -1168,10 +1216,9 @@ def _validate_s3a_reverb_spec(reverb_config):
 
 
 def _validate_reverb_config(reverb_config):
-
     if reverb_config is None:
         raise ScaperError(
-         'reverb_config is None')
+            'reverb_config is None')
 
     # Check all different supported reverb types
 
@@ -1184,7 +1231,6 @@ def _validate_reverb_config(reverb_config):
     else:
         raise ScaperError(
             'reverb_config of unknown type: ' + str(type(reverb_config)))
-
 
 
 class Scaper(object):
@@ -1936,7 +1982,6 @@ class Scaper(object):
         # Return
         return jam
 
-
     def _mono_downmix(self, file_path):
         '''
         Take the path to an audio file and produce a tmp file downmixed to mono,
@@ -1972,10 +2017,8 @@ class Scaper(object):
             delete=False)
 
         # Actual rendering
-        downmix_transformer.build(file_path,downmix_tmpfile.name)
+        downmix_transformer.build(file_path, downmix_tmpfile.name)
         return downmix_tmpfile
-
-
 
     def _generate_audio(self, destination_path, audio_filename, ann,
                         disable_sox_warnings=True):
@@ -2042,11 +2085,11 @@ class Scaper(object):
             try:
                 os.mkdir(destination_source_path)
             except OSError as err:
-                if err.errno != 17: # folder exists
+                if err.errno != 17:  # folder exists
                     raise
-                # If we arrived here because the folder already existed,
-                # don't warn again, since the parent folder also existed
-                # and the user already received a warning
+                    # If we arrived here because the folder already existed,
+                    # don't warn again, since the parent folder also existed
+                    # and the user already received a warning
 
             # Keep track of the different events appearing
             bg_events = []
@@ -2095,8 +2138,8 @@ class Scaper(object):
                 fx_transformer = sox.Transformer()
                 # Ensure consistent sampling rate
                 fx_transformer.convert(samplerate=self.sr,
-                                    n_channels=None,   # mono
-                                    bitdepth=None)
+                                       n_channels=None,  # mono
+                                       bitdepth=None)
 
                 # Trim
                 fx_transformer.trim(e.value['source_time'],
@@ -2112,11 +2155,10 @@ class Scaper(object):
                     if e.value['time_stretch'] is not None:
                         fx_transformer.tempo(1.0 / float(e.value['time_stretch']))
 
-                    # Apply very short fade in and out
-                    # (avoid unnatural sound onsets/offsets)
+                        # Apply very short fade in and out
+                        # (avoid unnatural sound onsets/offsets)
                         fx_transformer.fade(fade_in_len=self.fade_in_len,
-                                     fade_out_len=self.fade_out_len)
-
+                                            fade_out_len=self.fade_out_len)
 
                 # Normalize to specified SNR with respect to
                 # self.ref_db (from downmixed version)
@@ -2130,7 +2172,6 @@ class Scaper(object):
                         'Unsupported event role: {:s}'.format(
                             e.value['role']))
                 fx_transformer.gain(gain_db=gain, normalize=False)
-
 
                 # Here we got the final mono file with transformations
                 # but before time padding and ambisonics transformation
@@ -2154,7 +2195,7 @@ class Scaper(object):
                 # on the remix method
                 fx_combiner = sox.Combiner()
                 fx_combiner.convert(samplerate=self.sr,
-                                    n_channels=self.num_channels,   # num_ambisonics_channels
+                                    n_channels=self.num_channels,  # num_ambisonics_channels
                                     bitdepth=None)
 
                 # Pad with silence before/after event to match the
@@ -2172,7 +2213,6 @@ class Scaper(object):
                                                 e.value['time_stretch']))
                     fx_combiner.pad(prepad, postpad)
 
-
                 # Ambisonics
                 #
                 # Two main methods of operation here:
@@ -2188,19 +2228,18 @@ class Scaper(object):
                     if is_foreground(e):
                         # if foreground, apply both ambi coefs and spread
                         input_volumes = get_ambisonics_coefs(e.value['event_azimuth'],
-                                                            e.value['event_elevation'],
-                                                            self.ambisonics_order)
+                                                             e.value['event_elevation'],
+                                                             self.ambisonics_order)
                         input_volumes *= get_ambisonics_spread_coefs(
-                                                            e.value['event_spread'],
-                                                            self.ambisonics_spread_slope,
-                                                            self.ambisonics_order)
+                            e.value['event_spread'],
+                            self.ambisonics_spread_slope,
+                            self.ambisonics_order)
                     elif is_background(e):
                         # Apply just maximum spread (W gain is 1 in SN3D)
                         input_volumes = get_ambisonics_spread_coefs(
-                                                            1.0,
-                                                            self.ambisonics_spread_slope,
-                                                            self.ambisonics_order)
-
+                            1.0,
+                            self.ambisonics_spread_slope,
+                            self.ambisonics_order)
 
                     # Prepare tmp file for output
                     processed_tmpfiles.append(
@@ -2217,10 +2256,66 @@ class Scaper(object):
                 elif (type(self.reverb_config) is SmirReverbSpec):
 
                     if is_foreground(e):
-                    # Call matlab stuff and compute IRs
-                    # TODO
-                        1
+                        # Generate IRs
 
+                        # default
+                        # in matlab all number are doubles by default
+                        # so take care to define them in python at least as floats
+                        c = 343.0
+                        radius = 2.0  # TODO choose
+                        N_harm = 20.0
+                        K = 1.0
+                        order = 10.0  # maximum
+                        refl_coeff_ang_dep = 0.0
+                        HP = 0.0
+                        src_type = 'o'
+
+                        # the receiver will be at the middle of the room
+                        # TODO: make it configurable??
+                        sphLocation = matlab.double([float(dim) / 2 for dim in self.reverb_config.room_dimensions])
+
+                        # source location will be given by the specific instanciation
+                        azi = e.value['event_azimuth'],
+                        ele = e.value['event_elevation']
+                        s = matlab.double(spherical_to_cartesian([float(e.value['event_azimuth']),
+                                                                  float(e.value['event_elevation']),
+                                                                  float(radius)]))
+
+                        # room dimension given by the user
+                        L = matlab.double(self.reverb_config.room_dimensions)
+
+                        # beta given by the user.
+                        # It might be either a float (T_60 in seconds)
+                        # or wall reflectivity in list of len(6)
+                        if isinstance(self.reverb_config.beta, list):
+                            beta = matlab.double(self.reverb_config.beta)
+                        else:
+                            beta = float(self.reverb_config.beta)
+
+                        # sph_type, sph_radius, mic, given by the microphone type
+                        sphType = SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_type"]
+                        sphRadius = SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_radius"]
+                        mic = matlab.double(SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"])
+
+                        # nsample given by the user
+                        nsample = float(self.reverb_config.IRlength)
+
+                        self.matlab_engine.smir_generator(c,
+                                                          float(self.sr),
+                                                          sphLocation,
+                                                          s,
+                                                          L,
+                                                          beta,
+                                                          sphType,
+                                                          sphRadius,
+                                                          mic,
+                                                          N_harm,
+                                                          nsample,
+                                                          K,
+                                                          order,
+                                                          refl_coeff_ang_dep,
+                                                          HP,
+                                                          src_type)
 
 
                 elif (type(self.reverb_config) is S3aReverbSpec):
@@ -2250,7 +2345,6 @@ class Scaper(object):
                         file_data, file_sample_rate = sf.read(preprocessed_files[-1])
                         print(np.shape(file_data))
 
-
                         # fftconvolve will try to convolve the signals in every dimension
                         # i.e., if we have two files with 4 channels, the result will have 7 channel
                         # Obviously that's not what we want, so the provisional workaround
@@ -2258,7 +2352,7 @@ class Scaper(object):
                         # and then put all them together when wav rendering
                         output_signal_list = []
                         for i in range(num_channels):
-                            output_signal_list.append(scipy.signal.fftconvolve(file_data,filter_data[:,i]))
+                            output_signal_list.append(scipy.signal.fftconvolve(file_data, filter_data[:, i]))
 
                         output_signal = np.transpose(np.array(output_signal_list))
 
@@ -2275,8 +2369,7 @@ class Scaper(object):
                                 suffix='.wav', delete=False))
 
                         # Change here the subtype for other format types
-                        sf.write(processed_tmpfiles[-1].name,output_signal,self.sr,subtype='PCM_16')
-
+                        sf.write(processed_tmpfiles[-1].name, output_signal, self.sr, subtype='PCM_16')
 
             # Finally combine all the files and optionally apply reverb
             # If we have more than one tempfile (i.e.g background + at
@@ -2308,9 +2401,6 @@ class Scaper(object):
             [os.remove(t.name) for t in downmix_tmpfiles]
             [os.remove(t.name) for t in processed_tmpfiles]
 
-
-
-
     def set_reverb(self, reverb_config):
         '''
         TODO
@@ -2323,7 +2413,6 @@ class Scaper(object):
 
         # If ok, store it
         self.reverb_config = reverb_config
-
 
     def generate(self, destination_path,
                  allow_repeated_label=True, allow_repeated_source=True,
@@ -2394,14 +2483,19 @@ class Scaper(object):
         # The audio generation process will also probably vary depending on the
         # reverb type selected...
 
-        if (type(self.reverb_config) is S3aReverbSpec):
+        if (type(self.reverb_config) is SmirReverbSpec):
+            # Start Matlab Session
+            self.matlab_engine = matlab.engine.start_matlab("-nodesktop", async=False)
+            # Add smir code into the path
+            self.matlab_engine.addpath(smir_folder_path)
+
+        elif (type(self.reverb_config) is S3aReverbSpec):
 
             # Retrieve valid azimuth/elevation values
             imposed_source_positions = retrieve_RIR_positions(self.reverb_config)
 
             # todo! impose the ambisonics order!
             print (imposed_source_positions)
-
 
             # We are going to modify the foreground specs, in order to impose source positions
             # Since we cannot modify directly an EventSpec (todo: why?)
@@ -2413,42 +2507,41 @@ class Scaper(object):
             for e in self.fg_spec:
                 # For the moment, just choose random on the imposed positions for each event
                 # TODO: do we want
-                random_index = random.randint(0,len(imposed_source_positions)-1)
+                random_index = random.randint(0, len(imposed_source_positions) - 1)
                 random_position = imposed_source_positions[random_index]
-                imposed_azimuth=('const',random_position[0])
-                imposed_elevation=('const',random_position[1])
-                imposed_spread = ('const',0.0)
+                imposed_azimuth = ('const', random_position[0])
+                imposed_elevation = ('const', random_position[1])
+                imposed_spread = ('const', 0.0)
 
                 # Store the random indinces, so later in the generate_audio method we can
                 # easily retrieve the associated IRs
                 # Achtung! indices start at 0, but audio files start at 1...
                 self.chosen_IR_indices.append(random_index)
-                print(['chose index: ',random_index])
+                print(['chose index: ', random_index])
 
                 # Create a new event copying the other relevant informationo
                 imposed_fg_spec.append(EventSpec(label=e.label,
-                                             source_file=e.source_file,
-                                             source_time=e.source_time,
-                                             event_time=e.event_time,
-                                             event_duration=e.event_duration,
-                                             event_azimuth=imposed_azimuth,     # changed!
-                                             event_elevation=imposed_elevation, # changed!
-                                             event_spread=imposed_spread,       # changed!
-                                             snr=e.snr,
-                                             role=e.role,
-                                             pitch_shift=e.pitch_shift,
-                                             time_stretch=e.time_stretch))
+                                                 source_file=e.source_file,
+                                                 source_time=e.source_time,
+                                                 event_time=e.event_time,
+                                                 event_duration=e.event_duration,
+                                                 event_azimuth=imposed_azimuth,  # changed!
+                                                 event_elevation=imposed_elevation,  # changed!
+                                                 event_spread=imposed_spread,  # changed!
+                                                 snr=e.snr,
+                                                 role=e.role,
+                                                 pitch_shift=e.pitch_shift,
+                                                 time_stretch=e.time_stretch))
 
             # Actually substitute the old events for the new imposed ones
             self.fg_spec = []
             [self.fg_spec.append(e) for e in imposed_fg_spec]
 
-
         # Create specific instance of a soundscape based on the spec
         jam = self._instantiate(
             allow_repeated_label=allow_repeated_label,
             allow_repeated_source=allow_repeated_source,
-            reverb=0.69696969696969696969, #todo
+            reverb=0.69696969696969696969,  # todo
             disable_instantiation_warnings=disable_instantiation_warnings)
         ann = jam.annotations.search(namespace='sound_event')[0]
 
@@ -2460,23 +2553,23 @@ class Scaper(object):
         # Create the top folder
         # If it exists, the content will be overrided
         if os.path.exists(destination_path):
-            warnings.warn('Destination path exists: ' + destination_path,ScaperWarning)
+            warnings.warn('Destination path exists: ' + destination_path, ScaperWarning)
         else:
             os.mkdir(destination_path)
 
         # Generate the audio and save to disk
         if not no_audio:
             self._generate_audio(destination_path,
-                                 filename+'.wav',
+                                 filename + '.wav',
                                  ann,
                                  disable_sox_warnings=disable_sox_warnings)
 
         # Finally save JAMS to disk too
-        jam.save(os.path.join(destination_path, filename+'.jams'))
+        jam.save(os.path.join(destination_path, filename + '.jams'))
 
         # Optionally save to CSV as well
         if generate_txt:
-            txt_path = os.path.join(destination_path,filename+'.txt')
+            txt_path = os.path.join(destination_path, filename + '.txt')
 
             df = pd.DataFrame(columns=['onset', 'offset', 'label'])
 
@@ -2489,7 +2582,7 @@ class Scaper(object):
                     # manner, because it will always fit with the order given
                     # by the :_generate_audio(): method
                     # Just make sure that the nomenclature remains
-                    name = 'fg' + str(idx-1)
+                    name = 'fg' + str(idx - 1)
                     newrow = ([row.time.total_seconds(),
                                row.time.total_seconds() +
                                row.duration.total_seconds(),
@@ -2499,7 +2592,7 @@ class Scaper(object):
             # sort events by onset time
             df = df.sort_values('onset')
             df.reset_index(inplace=True, drop=True)
-            df.to_csv(os.path.join(destination_path,txt_path),
+            df.to_csv(os.path.join(destination_path, txt_path),
                       index=False,
                       header=False,
                       sep=txt_sep)
