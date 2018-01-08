@@ -14,7 +14,7 @@ s3a_reverb_path   = '~/source/scaper/IRs/S3A'
 n_soundscapes = 1
 ref_db = -50
 duration = 10.0
-ambisonics_order = 1
+ambisonics_order = 3
 ambisonics_spread_slope = 1.0
 
 num_events = 1

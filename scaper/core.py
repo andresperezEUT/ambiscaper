@@ -1082,6 +1082,12 @@ def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
 
 
 def _validate_smir_reverb_spec(reverb_config):
+    '''
+    TODO
+    RETURN MAX AMBISONICS ORDER
+    :param reverb_config:
+    :return:
+    '''
     # IR length: positive integer
     if reverb_config.IRlength is None:
         raise ScaperError(
@@ -1161,6 +1167,7 @@ def _validate_smir_reverb_spec(reverb_config):
                 + reverb_config.microphone_type)
 
 
+
 def _validate_s3a_reverb_spec(reverb_config):
     # Folder structure should be something like:
     # - S3A_top_folder (:path: in the config struct)
@@ -1170,6 +1177,8 @@ def _validate_s3a_reverb_spec(reverb_config):
     #             - "lsN.wav" with the N actual impulse responses, starting from 1
     #             - "LsPos.txt" with the loudspeaker positions
     #             - (maybe a "Metadata_SoundField.txt")
+    # TODO
+    # RETURN MAX AMBISONICS ORDER
 
     # Check that path is str
     if reverb_config.path is None:
@@ -1214,13 +1223,20 @@ def _validate_s3a_reverb_spec(reverb_config):
             'reverb_config: the number of audio files does not match with the speaker description')
 
 
-def _validate_reverb_config(reverb_config):
+
+def _validate_reverb_config(reverb_config, target_ambisonics_order):
+    '''
+
+    :param reverb_config:
+    :param target_ambisonics_order:
+    :return:
+    '''
+
     if reverb_config is None:
         raise ScaperError(
             'reverb_config is None')
 
     # Check all different supported reverb types
-
     # smir
     if type(reverb_config) is SmirReverbSpec:
         _validate_smir_reverb_spec(reverb_config)
@@ -1230,6 +1246,30 @@ def _validate_reverb_config(reverb_config):
     else:
         raise ScaperError(
             'reverb_config of unknown type: ' + str(type(reverb_config)))
+
+
+
+
+def _get_max_ambi_order_from_reverb_config(reverb_config):
+    '''
+    TODO
+    :param reverb_config:
+    :param target_ambisonics_order:
+    :return:
+    '''
+
+    # smir
+    if type(reverb_config) is SmirReverbSpec:
+       # Max ambisonics order is defined in the mic spec...
+       return SUPPORTED_VIRTUAL_MICS[reverb_config.microphone_type]['max_ambi_order']
+
+    # s3a
+    elif type(reverb_config) is S3aReverbSpec:
+        # Check the maximum ambisonics order
+        # Max ambisonics order given by the number of channels of the IRs
+        # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
+        return 1
+
 
 
 class Scaper(object):
@@ -2113,26 +2153,22 @@ class Scaper(object):
         for mic_pos in SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"]:
             azi = mic_pos[0]
             ele = mic_pos[1]
+            # ambi_coefs is a matrix of shape (num_capsules, num_ambisonics_channels)
             ambi_coefs.append(get_ambisonics_coefs(azi,ele,self.ambisonics_order))
 
-        # ambi_coefs is a matrix of shape (num_capsules, num_ambisonics_channels)
-        ambi_coefs_array = np.array(ambi_coefs)
-        print(ambi_coefs_array)
 
-        sf.write("/Volumes/Dinge/scaper/generated/soundscape0/source/mic_IR.wav",
-                 np.transpose(mic_IRs),
-                 self.sr,
-                 subtype='PCM_16')
+        # Just for testing purposes
+        # sf.write("/Volumes/Dinge/scaper/generated/soundscape0/source/mic_IR.wav",
+        #          np.transpose(mic_IRs),
+        #          self.sr,
+        #          subtype='PCM_16')
 
         # Then, we need as a result a matrix of shape (num_ambisonics_channels, num_samples)
         # which is in fact the deinterleaved form of the ambisonics IRs
-        ambi_IRs = np.dot(np.transpose(ambi_coefs_array),mic_IRs)
+        ambi_IRs = np.dot(np.transpose(np.array(ambi_coefs)),mic_IRs)
 
         # Write the resulting IRs into the given destination path
         sf.write(destination_path, np.transpose(ambi_IRs), self.sr, subtype='PCM_16')
-
-
-
         return
 
 
@@ -2239,6 +2275,7 @@ class Scaper(object):
                 elif is_foreground(event):
                     fg_event_idx += 1
                     audio_event_name = 'fg' + str(len(fg_events)) + '.wav'
+                    ir_name = 'ir' + str(len(fg_events)) + '.wav'
                     fg_events.append(event)
 
                 else:
@@ -2369,28 +2406,35 @@ class Scaper(object):
                                       combine_type='merge',
                                       input_volumes=input_volumes.tolist())
 
-                elif type(self.reverb_config) is SmirReverbSpec:
+                # There is ambisonics reverb:
+                # Create or find the desired IR, and then convolve with the source
+                else:
+                    if not is_foreground(e):
+                        # Just apply reverb to foreground sounds
+                        return
+                    else:
+                        # Check reverb type and get IR
 
-                    if is_foreground(e):
+                        if type(self.reverb_config) is SmirReverbSpec:
+                            ### Model IR through smir_generator in matlab ###
 
-                        ### Model IR through smir_generator in matlab ###
-                        destination_path = os.path.join(destination_source_path, "ambi_IR.wav")
-                        # TODO: CHANGEN DESTIINATION PATH
-                        self._generate_ambisonics_reverb_from_smir_spec(destination_path,e)
+                            # Save IRs as irX.wav in the same source folder
+                            filter_path = os.path.join(destination_source_path, ir_name)
+                            self._generate_ambisonics_reverb_from_smir_spec(filter_path,e)
 
+                        elif type(self.reverb_config) is S3aReverbSpec:
+                            # Get the IRs associated to the source position
+                            # They are stored at the chosen_IR_indices list
+                            # Watch out with the indices (wav files numbering starting at 1)
 
-                elif type(self.reverb_config) is S3aReverbSpec:
+                            # Construct the filter name given the speaker index
+                            ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
+                            filter_name = s3a_filter_name + str(ir_idx) + s3a_filter_extension
 
-                    # Get the IRs associated to the source position
-                    # They are stored at the chosen_IR_indices list
-                    # Watch out with the indices (wav files numbering starting at 1)
+                            filter_path = os.path.join(_generate_RIR_path(self.reverb_config), filter_name)
 
-                    if is_foreground(e):
-                        # Construct the filter name given the speaker index
-                        ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
-                        filter_name = s3a_filter_name + str(ir_idx) + s3a_filter_extension
-
-                        filter_path = os.path.join(_generate_RIR_path(self.reverb_config), filter_name)
+                        # In both reverb cases, at this point we have the IR at the location pointed by filter_path
+                        # So we just convolve it with the source and save the result
 
                         # Open the filter
                         # filter_data is deinterleaved. e.g. channel 0 is filter_data[:, 0], etc
@@ -2404,7 +2448,6 @@ class Scaper(object):
                         # Open the preprocessed file
                         # TODO: check sr of file and filter...
                         file_data, file_sample_rate = sf.read(preprocessed_files[-1])
-                        print(np.shape(file_data))
 
                         # fftconvolve will try to convolve the signals in every dimension
                         # i.e., if we have two files with 4 channels, the result will have 7 channel
@@ -2416,8 +2459,6 @@ class Scaper(object):
                             output_signal_list.append(scipy.signal.fftconvolve(file_data, filter_data[:, i]))
 
                         output_signal = np.transpose(np.array(output_signal_list))
-
-                        print(np.shape(output_signal))
 
                         # The convolved signal is already in ambisonics format
                         # What we can do now is to process it as a wavfile
@@ -2462,6 +2503,7 @@ class Scaper(object):
             [os.remove(t.name) for t in downmix_tmpfiles]
             [os.remove(t.name) for t in processed_tmpfiles]
 
+
     def set_reverb(self, reverb_config):
         '''
         TODO
@@ -2470,9 +2512,24 @@ class Scaper(object):
         '''
 
         # Check reverb validity
-        _validate_reverb_config(reverb_config)
+        _validate_reverb_config(reverb_config, self.ambisonics_order)
 
-        # If ok, store it
+        # Ensure that we are able to provide the target ambisonics order
+        # with the given mic configuration; downgrade it if necessary
+        max_ambi_order = _get_max_ambi_order_from_reverb_config(reverb_config)
+
+        # If the maximum ambisonics order given the reverb limitations
+        # is smaller than the target, then raise a Warning
+        # and modify the current order to adapt it
+        if self.ambisonics_order > max_ambi_order:
+            self.ambisonics_order = max_ambi_order
+            # TODO: use custom warnings but not raise them! find solution
+            warnings.warn(
+                'Target ambisonics order is higher than the defined by the reverb spec. '
+                'Downgrading it to ' + str(max_ambi_order)
+            )
+
+        # If reverb config ok, store it
         self.reverb_config = reverb_config
 
     def generate(self, destination_path,

@@ -26,13 +26,20 @@ from scaper.util import delta_kronecker, is_real_number
 # Info gathered from Farina, http://pcfarina.eng.unipr.it/SPS-conversion.htm
 # More info at https://www.mhacoustics.com/sites/default/files/ReleaseNotes.pdf
 
-# Store [azimuth,  elevation] of each capsule
-# Store as well the sphere radius as the last element
+# Store useful information from each mic:
+#   - Sphere type (rigid or open)
+#   - Sphere radius
+#   - Maximum ambisonics order (it could be computed from the number of capsules,
+#       but we specify it for avoiding computations)
+#   - Spherical coordinates of the capsules
+
+
 SUPPORTED_VIRTUAL_MICS = {
 
     "soundfield": {
         "sph_type": 'rigid',
         "sph_radius": 0.02, # todo: get real measurement!
+        "max_ambi_order": 1,
         "mic":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
                 [np.pi, -0.61547970867038726],  # BLD
@@ -42,6 +49,7 @@ SUPPORTED_VIRTUAL_MICS = {
     "tetramic": {
         "sph_type": 'rigid',
         "sph_radius": 0.02, # todo: get real measurement!
+        "max_ambi_order": 1,
         "mic":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
                 [np.pi, -0.61547970867038726],  # BLD
@@ -51,6 +59,7 @@ SUPPORTED_VIRTUAL_MICS = {
     "em32":  {
         "sph_type": 'rigid',
         "sph_radius": 0.042, # todo: get real measurement!
+        "max_ambi_order": 4,
         "mic":  [[0.0, 0.3665191429188092],
                 [0.5585053606381855, 0.0],
                 [0.0, -0.3665191429188092],
