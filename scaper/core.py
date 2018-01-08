@@ -2430,8 +2430,25 @@ class Scaper(object):
                             # Construct the filter name given the speaker index
                             ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
                             filter_name = s3a_filter_name + str(ir_idx) + s3a_filter_extension
-
                             filter_path = os.path.join(_generate_RIR_path(self.reverb_config), filter_name)
+
+                            # Create a symlink to the filter on the source folder
+                            # We could just copy the filter there for consistency,
+                            # but that would increase too much the output size
+                            # ACHTUNG!!! os.symlink is only defined for Unix,
+                            # so this line will probably break in Windows
+                            # TODO: handle Windows compatibility, test in Linux
+                            try:
+                                symlink_path = os.path.join(destination_source_path, ir_name)
+                                os.symlink(filter_path, symlink_path)
+                            except OSError as err:
+                                if err.errno == 17:  # folder exists
+                                    warnings.warn(
+                                        'Could not create symlink: file exists: ' + symlink_path
+                                    )
+                                else:
+                                    raise
+
 
                         # In both reverb cases, at this point we have the IR at the location pointed by filter_path
                         # So we just convolve it with the source and save the result
@@ -2613,9 +2630,6 @@ class Scaper(object):
             # Retrieve valid azimuth/elevation values
             imposed_source_positions = retrieve_RIR_positions(self.reverb_config)
 
-            # todo! impose the ambisonics order!
-            print (imposed_source_positions)
-
             # We are going to modify the foreground specs, in order to impose source positions
             # Since we cannot modify directly an EventSpec (todo: why?)
             # we will copy all valid args from each event, and create a new set of events
@@ -2636,7 +2650,6 @@ class Scaper(object):
                 # easily retrieve the associated IRs
                 # Achtung! indices start at 0, but audio files start at 1...
                 self.chosen_IR_indices.append(random_index)
-                print(['chose index: ', random_index])
 
                 # Create a new event copying the other relevant informationo
                 imposed_fg_spec.append(EventSpec(label=e.label,
