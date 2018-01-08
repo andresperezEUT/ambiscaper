@@ -1,9 +1,9 @@
 %% Initialization
-close all
-clear
-clc
+%close all
+%clear
+%clc
 
-%% Setup
+% Setup
 procFs = 48000;                      % Sampling frequency (Hz)
 c = 343;                            % Sound velocity (m/s)
 nsample = 4096;                   % Length of desired RIR
@@ -18,7 +18,7 @@ HP = 1;                             % Optional high pass filter (0/1)
 src_type = 'o';                     % Directional source type ('o','c','s','h','b')
 [src_ang(1),src_ang(2)] = mycart2sph(sphLocation(1)-s(1),sphLocation(2)-s(2),sphLocation(3)-s(3)); % Towards the receiver
 
-%% Example 1
+% Example 1
 order = 10;                          % Reflection order (-1 is maximum reflection order)
 refl_coeff_ang_dep = 0;             % Real reflection coeff(0) or angle dependent reflection coeff(1)
 % beta = 0.3;                         % Reverbration time T_60 (s)
@@ -26,8 +26,8 @@ beta = [1 0.7 0.7 0.5 0.2 1];             % Room reflection coefficients [\beta_
 
 sphRadius = 0.042;                  % Radius of the spherical microphone array (m)
 sphType = 'rigid';                  % Type of sphere (open/rigid)
-% mic = [0 0; pi/2 0; pi 0; 3*pi/2 0];                  % Microphone positions (azimuth, elevation)
-mic = [0 pi/4; pi/2 3*pi/4; pi pi/4; 3*pi/2 3*pi/4];                  % Microphone positions (azimuth, elevation)
+mic = [0 0; pi/2 0; pi 0; 3*pi/2 0];                  % Microphone positions (azimuth, elevation)
+%mic = [0 pi/4; pi/2 3*pi/4; pi pi/4; 3*pi/2 3*pi/4];                  % Microphone positions (azimuth, elevation)
 
 [h1, H1] = smir_generator(c, procFs, sphLocation, s, L, beta, sphType, sphRadius, mic, N_harm, nsample, K, order, refl_coeff_ang_dep, HP, src_type, src_ang);
 

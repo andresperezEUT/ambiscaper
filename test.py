@@ -14,10 +14,10 @@ s3a_reverb_path   = '~/source/scaper/IRs/S3A'
 n_soundscapes = 1
 ref_db = -50
 duration = 10.0
-ambisonics_order = 3
+ambisonics_order = 1
 ambisonics_spread_slope = 1.0
 
-num_events = 2
+num_events = 1
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -96,11 +96,11 @@ for n in range(n_soundscapes):
     # configure reverb
     reverb_config = scaper.core.SmirReverbSpec(
         # path = smir_reverb_path,
-        IRlength=1024,
-        room_dimensions=[30,30,30],
-        beta= [1, 0.7, 0.7, 0.5, 0.2, 1],
+        IRlength=4096,
+        room_dimensions=[6,3,3],
+        beta= 0.3,
         source_type='o',
-        microphone_type='soundfield'
+        microphone_type='em32'
     )
 
     # SmirReverbSpec = namedtuple(

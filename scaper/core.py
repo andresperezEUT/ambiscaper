@@ -29,8 +29,7 @@ from .ambisonics import get_number_of_ambisonics_channels, get_ambisonics_spread
 from .ambisonics import get_ambisonics_coefs
 import glob
 import csv
-# import matlab_wrapper
-import matlab.engine
+import matlab_wrapper
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -2020,6 +2019,123 @@ class Scaper(object):
         downmix_transformer.build(file_path, downmix_tmpfile.name)
         return downmix_tmpfile
 
+
+    def _compute_smir_IRs(self,e):
+        '''
+        # TODO: calling matlab...
+        :return:
+        '''
+
+        # Clear workspace, just in case
+        self.matlab.eval('clear')
+
+        # Follow parameter definition as stated in run_smir_generator.m
+        # Copy all parameters into the matlab workspace, and call the script
+        # which actually calls the smir_generator method.
+        # Just make sure that all values are passed as floats
+
+        # Sample Rate of the session
+        self.matlab.put('procFs', float(self.sr))
+        # Default speed of sound
+        self.matlab.put('c', 343.0)
+        # Buffer size given by the user
+        self.matlab.put('nsample', float(self.reverb_config.IRlength))
+
+        # Default number of harmonics
+        # TODO? HOW IS THIS RELATED TO THE AMBISONICS ORDER?
+        self.matlab.put('N_harm', 36.0)
+        # Default oversampling (no oversamplig)
+        self.matlab.put('K', 1.0)
+
+        # Room dimensions given by the user (with float casting)
+        self.matlab.put('L', [float(l) for l in self.reverb_config.room_dimensions])
+        # Receiver will be at the middle of the room
+        # TODO: make it configurable??
+        self.matlab.put('sphLocation', [float(l) / 2.0 for l in self.reverb_config.room_dimensions])
+        # Source location will be given by the specific instance
+        radius = 2.0  # TODO choose
+        azi = e.value['event_azimuth'],
+        ele = e.value['event_elevation']
+        self.matlab.put('s', (spherical_to_cartesian([float(e.value['event_azimuth']),
+                                                      float(e.value['event_elevation']),
+                                                      float(radius)])))
+
+        # Default no High Pass Filter
+        self.matlab.put('HP', 0.0)
+        # Default omnidirectional source directivity
+        self.matlab.put('src_type', 'o')
+        # Source angle pointing to the receiver (default behavior by ommision)
+        # src_ang
+
+        # Reflection order by default
+        self.matlab.put('order', 10.0)
+        # Not really sure what's this "room/angle dependent coeff, but let's keep it off
+        self.matlab.put('refl_coeff_ang_dep', 0.0)
+
+        # Beta given by the user.
+        # It might be either a float (T_60 in seconds)
+        # or wall reflectivity in list of len(6)
+        if isinstance(self.reverb_config.beta, list):
+            self.matlab.put('beta', [float(b) for b in self.reverb_config.beta])
+        else:
+            self.matlab.put('beta', float(self.reverb_config.beta))
+
+        # Sph_type, sph_radius, mic positions, given by the microphone type
+        self.matlab.put('sphType',
+                        SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_type"])
+        self.matlab.put('sphRadius',
+                        SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_radius"])
+        self.matlab.put('mic',
+                        SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"])
+
+        # Run the algorithm
+        self.matlab.eval('run_smir_generator_from_python')
+        # Get the data back
+        h = self.matlab.get('h')
+
+        return h
+
+
+    def _generate_ambisonics_reverb_from_smir_spec(self,destination_path,event):
+        '''
+        #TODO
+        '''
+
+        # Result of the method is the actual multichannel IRs
+        # as recorded by the virtual microphones (A-Format if you want)
+        # mic_IRs is a matrix of shape (num_capsules, num_samples)
+        mic_IRs = self._compute_smir_IRs(event)
+
+        # We need to convert them to ambisonics, i.e., perform ambisonics encoding on them
+        # based on the capsule positions
+        # TODO: how to ensure order limitation? (num_capsules >= num_sph or what?)
+        ambi_coefs = []
+        for mic_pos in SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"]:
+            azi = mic_pos[0]
+            ele = mic_pos[1]
+            ambi_coefs.append(get_ambisonics_coefs(azi,ele,self.ambisonics_order))
+
+        # ambi_coefs is a matrix of shape (num_capsules, num_ambisonics_channels)
+        ambi_coefs_array = np.array(ambi_coefs)
+        print(ambi_coefs_array)
+
+        sf.write("/Volumes/Dinge/scaper/generated/soundscape0/source/mic_IR.wav",
+                 np.transpose(mic_IRs),
+                 self.sr,
+                 subtype='PCM_16')
+
+        # Then, we need as a result a matrix of shape (num_ambisonics_channels, num_samples)
+        # which is in fact the deinterleaved form of the ambisonics IRs
+        ambi_IRs = np.dot(np.transpose(ambi_coefs_array),mic_IRs)
+
+        # Write the resulting IRs into the given destination path
+        sf.write(destination_path, np.transpose(ambi_IRs), self.sr, subtype='PCM_16')
+
+
+
+        return
+
+
     def _generate_audio(self, destination_path, audio_filename, ann,
                         disable_sox_warnings=True):
         '''
@@ -2253,72 +2369,17 @@ class Scaper(object):
                                       combine_type='merge',
                                       input_volumes=input_volumes.tolist())
 
-                elif (type(self.reverb_config) is SmirReverbSpec):
+                elif type(self.reverb_config) is SmirReverbSpec:
 
                     if is_foreground(e):
-                        # Generate IRs
 
-                        # default
-                        # in matlab all number are doubles by default
-                        # so take care to define them in python at least as floats
-                        c = 343.0
-                        radius = 2.0  # TODO choose
-                        N_harm = 20.0
-                        K = 1.0
-                        order = 10.0  # maximum
-                        refl_coeff_ang_dep = 0.0
-                        HP = 0.0
-                        src_type = 'o'
-
-                        # the receiver will be at the middle of the room
-                        # TODO: make it configurable??
-                        sphLocation = matlab.double([float(dim) / 2 for dim in self.reverb_config.room_dimensions])
-
-                        # source location will be given by the specific instanciation
-                        azi = e.value['event_azimuth'],
-                        ele = e.value['event_elevation']
-                        s = matlab.double(spherical_to_cartesian([float(e.value['event_azimuth']),
-                                                                  float(e.value['event_elevation']),
-                                                                  float(radius)]))
-
-                        # room dimension given by the user
-                        L = matlab.double(self.reverb_config.room_dimensions)
-
-                        # beta given by the user.
-                        # It might be either a float (T_60 in seconds)
-                        # or wall reflectivity in list of len(6)
-                        if isinstance(self.reverb_config.beta, list):
-                            beta = matlab.double(self.reverb_config.beta)
-                        else:
-                            beta = float(self.reverb_config.beta)
-
-                        # sph_type, sph_radius, mic, given by the microphone type
-                        sphType = SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_type"]
-                        sphRadius = SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_radius"]
-                        mic = matlab.double(SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"])
-
-                        # nsample given by the user
-                        nsample = float(self.reverb_config.IRlength)
-
-                        self.matlab_engine.smir_generator(c,
-                                                          float(self.sr),
-                                                          sphLocation,
-                                                          s,
-                                                          L,
-                                                          beta,
-                                                          sphType,
-                                                          sphRadius,
-                                                          mic,
-                                                          N_harm,
-                                                          nsample,
-                                                          K,
-                                                          order,
-                                                          refl_coeff_ang_dep,
-                                                          HP,
-                                                          src_type)
+                        ### Model IR through smir_generator in matlab ###
+                        destination_path = os.path.join(destination_source_path, "ambi_IR.wav")
+                        # TODO: CHANGEN DESTIINATION PATH
+                        self._generate_ambisonics_reverb_from_smir_spec(destination_path,e)
 
 
-                elif (type(self.reverb_config) is S3aReverbSpec):
+                elif type(self.reverb_config) is S3aReverbSpec:
 
                     # Get the IRs associated to the source position
                     # They are stored at the chosen_IR_indices list
@@ -2484,10 +2545,11 @@ class Scaper(object):
         # reverb type selected...
 
         if (type(self.reverb_config) is SmirReverbSpec):
+
             # Start Matlab Session
-            self.matlab_engine = matlab.engine.start_matlab("-nodesktop", async=False)
+            self.matlab = matlab_wrapper.MatlabSession(matlab_root=matlab_root)
             # Add smir code into the path
-            self.matlab_engine.addpath(smir_folder_path)
+            self.matlab.eval('addpath ' + smir_folder_path)
 
         elif (type(self.reverb_config) is S3aReverbSpec):
 
