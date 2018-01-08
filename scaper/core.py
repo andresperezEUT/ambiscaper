@@ -64,8 +64,9 @@ Container for storing specfic smir reverb configuration values
 
 S3aReverbSpec = namedtuple(
     'S3aReverbSpec',
-    ['path',
-     'name'], verbose=False)
+    ['name'
+     # TODO: add source position constrains type (random, magnet, etc)
+     ], verbose=False)
 '''
 Container for storing specfic s3a reverb configuration values
 '''
@@ -81,7 +82,8 @@ s3a_loudspeaker_positions_txtfile = "LsPos.txt"
 s3a_filter_name = 'ls'
 s3a_filter_extension = '.wav'
 
-s3a_folder_name = 'Soundfield'
+s3a_folder_name = "IRs/S3A"
+s3a_folder_path = os.path.join(os.getcwd(), s3a_folder_name)
 
 # TODO MATLAB STUFF CONFIG
 
@@ -89,6 +91,9 @@ matlab_root = "/Applications/MATLAB_R2017b.app"
 
 smir_folder_name = "SMIR-Generator-master"
 smir_folder_path = os.path.join(os.getcwd(), smir_folder_name)
+
+
+
 
 
 def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
@@ -306,7 +311,8 @@ def _generate_RIR_path(s3a_reverg_config):
     :param s3a_reverg_config:
     :return:
     '''
-    return os.path.expanduser(os.path.join(s3a_reverg_config.path, s3a_reverg_config.name, s3a_folder_name))
+    # TODO: remove hardcoded reference to Soundfield
+    return os.path.expanduser(os.path.join(s3a_folder_path, s3a_reverg_config.name, 'Soundfield'))
 
 
 def retrieve_RIR_positions(s3a_reverg_config):
@@ -1170,23 +1176,13 @@ def _validate_smir_reverb_spec(reverb_config):
 
 def _validate_s3a_reverb_spec(reverb_config):
     # Folder structure should be something like:
-    # - S3A_top_folder (:path: in the config struct)
+    # - S3A_top_folder (:s3a_folder_path: defined in ambisonics.py)
     #     - reverb_name (:name: in the config struct)
     #         - (maybe a pdf)
     #         - "Soundfield"
     #             - "lsN.wav" with the N actual impulse responses, starting from 1
     #             - "LsPos.txt" with the loudspeaker positions
     #             - (maybe a "Metadata_SoundField.txt")
-    # TODO
-    # RETURN MAX AMBISONICS ORDER
-
-    # Check that path is str
-    if reverb_config.path is None:
-        raise ScaperError(
-            'reverb_config: path is None')
-    elif type(reverb_config.path) is not str:
-        raise ScaperError(
-            'reverb path not a string')
 
     # Check that reverb name is str
     if reverb_config.name is None:
@@ -1196,17 +1192,17 @@ def _validate_s3a_reverb_spec(reverb_config):
         raise ScaperError(
             'reverb path not a string')
 
-    # The provided name should exist in path/
-    path = os.path.join(reverb_config.path, reverb_config.name)
-    if not os.path.exists(os.path.expanduser(path)):
+    # The provided name should exist in s3a_
+    reverb_folder_path = os.path.join(s3a_folder_path, reverb_config.name)
+    if not os.path.exists(os.path.expanduser(reverb_folder_path)):
         raise ScaperError(
-            'reverb_config: folder does not exist: ' + path)
+            'reverb_config: folder does not exist: ' + reverb_folder_path)
 
     # Inside the reverb folder should be a "Soundfield" folder
-    soundfield_path = os.path.join(path, s3a_folder_name)
+    soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
     if not os.path.exists(os.path.expanduser(soundfield_path)):
         raise ScaperError(
-            'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(path))
+            'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(reverb_folder_path))
 
     # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
 

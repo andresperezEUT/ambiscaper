@@ -8,13 +8,11 @@ outfolder = '/Volumes/Dinge/scaper/generated/'
 # SCAPER SETTINGS
 foreground_folder = '~/audio/scaper/foreground/'
 background_folder = '~/audio/scaper/background/'
-# smir_reverb_path  = '~/Documents/MATLAB/SMIR-Generator-master'
-s3a_reverb_path   = '~/source/scaper/IRs/S3A'
 
 n_soundscapes = 1
 ref_db = -50
 duration = 10.0
-ambisonics_order = 3
+ambisonics_order = 1
 ambisonics_spread_slope = 1.0
 
 num_events = 1
@@ -94,32 +92,19 @@ for n in range(n_soundscapes):
 
 
     # configure reverb
-    reverb_config = scaper.core.SmirReverbSpec(
-        # path = smir_reverb_path,
-        IRlength=4096,
-        room_dimensions=[6,3,3],
-        beta= 0.3,
-        source_type='o',
-        microphone_type='em32'
-    )
-
-    # SmirReverbSpec = namedtuple(
-    #     'SmirReverbSpec',
-    #     ['IRlength',
-    #      'room_dimensions',
-    #      'beta',
-    #      'source_location',
-    #      'source_type',
-    #      'receiver_location',
-    #      'sphere_radius',
-    #      'sphere_type',
-    #      'capsule_positions'
-    #      ], verbose=False)
-
-    # reverb_config = scaper.core.S3aReverbSpec(
-    #     path= s3a_reverb_path,
-    #     name = 'MainChurch'
+    # reverb_config = scaper.core.SmirReverbSpec(
+    #     # path = smir_reverb_path,
+    #     IRlength=4096,
+    #     room_dimensions=[6,3,3],
+    #     beta= 0.3,
+    #     source_type='o',
+    #     microphone_type='soundfield'
     # )
+
+
+    reverb_config = scaper.core.S3aReverbSpec(
+        name = 'MainChurch'
+    )
 
     sc.set_reverb(reverb_config)
 
