@@ -25,11 +25,19 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
-from .ambisonics import get_number_of_ambisonics_channels, get_ambisonics_spread_coefs, SUPPORTED_VIRTUAL_MICS
+from .ambisonics import get_number_of_ambisonics_channels
+from .ambisonics import _validate_ambisonics_order
+from .ambisonics import _validate_ambisonics_spread_slope
+from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-import glob
+from .reverb_ambisonics import SMIR_SUPPORTED_VIRTUAL_MICS, retrieve_RIR_positions, S3A_FILTER_NAME, \
+    S3A_FILTER_EXTENSION, generate_RIR_path
+from .reverb_ambisonics import S3aReverbSpec
+from .reverb_ambisonics import SmirReverbSpec, _validate_reverb_config, get_max_ambi_order_from_reverb_config
+
 import csv
 import matlab_wrapper
+
 
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: random.choice(x),
@@ -49,50 +57,6 @@ Container for storing event specifications, either probabilistic (i.e. using
 distribution tuples to specify possible values) or instantiated (i.e. storing
 constants directly).
 '''
-
-SmirReverbSpec = namedtuple(
-    'SmirReverbSpec',
-    ['IRlength',
-     'room_dimensions',
-     'beta',
-     'source_type',
-     'microphone_type'
-     ], verbose=False)
-'''
-Container for storing specfic smir reverb configuration values
-'''
-
-S3aReverbSpec = namedtuple(
-    'S3aReverbSpec',
-    ['name'
-     # TODO: add source position constrains type (random, magnet, etc)
-     ], verbose=False)
-'''
-Container for storing specfic s3a reverb configuration values
-'''
-
-# omnidirectional/subcardioid/cardioid/hypercardioid/bidirectional
-s3a_allowed_source_types = ['o', 'c', 's', 'h', 'b']
-
-# TODO: MAYBE MOVE THIS OR PUT IT TOGETHER OR SOMETHING
-
-s3a_loudspeaker_positions_txtfile = "LsPos.txt"
-
-# Filters are named by 'lsX.wav', with X the speaker number
-s3a_filter_name = 'ls'
-s3a_filter_extension = '.wav'
-
-s3a_folder_name = "IRs/S3A"
-s3a_folder_path = os.path.join(os.getcwd(), s3a_folder_name)
-
-# TODO MATLAB STUFF CONFIG
-
-matlab_root = "/Applications/MATLAB_R2017b.app"
-
-smir_folder_name = "SMIR-Generator-master"
-smir_folder_path = os.path.join(os.getcwd(), smir_folder_name)
-
-
 
 
 
@@ -305,48 +269,6 @@ def trim(audio_infile, jams_infile, audio_outfile, jams_outfile, start_time,
                 shutil.copyfile(tmpfiles[-1].name, audio_outfile)
 
 
-def _generate_RIR_path(s3a_reverg_config):
-    '''
-    TODO
-    :param s3a_reverg_config:
-    :return:
-    '''
-    # TODO: remove hardcoded reference to Soundfield
-    return os.path.expanduser(os.path.join(s3a_folder_path, s3a_reverg_config.name, 'Soundfield'))
-
-
-def retrieve_RIR_positions(s3a_reverg_config):
-    '''
-    TODO
-
-    Folder structure should be something like:
-    - S3A_top_folder (:path: in the config struct)
-        - reverb_name (:name: in the config struct)
-            - (maybe a pdf)
-            - "Soundfield"
-                - "lsN.wav" with the N actual impulse responses, starting from 1
-                - "LsPos.txt" with the loudspeaker positions
-                - (maybe a "Metadata_SoundField.txt")
-
-    :param s3a_reverg_config:
-    :return:
-    '''
-
-    # Go to Soundfield folder
-    # todo: maybe better implementation for txt file open?
-
-    speakers_positions_file = os.path.join(_generate_RIR_path(s3a_reverg_config), s3a_loudspeaker_positions_txtfile)
-
-    # Retrieve the file content into speaker_positions
-    speaker_positions_cartesian = []
-    with open(os.path.expanduser(speakers_positions_file)) as tsv:
-        for line in csv.reader(tsv, delimiter='\t'):  # You can also use delimiter="\t" rather than giving a dialect.
-            speaker_positions_cartesian.append([float(element) for element in line])
-
-    # Convert speaker_positions to spherical coordinates
-    speaker_positions_spherical = [cartesian_to_spherical(pos) for pos in speaker_positions_cartesian]
-
-    return speaker_positions_spherical
 
 
 def _get_value_from_dist(dist_tuple):
@@ -1067,204 +989,6 @@ def _validate_soundscape_duration(duration):
         raise ScaperError('Duration must be a real value')
     elif duration <= 0:
         raise ScaperError('Duration must be a positive value')
-
-
-def _validate_ambisonics_order(ambisonics_order):
-    # TODO comments
-
-    if not isinstance(ambisonics_order, int):
-        raise ScaperError('Ambisonics Order must be an integer')
-    elif ambisonics_order < 0:
-        raise ScaperError('Ambisonics Order must be 0 or greater')
-
-
-def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
-    # TODO comments
-
-    if not is_real_number(ambisonics_spread_slope):
-        raise ScaperError('Ambisonics Spread Slope must be a real value')
-    elif not 0 <= ambisonics_spread_slope <= 1:
-        raise ScaperError('Ambisonics Order must be 0 located on the range [0,1]')
-
-
-def _validate_smir_reverb_spec(reverb_config):
-    '''
-    TODO
-    RETURN MAX AMBISONICS ORDER
-    :param reverb_config:
-    :return:
-    '''
-    # IR length: positive integer
-    if reverb_config.IRlength is None:
-        raise ScaperError(
-            'reverb_config: IR length is None')
-    elif not isinstance(reverb_config.IRlength, int) or reverb_config.IRlength <= 0:
-        raise ScaperError(
-            'reverb_config: IR length must be a positive integer')
-
-    # room_dimensions: list of 3 elements
-    if reverb_config.room_dimensions is None:
-        raise ScaperError(
-            'reverb_config: room_dimensions is None')
-    elif not isinstance(reverb_config.room_dimensions, list):
-        raise ScaperError(
-            'reverb_config: room_dimensions is not a List')
-    elif len(reverb_config.room_dimensions) is not 3:
-        raise ScaperError(
-            'reverb_config: room_dimensions must have 3 elements')
-
-    # beta: float > 0 (T_60) or list of 6 floats
-    if reverb_config.beta is None:
-        raise ScaperError(
-            'reverb_config: beta is None')
-
-    # If it's T_60, it should be bigger than 0
-    if isinstance(reverb_config.beta, Number):
-
-        if reverb_config.beta <= 0:
-            raise ScaperError(
-                'reverb_config: beta (T_60) must be a positive number')
-
-    # If list, it should be a list of 6 numbers
-    elif isinstance(reverb_config.beta, list):
-
-        if len(reverb_config.beta) is not 6:
-            raise ScaperError(
-                'reverb_config: beta must have 6 elements; found '
-                + str(len(reverb_config.beta)))
-
-        if not all([isinstance(e, Number) for e in reverb_config.beta]):
-            raise ScaperError(
-                'reverb_config: beta must contain numbers')
-
-    # If none of them, wrong type
-    else:
-        raise ScaperError(
-            'reverb_config: beta must be a T_60 value, or '
-            'the walls reflectivity (list of 6 numbers)')
-
-    # Valid source types: 'o','c','s','h','b'
-    if reverb_config.source_type is None:
-        raise ScaperError(
-            'reverb_config: source_type is None')
-
-    elif not isinstance(reverb_config.source_type, str):
-        ScaperError(
-            'reverb_config: source_type must be a string')
-
-    elif find_element_in_list(reverb_config.source_type, s3a_allowed_source_types) is None:
-        ScaperError(
-            'reverb_config: source_type not known: '
-            + reverb_config.source_type)
-
-    # Mic type: defined SUPPORTED_VIRTUAL_MICS
-    if reverb_config.microphone_type is None:
-        raise ScaperError(
-            'reverb_config: microphone_type is None')
-
-    elif not isinstance(reverb_config.microphone_type, str):
-        ScaperError(
-            'reverb_config: microphone_type must be a string')
-
-    else:
-        if not SUPPORTED_VIRTUAL_MICS.has_key(reverb_config.microphone_type):
-            raise ScaperError(
-                'reverb_config: unsupported microphone_type: '
-                + reverb_config.microphone_type)
-
-
-
-def _validate_s3a_reverb_spec(reverb_config):
-    # Folder structure should be something like:
-    # - S3A_top_folder (:s3a_folder_path: defined in ambisonics.py)
-    #     - reverb_name (:name: in the config struct)
-    #         - (maybe a pdf)
-    #         - "Soundfield"
-    #             - "lsN.wav" with the N actual impulse responses, starting from 1
-    #             - "LsPos.txt" with the loudspeaker positions
-    #             - (maybe a "Metadata_SoundField.txt")
-
-    # Check that reverb name is str
-    if reverb_config.name is None:
-        raise ScaperError(
-            'reverb_config: path is None')
-    elif type(reverb_config.name) is not str:
-        raise ScaperError(
-            'reverb path not a string')
-
-    # The provided name should exist in s3a_
-    reverb_folder_path = os.path.join(s3a_folder_path, reverb_config.name)
-    if not os.path.exists(os.path.expanduser(reverb_folder_path)):
-        raise ScaperError(
-            'reverb_config: folder does not exist: ' + reverb_folder_path)
-
-    # Inside the reverb folder should be a "Soundfield" folder
-    soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
-    if not os.path.exists(os.path.expanduser(soundfield_path)):
-        raise ScaperError(
-            'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(reverb_folder_path))
-
-    # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
-
-    # Count number of audio files (the actual IRs)
-    num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
-
-    # Count number of lines in speakers file
-    speakers_positions_file = os.path.join(soundfield_path, s3a_loudspeaker_positions_txtfile);
-    num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
-
-    # Check
-    if num_wav_files is not num_lines:
-        raise ScaperError(
-            'reverb_config: the number of audio files does not match with the speaker description')
-
-
-
-def _validate_reverb_config(reverb_config, target_ambisonics_order):
-    '''
-
-    :param reverb_config:
-    :param target_ambisonics_order:
-    :return:
-    '''
-
-    if reverb_config is None:
-        raise ScaperError(
-            'reverb_config is None')
-
-    # Check all different supported reverb types
-    # smir
-    if type(reverb_config) is SmirReverbSpec:
-        _validate_smir_reverb_spec(reverb_config)
-    # s3a
-    elif type(reverb_config) is S3aReverbSpec:
-        _validate_s3a_reverb_spec(reverb_config)
-    else:
-        raise ScaperError(
-            'reverb_config of unknown type: ' + str(type(reverb_config)))
-
-
-
-
-def _get_max_ambi_order_from_reverb_config(reverb_config):
-    '''
-    TODO
-    :param reverb_config:
-    :param target_ambisonics_order:
-    :return:
-    '''
-
-    # smir
-    if type(reverb_config) is SmirReverbSpec:
-       # Max ambisonics order is defined in the mic spec...
-       return SUPPORTED_VIRTUAL_MICS[reverb_config.microphone_type]['max_ambi_order']
-
-    # s3a
-    elif type(reverb_config) is S3aReverbSpec:
-        # Check the maximum ambisonics order
-        # Max ambisonics order given by the number of channels of the IRs
-        # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
-        return 1
 
 
 
@@ -2146,7 +1870,7 @@ class Scaper(object):
         # based on the capsule positions
         # TODO: how to ensure order limitation? (num_capsules >= num_sph or what?)
         ambi_coefs = []
-        for mic_pos in SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"]:
+        for mic_pos in SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"]:
             azi = mic_pos[0]
             ele = mic_pos[1]
             # ambi_coefs is a matrix of shape (num_capsules, num_ambisonics_channels)
@@ -2425,8 +2149,8 @@ class Scaper(object):
 
                             # Construct the filter name given the speaker index
                             ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
-                            filter_name = s3a_filter_name + str(ir_idx) + s3a_filter_extension
-                            filter_path = os.path.join(_generate_RIR_path(self.reverb_config), filter_name)
+                            filter_name = S3A_FILTER_NAME + str(ir_idx) + S3A_FILTER_EXTENSION
+                            filter_path = os.path.join(generate_RIR_path(self.reverb_config), filter_name)
 
                             # Create a symlink to the filter on the source folder
                             # We could just copy the filter there for consistency,
@@ -2529,7 +2253,7 @@ class Scaper(object):
 
         # Ensure that we are able to provide the target ambisonics order
         # with the given mic configuration; downgrade it if necessary
-        max_ambi_order = _get_max_ambi_order_from_reverb_config(reverb_config)
+        max_ambi_order = get_max_ambi_order_from_reverb_config(reverb_config)
 
         # If the maximum ambisonics order given the reverb limitations
         # is smaller than the target, then raise a Warning
@@ -2617,9 +2341,9 @@ class Scaper(object):
         if (type(self.reverb_config) is SmirReverbSpec):
 
             # Start Matlab Session
-            self.matlab = matlab_wrapper.MatlabSession(matlab_root=matlab_root)
+            self.matlab = matlab_wrapper.MatlabSession(matlab_root=MATLAB_ROOT)
             # Add smir code into the path
-            self.matlab.eval('addpath ' + smir_folder_path)
+            self.matlab.eval('addpath ' + SMIR_FOLDER_PATH)
 
         elif (type(self.reverb_config) is S3aReverbSpec):
 

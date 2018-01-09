@@ -23,79 +23,6 @@ from scaper.util import delta_kronecker, is_real_number
 
 
 
-# Info gathered from Farina, http://pcfarina.eng.unipr.it/SPS-conversion.htm
-# More info at https://www.mhacoustics.com/sites/default/files/ReleaseNotes.pdf
-
-# Store useful information from each mic:
-#   - Sphere type (rigid or open)
-#   - Sphere radius
-#   - Maximum ambisonics order (it could be computed from the number of capsules,
-#       but we specify it for avoiding computations)
-#   - Spherical coordinates of the capsules
-
-
-SUPPORTED_VIRTUAL_MICS = {
-
-    "soundfield": {
-        "sph_type": 'rigid',
-        "sph_radius": 0.02, # todo: get real measurement!
-        "max_ambi_order": 1,
-        "mic":  [[0.0, 0.61547970867038726],       # FLU
-                [np.pi/2, -0.61547970867038726],  # FRD
-                [np.pi, -0.61547970867038726],  # BLD
-                [3*np.pi/2, 0.61547970867038726]]   # BRU
-    },
-
-    "tetramic": {
-        "sph_type": 'rigid',
-        "sph_radius": 0.02, # todo: get real measurement!
-        "max_ambi_order": 1,
-        "mic":  [[0.0, 0.61547970867038726],       # FLU
-                [np.pi/2, -0.61547970867038726],  # FRD
-                [np.pi, -0.61547970867038726],  # BLD
-                [3*np.pi/2, 0.61547970867038726]]   # BRU
-    },
-
-    "em32":  {
-        "sph_type": 'rigid',
-        "sph_radius": 0.042, # todo: get real measurement!
-        "max_ambi_order": 4,
-        "mic":  [[0.0, 0.3665191429188092],
-                [0.5585053606381855, 0.0],
-                [0.0, -0.3665191429188092],
-                [5.7246799465414, 0.0],
-                [0.0, 1.0122909661567112],
-                [np.pi / 4, 0.61547970867038726],  # FLU
-                [1.2042771838760873, 0.0],
-                [np.pi / 4, -0.61547970867038726],  # FLD
-                [0.0, -1.0122909661567112],
-                [7 * np.pi / 4, -0.61547970867038726],  # FRD
-                [5.078908123303498, 0.0],
-                [7 * np.pi / 4, 0.61547970867038726],  # FRU
-                [1.5882496193148399, 1.2042771838760873],
-                [np.pi / 2, 0.5585053606381855],
-                [np.pi / 2, -0.5410520681182421],
-                [1.5533430342749535, -1.2042771838760873],
-                [np.pi, 0.3665191429188092],
-                [3.7000980142279785, 0.0],
-                [np.pi, -0.3665191429188092],
-                [2.5830872929516078, 0.0],
-                [np.pi, 1.0122909661567112],
-                [5 * np.pi / 4, 0.61547970867038726],  # BRU
-                [4.34586983746588, 0.0],
-                [5 * np.pi / 4, -0.61547970867038726],  # BRD
-                [np.pi, -1.0122909661567112],
-                [3 * np.pi / 4, -0.61547970867038726],  # BLD
-                [1.9373154697137058, 0.0],
-                [3 * np.pi / 4, 0.61547970867038726],  # BLU
-                [4.694935687864747, 1.2042771838760873],
-                [4.71238898038469, 0.5585053606381855],
-                [4.71238898038469, -0.5585053606381855],
-                [4.729842272904633, -1.2042771838760873]]
-    }
-}
-
-
 def _validate_ambisonics_order(order):
 
     if (order<0):
@@ -117,18 +44,41 @@ def _validate_ambisonics_degree(degree, order):
             'Ambisonics degree modulus must be minor or equal to ambisonics order')
 
 
-def get_number_of_ambisonics_channels(order):
-    _validate_ambisonics_order(order)
-    return pow(order+1,2)
-
-
 def _validate_ambisonics_angle(angle):
     if (not is_real_number(angle)):
             raise ScaperError(
                 'Ambisonics angle must be a number')
 
 
+def _validate_spread_coef(alpha):
+    '''
+    Must be a real number between 0.0 and 1.0
+    :param alpha:
+    :return:
+    '''
+    if not is_real_number(alpha):
+        raise ScaperError(
+            'Ambisonics spread coef must be a real number')
 
+    if (not 0.0 <= alpha <= 1.0):
+        raise ScaperError(
+            'Ambisonics spread coef must be in the range [0.0, 1.0]')
+
+
+def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
+    # TODO comments
+
+    if not is_real_number(ambisonics_spread_slope):
+        raise ScaperError('Ambisonics Spread Slope must be a real value')
+    elif not 0 <= ambisonics_spread_slope <= 1:
+        raise ScaperError('Ambisonics Order must be 0 located on the range [0,1]')
+
+
+
+
+def get_number_of_ambisonics_channels(order):
+    _validate_ambisonics_order(order)
+    return pow(order+1,2)
 
 def get_ambisonics_coefs(azimuth,elevation,order):
     # up to the given order
@@ -218,24 +168,6 @@ def get_imag_spherical_harmonic(azimuth, elevation, ambisonics_order, ambisonics
     # here, we use phi as azimuth and theta as elevation
     # furthermore, L is ambisonics order and M is ambisonics degree
     return np.asscalar(np.imag(sph_harm(ambisonics_degree,ambisonics_order,azimuth,elevation)))
-
-
-
-
-def _validate_spread_coef(alpha):
-    '''
-    Must be a real number between 0.0 and 1.0
-    :param alpha:
-    :return:
-    '''
-    if not is_real_number(alpha):
-        raise ScaperError(
-            'Ambisonics spread coef must be a real number')
-
-    if (not 0.0 <= alpha <= 1.0):
-        raise ScaperError(
-            'Ambisonics spread coef must be in the range [0.0, 1.0]')
-
 
 # eq 16
 def get_ambisonics_spread_coefs(alpha, tau, max_ambisonics_order):
