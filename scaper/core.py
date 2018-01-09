@@ -15,7 +15,7 @@ import shutil
 import pandas as pd
 from .scaper_exceptions import ScaperError
 from .scaper_warnings import ScaperWarning
-from .util import _close_temp_files, cartesian_to_spherical, spherical_to_cartesian, find
+from .util import _close_temp_files, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -1152,7 +1152,7 @@ def _validate_smir_reverb_spec(reverb_config):
         ScaperError(
             'reverb_config: source_type must be a string')
 
-    elif find(reverb_config.source_type, s3a_allowed_source_types) is None:
+    elif find_element_in_list(reverb_config.source_type, s3a_allowed_source_types) is None:
         ScaperError(
             'reverb_config: source_type not known: '
             + reverb_config.source_type)

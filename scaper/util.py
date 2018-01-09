@@ -421,23 +421,41 @@ def delta_kronecker(q1,q2):
 
 def cartesian_to_spherical(cartesian_list):
     '''
-    TODO
-    :param cartesian:
-    :param spherical:
-    :return:
+    Performs conversion from cartesian to spherical coordinates.
+    Reference system:
+        azimuth 0: +x axis
+        elevation 0: horizontal plane ()
+        +y axis: azimuth pi/2
+        +x axis: elevation pi/2
+
+    Parameters
+    ----------
+    cartesian_list: list of 3 floats
+        Cartesian coordinates in the form [x, y, z]
+
+    Returns
+    ------
+    value : list of 3 floats
+        Cartesian conversion in the form [azimuth, elevation, radius]
+
+    Raises
+    ------
+    ScaperError
+        If the input argument does not match the required type
+
     '''
 
     # Both arguments should be lists of 3 floats
     def _validate_args(list_arg):
         if not isinstance(list_arg,list):
             raise ScaperError(
-                'Error on Cartesian to Spherical conversion: argument not a list ' + list_arg)
+                'Error on Cartesian to Spherical conversion: argument not a list, given ' + str(list_arg))
         if len(list_arg) is not 3:
             raise ScaperError(
-                'Error on Cartesian to Spherical conversion: argument should have lenght of 3' + list_arg)
+                'Error on Cartesian to Spherical conversion: argument should have lenght of 3, given' + str(list_arg))
         if not any([isinstance(f,float) for f in list_arg]):
             raise ScaperError(
-                'Error on Cartesian to Spherical conversion: argument should contain floats' + list_arg)
+                'Error on Cartesian to Spherical conversion: argument should contain floats, given' + str(list_arg))
 
     _validate_args(cartesian_list)
 
@@ -454,23 +472,41 @@ def cartesian_to_spherical(cartesian_list):
 
 def spherical_to_cartesian(spherical_list):
     '''
-    TODO
-    :param cartesian:
-    :param spherical:
-    :return:
+    Performs conversion from spherical to cartesian coordinates.
+    Reference system:
+        azimuth 0: +x axis
+        elevation 0: horizontal plane ()
+        +y axis: azimuth pi/2
+        +x axis: elevation pi/2
+
+    Parameters
+    ----------
+    spherical_list: list of 3 floats
+        Spherical coordinates in the form [azimuth, elevation, radius]
+
+    Returns
+    ------
+    value : list of 3 floats
+        Cartesian conversion in the form [x, y, z]
+
+    Raises
+    ------
+    ScaperError
+        If the input argument does not match the required type
+
     '''
 
     # Both arguments should be lists of 3 floats
     def _validate_args(list_arg):
         if not isinstance(list_arg,list):
             raise ScaperError(
-                'Error on Spherical to Cartesian conversion: argument not a list ' + list_arg)
+                'Error on Spherical to Cartesian conversion: argument not a list, given ' + str(list_arg))
         if len(list_arg) is not 3:
             raise ScaperError(
-                'Error on Spherical to Cartesian conversion: argument should have lenght of 3' + list_arg)
+                'Error on Spherical to Cartesian conversion: argument should have lenght of 3, given ' + str(list_arg))
         if not any([isinstance(f,float) for f in list_arg]):
             raise ScaperError(
-                'Error on Spherical to Cartesian conversion: argument should contain floats' + str(list_arg))
+                'Error on Spherical to Cartesian conversion: argument should contain floats, given ' + str(list_arg))
 
     _validate_args(spherical_list)
 
@@ -486,15 +522,36 @@ def spherical_to_cartesian(spherical_list):
     return [x,y,z]
 
 
-def find(element, list_element):
+def find_element_in_list(element, list_arg):
     '''
-    TODO
-    :param element:
-    :param list_element:
-    :return: index, or None if not found
+    Check if a given element is found in a given list.
+    Returns the first occurrence of the object in the list, or None if not found.
+    Very similar to list.index(), but does not return Error if not found
+    (kinda more convenient sometimes)
+
+    Parameters
+    ----------
+    element: any type
+        The element to find
+    list_arg: list type
+        The list where to search the element
+
+    Returns
+    ------
+    value : int or None
+        Index of the first occurrence of the element in the list,
+        or None if not found
+
     '''
+
+    # element might have any kind of type,
+    # but list_element must be a list
+    if not isinstance(list_arg,list):
+        raise ScaperError(
+            'Error on find(): second argument not a list, given' + str(list_arg))
+
     try:
-        index_element = list_element.index(element)
+        index_element = list_arg.index(element)
         return index_element
     except ValueError:
         return None

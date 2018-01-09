@@ -4,7 +4,7 @@
 Tests for functions in util.py
 '''
 
-from scaper.util import _close_temp_files, wrap_number, delta_kronecker
+from scaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list
 from scaper.util import _set_temp_logging_level
 from scaper.util import _validate_folder_path
 from scaper.util import _get_sorted_files
@@ -342,6 +342,7 @@ def test_wrap_number():
     for correct_entry in correct_entries:
         __test_correct_wrap_number(*correct_entry)
 
+
 def test_delta_kronecker():
 
     # test incorrect values
@@ -367,3 +368,98 @@ def test_delta_kronecker():
     ]
     for correct_entry in correct_entries:
         __test_correct_delta_kronecker(*correct_entry)
+
+
+def test_cartesian_to_spherical():
+
+    # test incorrect values
+    def __test_bad_cartesian_list(bad_entry):
+        pytest.raises(ScaperError, cartesian_to_spherical, bad_entry)
+        
+    bad_entries = [
+        1,
+        2j,
+        'str',
+        None,
+        [],
+        [1,2,3],    # not float
+        [1.3, 4.5]
+    ]
+    for bad_entry in bad_entries:
+        __test_bad_cartesian_list(bad_entry)
+
+    # test correct values
+    def __test_correct_cartesian_to_spherical(cartesian, groundtruth):
+        assert np.allclose(groundtruth, cartesian_to_spherical(cartesian))
+
+    correct_entries = [
+        # cartesian, groundtruth
+        [ [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+        [ [0.0, 1.0, 0.0], [np.pi/2, 0.0, 1.0]],
+        [ [0.0, 0.0, 1.0], [0.0, np.pi/2, 1.0]],
+    ]
+    for correct_entry in correct_entries:
+        __test_correct_cartesian_to_spherical(*correct_entry)
+
+
+def test_spherical_to_cartesian():
+    # test incorrect values
+    def __test_bad_spherical_list(bad_entry):
+        pytest.raises(ScaperError, spherical_to_cartesian, bad_entry)
+
+    bad_entries = [
+        1,
+        2j,
+        'str',
+        None,
+        [],
+        [1, 2, 3],  # not float
+        [1.3, 4.5]
+    ]
+    for bad_entry in bad_entries:
+        __test_bad_spherical_list(bad_entry)
+
+    # test correct values
+    def __test_correct_spherical_to_cartesian(spherical, groundtruth):
+        assert np.allclose(groundtruth, spherical_to_cartesian(spherical))
+
+    correct_entries = [
+        # spherical, groundtruth
+        [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], ],
+        [[np.pi / 2, 0.0, 1.0], [0.0, 1.0, 0.0], ],
+        [[0.0, np.pi / 2, 1.0], [0.0, 0.0, 1.0], ],
+    ]
+    for correct_entry in correct_entries:
+        __test_correct_spherical_to_cartesian(*correct_entry)
+
+
+def test_find_element_in_list():
+    # test incorrect values
+    # basically, second argument not a list
+
+    def __test_bad_list(bad_entry):
+        pytest.raises(ScaperError, find_element_in_list, *bad_entry)
+
+    bad_entries = [
+        [1, 2],
+        [1, None],
+        [1, {}],
+    ]
+    for bad_entry in bad_entries:
+        __test_bad_list(bad_entry)
+
+    # test correct values
+    def __test_correct_find_element_in_list(element, list, groundtruth):
+        assert groundtruth == find_element_in_list(element,list)
+
+    correct_entries = [
+        # element, list, groundtruth
+        [1, [1,2,3], 0 ],
+        [3, [1,2,3], 2 ],
+        [None, [None,None,None], 0 ],
+        [None, [None,None,None], 0 ],
+        [1, [2,3,4], None ],
+
+    ]
+    for correct_entry in correct_entries:
+        __test_correct_find_element_in_list(*correct_entry)
