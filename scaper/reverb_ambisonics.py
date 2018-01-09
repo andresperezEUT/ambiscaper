@@ -9,20 +9,19 @@ Currently supporrting two IR acquisition methods:
 - Recorded: S3A material
 - Modelled: SMIR generator
 '''
+
 import csv
 from collections import namedtuple
 from numbers import Number
-
 import numpy as np
 import os
 import glob
 from scaper.scaper_exceptions import ScaperError
+from scaper.util import find_element_in_list, cartesian_to_spherical
 
 
 
 ######### METHODS #########
-from scaper.util import find_element_in_list, cartesian_to_spherical
-
 
 def _validate_reverb_config(reverb_config, target_ambisonics_order):
     '''
@@ -259,7 +258,7 @@ S3A_LOUDSPEAKER_POSITIONS_TXTFILE = "LsPos.txt"
 S3A_FILTER_NAME = 'ls'
 S3A_FILTER_EXTENSION = '.wav'
 
-S3A_FOLDER_NAME = "IRs/S3A"
+S3A_FOLDER_NAME = "IRs"
 S3A_FOLDER_PATH = os.path.join(os.getcwd(), S3A_FOLDER_NAME)
 
 

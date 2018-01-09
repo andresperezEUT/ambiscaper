@@ -31,6 +31,11 @@ from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
 from .reverb_ambisonics import generate_RIR_path
+from .reverb_ambisonics import retrieve_RIR_positions
+from .reverb_ambisonics import MATLAB_ROOT
+from .reverb_ambisonics import S3A_FILTER_NAME
+from .reverb_ambisonics import S3A_FILTER_EXTENSION
+from .reverb_ambisonics import SMIR_FOLDER_PATH
 from .reverb_ambisonics import S3aReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
 from .reverb_ambisonics import _validate_reverb_config
