@@ -30,12 +30,11 @@ from .ambisonics import _validate_ambisonics_order
 from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-from .reverb_ambisonics import SMIR_SUPPORTED_VIRTUAL_MICS, retrieve_RIR_positions, S3A_FILTER_NAME, \
-    S3A_FILTER_EXTENSION, generate_RIR_path
+from .reverb_ambisonics import generate_RIR_path
 from .reverb_ambisonics import S3aReverbSpec
-from .reverb_ambisonics import SmirReverbSpec, _validate_reverb_config, get_max_ambi_order_from_reverb_config
-
-import csv
+from .reverb_ambisonics import SmirReverbSpec
+from .reverb_ambisonics import _validate_reverb_config
+from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
 import matlab_wrapper
 
 
