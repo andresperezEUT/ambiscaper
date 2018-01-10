@@ -90,23 +90,16 @@ for n in range(n_soundscapes):
                      time_stretch=(time_stretch_dist, time_stretch))
 
 
+    # Simulated Reverb
+    sc.add_simulated_reverb(IRlength=('const', 1024),
+                            room_dimensions=('const',[6,3,3]),
+                            t60=('uniform',0.1,0.5),
+                            source_type=('const','o'),
+                            microphone_type=('const','soundfield'))
 
-    # configure reverb
-    # reverb_config = scaper.core.SmirReverbSpec(
-    #     # path = smir_reverb_path,
-    #     IRlength=4096,
-    #     room_dimensions=[6,3,3],
-    #     beta= 0.3,
-    #     source_type='o',
-    #     microphone_type='soundfield'
-    # )
-
-
-    reverb_config = scaper.core.S3aReverbSpec(
-        name = 'MainChurch'
-    )
-
-    sc.set_reverb(reverb_config)
+    # Recorded Reverb
+    # sc.set_reverb(scaper.core.S3aReverbSpec(
+    #     name = 'MainChurch'))
 
     # generate
     destination_path = os.path.join(outfolder,"soundscape{:d}".format(n))
