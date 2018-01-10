@@ -16,121 +16,364 @@ from numbers import Number
 import numpy as np
 import os
 import glob
+import warnings
+
+# from scaper.core import validate_distribution
+from scaper.scaper_warnings import ScaperWarning
+from scaper.util import _validate_distribution
 from scaper.scaper_exceptions import ScaperError
 from scaper.util import find_element_in_list, cartesian_to_spherical
 
 
 
-######### METHODS #########
+def _validate_smir_reverb_spec(IRlength, room_dimensions,
+                               t60, reflectivity,
+                               source_type, microphone_type):
+    # TODO
+    '''
+    Check that event parameter values are valid.
 
-def _validate_reverb_config(reverb_config, target_ambisonics_order):
+    Parameters
+    ----------
+    label : tuple
+    source_file : tuple
+    source_time : tuple
+    event_time : tuple
+    event_duration : tuple
+    event_azimuth : tuple
+    event_elevation : tuple
+    event_spread : tuple
+    snr : tuple
+    allowed_labels : list
+        List of allowed labels for the event.
+    pitch_shift : tuple or None
+    time_stretch: tuple or None
+
+    Raises
+    ------
+    ScaperError :
+        If any of the input parameters has an invalid format or value.
+
+    See Also
+    --------
+    Scaper.add_event : Add a foreground sound event to the foreground
+    specification.
     '''
 
-    :param reverb_config:
-    :param target_ambisonics_order:
-    :return:
-    '''
+    # IR LENGTH
+    _validate_IR_length(IRlength)
 
-    if reverb_config is None:
-        raise ScaperError(
-            'reverb_config is None')
+    # ROOM DIMENSIONS
+    _validate_room_dimensions(room_dimensions)
 
-    # Check all different supported reverb types
-    # smir
-    if type(reverb_config) is SmirReverbSpec:
-        _validate_smir_reverb_spec(reverb_config)
-    # s3a
-    elif type(reverb_config) is S3aReverbSpec:
-        _validate_s3a_reverb_spec(reverb_config)
+    # We must define either t60 or reflectivity, but not none
+    # If both are defined, just raise a warning
+    if reflectivity is None:
+        if t60 is None:
+            raise ScaperError(
+                'reverb_config: Neither t60 nor reflectivity defined!')
+        else:
+            # T60
+            _validate_t60(t60)
+    elif t60 is None:
+        # REFLECTIVITY
+        _validate_wall_reflectivity(reflectivity)
     else:
-        raise ScaperError(
-            'reverb_config of unknown type: ' + str(type(reverb_config)))
+        raise ScaperWarning(
+            'reverb_config: Both t60 and reflectivity defined!')
 
+    # SOURCE TYPE
+    _validate_source_type(source_type)
 
-def _validate_smir_reverb_spec(reverb_config):
+    # MYCROPHONE TYPE
+    _validate_microphone_type(microphone_type)
+
+def _validate_IR_length(IRlenght_tuple):
     '''
     TODO
-    :param reverb_config:
+    :param IRlenght_tuple:
     :return:
     '''
-    # IR length: positive integer
-    if reverb_config.IRlength is None:
-        raise ScaperError(
-            'reverb_config: IR length is None')
-    elif not isinstance(reverb_config.IRlength, int) or reverb_config.IRlength <= 0:
-        raise ScaperError(
-            'reverb_config: IR length must be a positive integer')
 
-    # room_dimensions: list of 3 elements
-    if reverb_config.room_dimensions is None:
-        raise ScaperError(
-            'reverb_config: room_dimensions is None')
-    elif not isinstance(reverb_config.room_dimensions, list):
-        raise ScaperError(
-            'reverb_config: room_dimensions is not a List')
-    elif len(reverb_config.room_dimensions) is not 3:
-        raise ScaperError(
-            'reverb_config: room_dimensions must have 3 elements')
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(IRlenght_tuple)
 
-    # beta: float > 0 (T_60) or list of 6 floats
-    if reverb_config.beta is None:
-        raise ScaperError(
-            'reverb_config: beta is None')
+    def __valid_IR_length_values(IRlength):
+        if (not isinstance(IRlength, int) or
+                    IRlength <= 0):
+            return False
+        else:
+            return True
 
-    # If it's T_60, it should be bigger than 0
-    if isinstance(reverb_config.beta, Number):
 
-        if reverb_config.beta <= 0:
+    # If IR length is specified explicitly
+    if IRlenght_tuple[0] == "const":
+
+        # IR length: positive integer
+        if IRlenght_tuple[1] is None:
             raise ScaperError(
-                'reverb_config: beta (T_60) must be a positive number')
-
-    # If list, it should be a list of 6 numbers
-    elif isinstance(reverb_config.beta, list):
-
-        if len(reverb_config.beta) is not 6:
+                'reverb_config: IR length is None')
+        elif not __valid_IR_length_values(IRlenght_tuple[1]):
             raise ScaperError(
-                'reverb_config: beta must have 6 elements; found '
-                + str(len(reverb_config.beta)))
+                'reverb_config: IR length must be a positive integer')
 
-        if not all([isinstance(e, Number) for e in reverb_config.beta]):
+    # Otherwise it must be specified using "choose"
+    elif IRlenght_tuple[0] == "choose":
+        if not IRlenght_tuple[1]:  # list is empty
             raise ScaperError(
-                'reverb_config: beta must contain numbers')
+                'reverb_config: IR length list empty')
+        elif not all(__valid_IR_length_values(length) for length in IRlenght_tuple[1]):
+            raise ScaperError(
+                'reverb_config: IR length must be a positive integer')
 
-    # If none of them, wrong type
+    # No other labels allowed"
     else:
         raise ScaperError(
-            'reverb_config: beta must be a T_60 value, or '
-            'the walls reflectivity (list of 6 numbers)')
+            'IR length must be specified using a "const" or "choose" tuple.')
 
-    # Valid source types: 'o','c','s','h','b'
-    if reverb_config.source_type is None:
-        raise ScaperError(
-            'reverb_config: source_type is None')
+def _validate_room_dimensions(room_dimensions_tuple):
+    '''
+    TODO
+    :param room_dimensions_tuple:
+    :return:
+    '''
 
-    elif not isinstance(reverb_config.source_type, str):
-        ScaperError(
-            'reverb_config: source_type must be a string')
+    def _valid_room_dimensions_values(room_dimensions):
+        # room_dimensions: list of 3 Numbers
+        if (room_dimensions is None or
+                not isinstance(room_dimensions, list) or
+                not all(isinstance(dim,Number) for dim in room_dimensions) or
+                len(room_dimensions) is not 3):
+            return False
+        else:
+            return True
 
-    elif find_element_in_list(reverb_config.source_type, SMIR_ALLOWED_SOURCE_TYPES) is None:
-        ScaperError(
-            'reverb_config: source_type not known: '
-            + reverb_config.source_type)
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(room_dimensions_tuple)
 
-    # Mic type: defined SUPPORTED_VIRTUAL_MICS
-    if reverb_config.microphone_type is None:
-        raise ScaperError(
-            'reverb_config: microphone_type is None')
-
-    elif not isinstance(reverb_config.microphone_type, str):
-        ScaperError(
-            'reverb_config: microphone_type must be a string')
-
-    else:
-        if not SMIR_SUPPORTED_VIRTUAL_MICS.has_key(reverb_config.microphone_type):
+    # If room_dimensions is specified explicitly
+    if room_dimensions_tuple[0] == "const":
+        if not _valid_room_dimensions_values(room_dimensions_tuple[1]):
             raise ScaperError(
-                'reverb_config: unsupported microphone_type: '
-                + reverb_config.microphone_type)
+                'reverb_config: room dimensions must be a list of 3 elements')
 
+    elif room_dimensions_tuple[0] == "choose":
+        if not room_dimensions_tuple[1]:  # list is empty
+            raise ScaperError(
+                'reverb_config: room_dimensions_tuple list empty')
+        elif not all(_valid_room_dimensions_values(room_dimensions)
+                     for room_dimensions in room_dimensions_tuple[1]):
+            raise ScaperError(
+                     'reverb_config: room dimensions must be a list of 3 elements')
+
+    elif room_dimensions_tuple[0] == "uniform":
+        if room_dimensions_tuple[1] < 0:
+            raise ScaperError(
+                'A "uniform" distribution tuple for room dimensions must have '
+                'min_value >= 0')
+
+    elif room_dimensions_tuple[0] == "normal":
+        warnings.warn(
+            'A "normal" distribution tuple for room dimensions can result in '
+            'negative values, in which case the distribution will be '
+            're-sampled until a positive value is returned: this can result '
+            'in an infinite loop!',
+            ScaperWarning)
+
+    elif room_dimensions_tuple[0] == "truncnorm":
+        if room_dimensions_tuple[3] < 0:
+            raise ScaperError(
+                'A "truncnorm" distirbution tuple for room dimensions must specify a non-'
+                'negative trunc_min value.')
+
+def _validate_t60(t60_tuple):
+    '''
+    TODO
+    :param beta_tuple:
+    :return:
+    '''
+
+    def _valid_t60_values(t60):
+        # t60: float bigger than 0
+        if (t60 is None or
+            not isinstance(t60,float) or
+            t60 <= 0):
+            return False
+        else:
+            return True
+
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(t60_tuple)
+
+    # If t60 is specified explicitly
+    if t60_tuple[0] == "const":
+        if not _valid_t60_values(t60_tuple[1]):
+            raise ScaperError(
+                'reverb_config: t60 must be a float >0')
+
+    elif t60_tuple[0] == "choose":
+        if not t60_tuple[1]:  # list is empty
+            raise ScaperError(
+                'reverb_config: t60_tuple list empty')
+        elif not all(_valid_t60_values(t60)
+                     for t60 in t60_tuple[1]):
+            raise ScaperError(
+                'reverb_config: t60 must be a float >0')
+
+    elif t60_tuple[0] == "uniform":
+        if t60_tuple[1] < 0:
+            raise ScaperError(
+                'A "uniform" distribution tuple for t60 must have '
+                'min_value >= 0')
+
+    elif t60_tuple[0] == "normal":
+        warnings.warn(
+            'A "normal" distribution tuple for t60 can result in '
+            'negative values, in which case the distribution will be '
+            're-sampled until a positive value is returned: this can result '
+            'in an infinite loop!',
+            ScaperWarning)
+
+    elif t60_tuple[0] == "truncnorm":
+        if t60_tuple[3] < 0:
+            raise ScaperError(
+                'A "truncnorm" distirbution tuple for t60 must specify a non-'
+                'negative trunc_min value.')
+
+def _validate_wall_reflectivity(wall_reflectivity_tuple):
+    '''
+    TODO
+    :param wall_reflectivity_tuple:
+    :return:
+    '''
+
+    def _valid_wall_reflectivity_values(wall_reflectivity):
+        # wall_reflectivity: list of 6 floats in the range [0,1]
+        if (wall_reflectivity is None or
+                not isinstance(wall_reflectivity, list) or
+                len(wall_reflectivity) is not 6 or
+                not all(isinstance(r, float) and 0<=r<=1 for r in wall_reflectivity)):
+            return False
+        else:
+            return True
+
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(wall_reflectivity_tuple)
+
+    # If wall_reflectivity is specified explicitly
+    if wall_reflectivity_tuple[0] == "const":
+        if not _valid_wall_reflectivity_values(wall_reflectivity_tuple[1]):
+            raise ScaperError(
+                'reverb_config: wall_reflectivity must be a list of 3 elements')
+
+    elif wall_reflectivity_tuple[0] == "choose":
+        if not wall_reflectivity_tuple[1]:  # list is empty
+            raise ScaperError(
+                'reverb_config: wall_reflectivity_tuple list empty')
+        elif not all(_valid_wall_reflectivity_values(wall_reflectivity)
+                     for wall_reflectivity in wall_reflectivity_tuple[1]):
+            raise ScaperError(
+                'reverb_config: wall_reflectivity must be a list of 3 elements')
+
+    elif wall_reflectivity_tuple[0] == "uniform":
+        if wall_reflectivity_tuple[1] < 0:
+            raise ScaperError(
+                'A "uniform" distribution tuple for wall_reflectivity must have '
+                'min_value >= 0')
+        elif wall_reflectivity_tuple[2] > 1:
+            raise ScaperError(
+                'A "uniform" distribution tuple for wall_reflectivity must have '
+                'max_value <= 1')
+
+    elif wall_reflectivity_tuple[0] == "normal":
+        warnings.warn(
+            'A "normal" distribution tuple for wall_reflectivity can result in '
+            'values outside [0,1], in which case the distribution will be '
+            're-sampled until a positive value is returned: this can result '
+            'in an infinite loop!',
+            ScaperWarning)
+
+    elif wall_reflectivity_tuple[0] == "truncnorm":
+        if wall_reflectivity_tuple[3] < 0:
+            raise ScaperError(
+                'A "uniform" distribution tuple for wall_reflectivity must have '
+                'min_value >= 0')
+        elif wall_reflectivity_tuple[4] > 1:
+            raise ScaperError(
+                'A "uniform" distribution tuple for wall_reflectivity must have '
+                'max_value <= 1')
+
+def _validate_source_type(source_type_tuple):
+    '''
+    Validate that a source_type tuple is in the right format and that it's values
+    are valid.
+
+    Parameters
+    ----------
+    source_type_tuple : tuple
+        Label tuple (see ```Scaper.add_event``` for required format).
+
+    Raises
+    ------
+    ScaperError
+        If the validation fails.
+
+    '''
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(source_type_tuple)
+
+    # Make sure it's one of the allowed distributions for a source_type and that the
+    # source_type value is one of the allowed labels.
+    if source_type_tuple[0] == "const":
+        if not source_type_tuple[1] in SMIR_ALLOWED_SOURCE_TYPES:
+            raise ScaperError(
+                'Source type value must match one of the available labels: '
+                '{:s}'.format(str(SMIR_ALLOWED_SOURCE_TYPES)))
+    elif source_type_tuple[0] == "choose":
+        if source_type_tuple[1]:  # list is not empty
+            if not set(source_type_tuple[1]).issubset(set(SMIR_ALLOWED_SOURCE_TYPES)):
+                raise ScaperError(
+                    'Source type provided must be a subset of the available '
+                    'labels: {:s}'.format(str(SMIR_ALLOWED_SOURCE_TYPES)))
+    else:
+        raise ScaperError(
+            'Source type must be specified using a "const" or "choose" tuple.')
+
+def _validate_microphone_type(mic_type_tuple):
+    '''
+    Validate that a mic_type tuple is in the right format and that it's values
+    are valid.
+
+    Parameters
+    ----------
+    mic_type_tuple : tuple
+        Label tuple (see ```Scaper.add_event``` for required format).
+
+    Raises
+    ------
+    ScaperError
+        If the validation fails.
+
+    '''
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(mic_type_tuple)
+
+    # Make sure it's one of the allowed distributions for a mic_type and that the
+    # mic_type value is one of the allowed labels.
+    if mic_type_tuple[0] == "const":
+        if not mic_type_tuple[1] in SMIR_SUPPORTED_VIRTUAL_MICS.keys():
+            raise ScaperError(
+                'Microphone type value must match one of the available labels: '
+                '{:s}'.format(str(SMIR_SUPPORTED_VIRTUAL_MICS.keys())))
+    elif mic_type_tuple[0] == "choose":
+        if mic_type_tuple[1]:  # list is not empty
+            if not set(mic_type_tuple[1]).issubset(set(SMIR_SUPPORTED_VIRTUAL_MICS.keys())):
+                raise ScaperError(
+                    'Microphone type provided must be a subset of the available '
+                    'labels: {:s}'.format(str(SMIR_SUPPORTED_VIRTUAL_MICS.keys())))
+    else:
+        raise ScaperError(
+            'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
 def _validate_s3a_reverb_spec(reverb_config):
@@ -270,7 +513,8 @@ SmirReverbSpec = namedtuple(
     'SmirReverbSpec',
     ['IRlength',
      'room_dimensions',
-     'beta',
+     't60',
+     'reflectivity',
      'source_type',
      'microphone_type'
      ], verbose=False)

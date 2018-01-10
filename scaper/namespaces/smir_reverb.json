@@ -1,0 +1,29 @@
+{"smir_reverb":
+    {
+        "value": {
+          "type": "object",
+          "properties": {
+            "IRlength": {
+              "type": "number"
+            },
+            "room_dimensions": {
+              "type": "array"
+            },
+            "t60": {
+              "type": "number"
+            },
+            "reflectivity": {
+              "type": "array"
+            },
+            "source_type": {
+              "type": "string"
+            },
+            "microphone_type": {
+              "type": "string"
+            },
+          }
+        },
+        "dense": false,
+        "description": "Smir Reverb following the AmbiScaper format."
+    }
+}

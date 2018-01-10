@@ -15,7 +15,8 @@ import shutil
 import pandas as pd
 from .scaper_exceptions import ScaperError
 from .scaper_warnings import ScaperWarning
-from .util import _close_temp_files, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list
+from .util import _close_temp_files, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list, \
+    _validate_distribution, SUPPORTED_DIST
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -30,7 +31,7 @@ from .ambisonics import _validate_ambisonics_order
 from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-from .reverb_ambisonics import generate_RIR_path
+from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec
 from .reverb_ambisonics import retrieve_RIR_positions
 from .reverb_ambisonics import MATLAB_ROOT
 from .reverb_ambisonics import S3A_FILTER_NAME
@@ -38,16 +39,10 @@ from .reverb_ambisonics import S3A_FILTER_EXTENSION
 from .reverb_ambisonics import SMIR_FOLDER_PATH
 from .reverb_ambisonics import S3aReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
-from .reverb_ambisonics import _validate_reverb_config
 from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
 import matlab_wrapper
 
 
-SUPPORTED_DIST = {"const": lambda x: x,
-                  "choose": lambda x: random.choice(x),
-                  "uniform": random.uniform,
-                  "normal": random.normalvariate,
-                  "truncnorm": _trunc_norm}
 
 # Define single event spec as namedtuple
 EventSpec = namedtuple(
@@ -306,86 +301,86 @@ def _get_value_from_dist(dist_tuple):
     return SUPPORTED_DIST[dist_tuple[0]](*dist_tuple[1:])
 
 
-def _validate_distribution(dist_tuple):
-    '''
-    Check whether a tuple specifying a parameter distribution has a valid
-    format, if not raise an error.
-
-    Parameters
-    ----------
-    dist_tuple : tuple
-        Tuple specifying a distribution to sample from. See Scaper.add_event
-        for details about the expected format of the tuple and allowed values.
-
-    Raises
-    ------
-    ScaperError
-        If the tuple does not have a valid format.
-
-    See Also
-    --------
-    Scaper.add_event : Add a foreground sound event to the foreground
-    specification.
-    '''
-    # Make sure it's a tuple
-    if not isinstance(dist_tuple, tuple):
-        raise ScaperError('Distribution tuple must be of type tuple.')
-
-    # Make sure the tuple contains at least 2 items
-    if len(dist_tuple) < 2:
-        raise ScaperError('Distribution tuple must be at least of length 2.')
-
-    # Make sure the first item is one of the supported distribution names
-    if dist_tuple[0] not in SUPPORTED_DIST.keys():
-        raise ScaperError(
-            "Unsupported distribution name: {:s}".format(dist_tuple[0]))
-
-    # If it's a constant distribution, tuple must be of length 2
-    if dist_tuple[0] == 'const':
-        if len(dist_tuple) != 2:
-            raise ScaperError('"const" distribution tuple must be of length 2')
-    # If it's a choose, tuple must be of length 2 and second item of type list
-    elif dist_tuple[0] == 'choose':
-        if len(dist_tuple) != 2 or not isinstance(dist_tuple[1], list):
-            raise ScaperError(
-                'The "choose" distribution tuple must be of length 2 where '
-                'the second item is a list.')
-    # If it's a uniform distribution, tuple must be of length 3, 2nd item must
-    # be a real number and 3rd item must be real and greater/equal to the 2nd.
-    elif dist_tuple[0] == 'uniform':
-        if (len(dist_tuple) != 3 or
-                not is_real_number(dist_tuple[1]) or
-                not is_real_number(dist_tuple[2]) or
-                    dist_tuple[1] > dist_tuple[2]):
-            raise ScaperError(
-                'The "uniform" distribution tuple be of length 2, where the '
-                '2nd item is a real number and the 3rd item is a real number '
-                'and greater/equal to the 2nd item.')
-    # If it's a normal distribution, tuple must be of length 3, 2nd item must
-    # be a real number and 3rd item must be a non-negative real
-    elif dist_tuple[0] == 'normal':
-        if (len(dist_tuple) != 3 or
-                not is_real_number(dist_tuple[1]) or
-                not is_real_number(dist_tuple[2]) or
-                    dist_tuple[2] < 0):
-            raise ScaperError(
-                'The "normal" distribution tuple must be of length 3, where '
-                'the 2nd item (mean) is a real number and the 3rd item (std '
-                'dev) is real and non-negative.')
-    elif dist_tuple[0] == 'truncnorm':
-        if (len(dist_tuple) != 5 or
-                not is_real_number(dist_tuple[1]) or
-                not is_real_number(dist_tuple[2]) or
-                not is_real_number(dist_tuple[3]) or
-                not is_real_number(dist_tuple[4]) or
-                    dist_tuple[2] < 0 or
-                    dist_tuple[4] < dist_tuple[3]):
-            raise ScaperError(
-                'The "truncnorm" distribution tuple must be of length 5, '
-                'where the 2nd item (mean) is a real number, the 3rd item '
-                '(std dev) is real and non-negative, the 4th item (trunc_min) '
-                'is a real number and the 5th item (trun_max) is a real '
-                'number that is equal to or greater than trunc_min.')
+# def _validate_distribution(dist_tuple):
+#     '''
+#     Check whether a tuple specifying a parameter distribution has a valid
+#     format, if not raise an error.
+#
+#     Parameters
+#     ----------
+#     dist_tuple : tuple
+#         Tuple specifying a distribution to sample from. See Scaper.add_event
+#         for details about the expected format of the tuple and allowed values.
+#
+#     Raises
+#     ------
+#     ScaperError
+#         If the tuple does not have a valid format.
+#
+#     See Also
+#     --------
+#     Scaper.add_event : Add a foreground sound event to the foreground
+#     specification.
+#     '''
+#     # Make sure it's a tuple
+#     if not isinstance(dist_tuple, tuple):
+#         raise ScaperError('Distribution tuple must be of type tuple.')
+#
+#     # Make sure the tuple contains at least 2 items
+#     if len(dist_tuple) < 2:
+#         raise ScaperError('Distribution tuple must be at least of length 2.')
+#
+#     # Make sure the first item is one of the supported distribution names
+#     if dist_tuple[0] not in SUPPORTED_DIST.keys():
+#         raise ScaperError(
+#             "Unsupported distribution name: {:s}".format(dist_tuple[0]))
+#
+#     # If it's a constant distribution, tuple must be of length 2
+#     if dist_tuple[0] == 'const':
+#         if len(dist_tuple) != 2:
+#             raise ScaperError('"const" distribution tuple must be of length 2')
+#     # If it's a choose, tuple must be of length 2 and second item of type list
+#     elif dist_tuple[0] == 'choose':
+#         if len(dist_tuple) != 2 or not isinstance(dist_tuple[1], list):
+#             raise ScaperError(
+#                 'The "choose" distribution tuple must be of length 2 where '
+#                 'the second item is a list.')
+#     # If it's a uniform distribution, tuple must be of length 3, 2nd item must
+#     # be a real number and 3rd item must be real and greater/equal to the 2nd.
+#     elif dist_tuple[0] == 'uniform':
+#         if (len(dist_tuple) != 3 or
+#                 not is_real_number(dist_tuple[1]) or
+#                 not is_real_number(dist_tuple[2]) or
+#                     dist_tuple[1] > dist_tuple[2]):
+#             raise ScaperError(
+#                 'The "uniform" distribution tuple be of length 2, where the '
+#                 '2nd item is a real number and the 3rd item is a real number '
+#                 'and greater/equal to the 2nd item.')
+#     # If it's a normal distribution, tuple must be of length 3, 2nd item must
+#     # be a real number and 3rd item must be a non-negative real
+#     elif dist_tuple[0] == 'normal':
+#         if (len(dist_tuple) != 3 or
+#                 not is_real_number(dist_tuple[1]) or
+#                 not is_real_number(dist_tuple[2]) or
+#                     dist_tuple[2] < 0):
+#             raise ScaperError(
+#                 'The "normal" distribution tuple must be of length 3, where '
+#                 'the 2nd item (mean) is a real number and the 3rd item (std '
+#                 'dev) is real and non-negative.')
+#     elif dist_tuple[0] == 'truncnorm':
+#         if (len(dist_tuple) != 5 or
+#                 not is_real_number(dist_tuple[1]) or
+#                 not is_real_number(dist_tuple[2]) or
+#                 not is_real_number(dist_tuple[3]) or
+#                 not is_real_number(dist_tuple[4]) or
+#                     dist_tuple[2] < 0 or
+#                     dist_tuple[4] < dist_tuple[3]):
+#             raise ScaperError(
+#                 'The "truncnorm" distribution tuple must be of length 5, '
+#                 'where the 2nd item (mean) is a real number, the 3rd item '
+#                 '(std dev) is real and non-negative, the 4th item (trunc_min) '
+#                 'is a real number and the 5th item (trun_max) is a real '
+#                 'number that is equal to or greater than trunc_min.')
 
 
 def _validate_label(label, allowed_labels):
@@ -1329,6 +1324,53 @@ class Scaper(object):
         # Add event to foreground specification
         self.fg_spec.append(event)
 
+
+    def add_simulated_reverb(self, IRlength, room_dimensions,
+                  t60, source_type, microphone_type, reflectivity=None):
+        '''
+        TODO
+        :param IRlength:
+        :param room_dimentions:
+        :param beta:
+        :param source_type:
+        :param microphone_type:
+        :return:
+        '''
+
+        # SAFETY_CHECKS
+        _validate_smir_reverb_spec(IRlength, room_dimensions,
+                  t60, reflectivity, source_type, microphone_type)
+
+        # Create reverb spec
+        if t60 is not None:
+            reverb = SmirReverbSpec(IRlength=IRlength,
+                                    room_dimensions=room_dimensions,
+                                    t60=t60,
+                                    reflectivity=None,
+                                    source_type=source_type,
+                                    microphone_type=microphone_type)
+        else:
+            reverb = SmirReverbSpec(IRlength=IRlength,
+                                    room_dimensions=room_dimensions,
+                                    t60=None,
+                                    reflectivity=reflectivity,
+                                    source_type=source_type,
+                                    microphone_type=microphone_type)
+
+        # Add event to foreground specification
+        self.reverb_spec = reverb
+
+        return
+
+
+    def add_recorded_reverb(self, reverb_name):
+        '''
+        TODO
+        :param reverb_name:
+        :return:
+        '''
+        return
+
     def _instantiate_event(self, event, isbackground=False,
                            allow_repeated_label=True,
                            allow_repeated_source=True,
@@ -1612,6 +1654,118 @@ class Scaper(object):
         # Return
         return instantiated_event
 
+    def _instantiate_reverb(self,reverb):
+
+        if type (self.reverb_spec) is SmirReverbSpec:
+            reverb = self._instantiate_smir_reverb(reverb)
+        else:
+            # TODO
+            raise ScaperWarning('TO BE IMPLEMENTED!')
+            # self._instantiate_S3A_reverb(reverb)
+            reverb = None
+
+        return reverb
+
+
+    def _instantiate_smir_reverb(self, reverb,
+                           #       isbackground=False,
+                           # allow_repeated_label=True,
+                           # allow_repeated_source=True,
+                           # used_labels=[],
+                           # used_source_files=[],
+                           disable_instantiation_warnings=False):
+        '''
+        Instantiate an event specification.
+
+        Given an event specification containing distribution tuples,
+        instantiate the event, i.e. samples values for the label, source_file,
+        source_time, event_time, event_duration and snr from their respective
+        distribution tuples, and return the sampled values in as a new event
+        specification.
+
+        Parameters
+        ----------
+        event : EventSpec
+            Event specification containing distribution tuples.
+        isbackground : bool
+            Flag indicating whether the event to instantiate is a background
+            event or not (False implies it is a foreground event).
+        allow_repeated_label : bool
+            When True (default) any label can be used, including a label that
+            has already been used for another event. When False, only a label
+            that is not already in ``used_labels`` can be selected.
+        allow_repeated_source : bool
+            When True (default) any source file matching the selected label can
+            be used, including a source file that has already been used for
+            another event. When False, only a source file that is not already
+            in ``used_source_files`` can be selected.
+        used_labels : list
+            List labels that have already been used in the current soundscape
+            instantiation. The label selected for instantiating the event will
+            be appended to this list unless its already in it.
+        used_source_files : list
+            List of full paths to source files that have already been used in
+            the current soundscape instantiation. The source file selected for
+            instantiating the event will be appended to this list unless its
+            already in it.
+        disable_instantiation_warnings : bool
+            When True (default is False), warnings stemming from event
+            instantiation (primarily about automatic duration adjustments) are
+            disabled. Not recommended other than for testing purposes.
+
+        Returns
+        -------
+        instantiated_event : EventSpec
+            Event specification containing values sampled from the distribution
+            tuples of the input event specification.
+
+        Raises
+        ------
+        ScaperError
+            If allow_repeated_source is False and there is no valid source file
+            to select.
+
+        '''
+
+        # Get IR length
+        IRlength = _get_value_from_dist(reverb.IRlength)
+
+        # Get room dimensions
+        room_dimensions = _get_value_from_dist(reverb.room_dimensions)
+
+        # Get t60
+        if reverb.t60 is not None:
+            t60 = _get_value_from_dist(reverb.t60)
+            reflectivity = None
+        # or get wall_reflectivity
+        else:
+            t60 = None
+            reflectivity = _get_value_from_dist(reverb.reflectivity)
+
+        # Get source type
+        source_type = _get_value_from_dist(reverb.source_type)
+
+        # Get microphone type
+        microphone_type = _get_value_from_dist(reverb.microphone_type)
+
+        # pack up instantiated values in an SmirReverbSpec
+        if reverb.t60 is not None:
+            instantiated_reverb = SmirReverbSpec(IRlength=IRlength,
+                                    room_dimensions=room_dimensions,
+                                    t60=t60,
+                                    reflectivity=None,
+                                    source_type=source_type,
+                                    microphone_type=microphone_type)
+        else:
+            instantiated_reverb = SmirReverbSpec(IRlength=IRlength,
+                                    room_dimensions=room_dimensions,
+                                    t60=None,
+                                    reflectivity=reflectivity,
+                                    source_type=source_type,
+                                    microphone_type=microphone_type)
+        # Return
+        return instantiated_reverb
+
     def _instantiate(self, allow_repeated_label=True,
                      allow_repeated_source=True, reverb=None,
                      disable_instantiation_warnings=False):
@@ -1705,6 +1859,16 @@ class Scaper(object):
                        value=value._asdict(),
                        confidence=1.0)
 
+        ############### andres
+
+        # ADD REVERB
+        value = self._instantiate_reverb(self.reverb_spec)
+        ann.append(time=0.0,    # TODO!
+                   duration=self.duration, # todo!
+                   value=value._asdict(),
+                   confidence=1.0)
+        #############################################
+
         # Compute max polyphony
         poly = max_polyphony(ann)
 
@@ -1715,6 +1879,7 @@ class Scaper(object):
         gini = polyphony_gini(ann)
 
         # Add specs and other info to sandbox
+        # todo: ADD REVERB, AMBISONICS INFO
         ann.sandbox.scaper = jams.Sandbox(
             duration=self.duration,
             fg_path=self.fg_path,

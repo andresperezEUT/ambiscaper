@@ -12,6 +12,7 @@ from .scaper_exceptions import ScaperError
 import scipy
 import numpy as np
 from numbers import Number
+import random
 
 
 @contextmanager
@@ -555,3 +556,92 @@ def find_element_in_list(element, list_arg):
         return index_element
     except ValueError:
         return None
+
+
+
+SUPPORTED_DIST = {"const": lambda x: x,
+                  "choose": lambda x: scipy.random.choice(x),
+                  "uniform": random.uniform,
+                  "normal": random.normalvariate,
+                  "truncnorm": _trunc_norm}
+
+def _validate_distribution(dist_tuple):
+    '''
+    Check whether a tuple specifying a parameter distribution has a valid
+    format, if not raise an error.
+
+    Parameters
+    ----------
+    dist_tuple : tuple
+        Tuple specifying a distribution to sample from. See Scaper.add_event
+        for details about the expected format of the tuple and allowed values.
+
+    Raises
+    ------
+    ScaperError
+        If the tuple does not have a valid format.
+
+    See Also
+    --------
+    Scaper.add_event : Add a foreground sound event to the foreground
+    specification.
+    '''
+    # Make sure it's a tuple
+    if not isinstance(dist_tuple, tuple):
+        raise ScaperError('Distribution tuple must be of type tuple.')
+
+    # Make sure the tuple contains at least 2 items
+    if len(dist_tuple) < 2:
+        raise ScaperError('Distribution tuple must be at least of length 2.')
+
+    # Make sure the first item is one of the supported distribution names
+    if dist_tuple[0] not in SUPPORTED_DIST.keys():
+        raise ScaperError(
+            "Unsupported distribution name: {:s}".format(dist_tuple[0]))
+
+    # If it's a constant distribution, tuple must be of length 2
+    if dist_tuple[0] == 'const':
+        if len(dist_tuple) != 2:
+            raise ScaperError('"const" distribution tuple must be of length 2')
+    # If it's a choose, tuple must be of length 2 and second item of type list
+    elif dist_tuple[0] == 'choose':
+        if len(dist_tuple) != 2 or not isinstance(dist_tuple[1], list):
+            raise ScaperError(
+                'The "choose" distribution tuple must be of length 2 where '
+                'the second item is a list.')
+    # If it's a uniform distribution, tuple must be of length 3, 2nd item must
+    # be a real number and 3rd item must be real and greater/equal to the 2nd.
+    elif dist_tuple[0] == 'uniform':
+        if (len(dist_tuple) != 3 or
+                not is_real_number(dist_tuple[1]) or
+                not is_real_number(dist_tuple[2]) or
+                    dist_tuple[1] > dist_tuple[2]):
+            raise ScaperError(
+                'The "uniform" distribution tuple be of length 2, where the '
+                '2nd item is a real number and the 3rd item is a real number '
+                'and greater/equal to the 2nd item.')
+    # If it's a normal distribution, tuple must be of length 3, 2nd item must
+    # be a real number and 3rd item must be a non-negative real
+    elif dist_tuple[0] == 'normal':
+        if (len(dist_tuple) != 3 or
+                not is_real_number(dist_tuple[1]) or
+                not is_real_number(dist_tuple[2]) or
+                    dist_tuple[2] < 0):
+            raise ScaperError(
+                'The "normal" distribution tuple must be of length 3, where '
+                'the 2nd item (mean) is a real number and the 3rd item (std '
+                'dev) is real and non-negative.')
+    elif dist_tuple[0] == 'truncnorm':
+        if (len(dist_tuple) != 5 or
+                not is_real_number(dist_tuple[1]) or
+                not is_real_number(dist_tuple[2]) or
+                not is_real_number(dist_tuple[3]) or
+                not is_real_number(dist_tuple[4]) or
+                    dist_tuple[2] < 0 or
+                    dist_tuple[4] < dist_tuple[3]):
+            raise ScaperError(
+                'The "truncnorm" distribution tuple must be of length 5, '
+                'where the 2nd item (mean) is a real number, the 3rd item '
+                '(std dev) is real and non-negative, the 4th item (trunc_min) '
+                'is a real number and the 5th item (trun_max) is a real '
+                'number that is equal to or greater than trunc_min.')
