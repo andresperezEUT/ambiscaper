@@ -508,6 +508,17 @@ S3A_FOLDER_PATH = os.path.join(os.getcwd(), S3A_FOLDER_NAME)
 
 ######### SMIR CONFIG #########
 
+
+# Smir default (non-configurable) values
+
+SMIR_SOUND_SPEED = 343.0
+SMIR_NUM_HARMONICS = 36.0
+SMIR_OVERSAMPLING_FACTOR = 1.0
+SMIR_DEFAULT_SOURCE_RADIUS = 2.0
+SMIR_HIGH_PASS_FILTER = 0.0
+SMIR_REFLECTION_ORDER = 10.0
+SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY = 0.0
+
 # Container for storing specfic SMIR reverb configuration values
 SmirReverbSpec = namedtuple(
     'SmirReverbSpec',
@@ -599,3 +610,11 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
                 [4.729842272904633, -1.2042771838760873]]
     }
 }
+
+def get_receiver_position(room_dimensions):
+    '''
+    TODO: for the moment just the center
+    :param room_dimensions:
+    :return:
+    '''
+    return [float(l) / 2.0 for l in room_dimensions]

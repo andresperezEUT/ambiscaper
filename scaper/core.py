@@ -31,7 +31,9 @@ from .ambisonics import _validate_ambisonics_order
 from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec
+from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, \
+    SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, \
+    SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY
 from .reverb_ambisonics import retrieve_RIR_positions
 from .reverb_ambisonics import MATLAB_ROOT
 from .reverb_ambisonics import S3A_FILTER_NAME
@@ -1838,6 +1840,9 @@ class Scaper(object):
                        value=value._asdict(),
                        confidence=1.0)
 
+        # Keep them for the reverb spec...
+        fg_source_positions = []
+
         # Add foreground events
         fg_labels = []
         fg_source_files = []
@@ -1850,6 +1855,9 @@ class Scaper(object):
                 used_labels=fg_labels,
                 used_source_files=fg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
+
+            # Retrieve source position
+            fg_source_positions.append([value.event_azimuth,value.event_elevation])
 
             if value.time_stretch is not None:
                 event_duration_stretched = (
@@ -1873,7 +1881,6 @@ class Scaper(object):
         gini = polyphony_gini(ann)
 
         # Add specs and other info to sandbox
-        # todo: ADD REVERB, AMBISONICS INFO
         ann.sandbox.scaper = jams.Sandbox(
             duration=self.duration,
             fg_path=self.fg_path,
@@ -1907,12 +1914,46 @@ class Scaper(object):
         # ADD REVERB
         ann_reverb = jams.Annotation(namespace='smir_reverb')
 
-        value = self._instantiate_reverb(self.reverb_spec)
-        ann_reverb.append(time=0.0,    # TODO!
-                   duration=self.duration, # todo!
-                   value=value._asdict(),
+        instanciated_reverb_spec = self._instantiate_reverb(self.reverb_spec)
+        ann_reverb.append(time=0.0,   # TODO: does it have any meaning for a reverb?
+                   duration=0.0,      # TODO: does it have any meaning for a reverb?
+                   value=instanciated_reverb_spec._asdict(),
                    confidence=1.0)
 
+        # Add specs and other info to sandbox
+        # TODO: this way is more concise, because it specifies each tuple name and values
+        # TODO: But, it is not compatible with the sound_event Sandbox, which is not labelled
+        # TODO: What should we do?
+
+        ann_reverb.sandbox.scaper = jams.Sandbox(
+
+            # all this?
+            # IRlength = self.reverb_spec.IRlength,
+            # room_dimensions = self.reverb_spec.room_dimensions,
+            # t60 = self.reverb_spec.t60,
+            # reflectivity = self.reverb_spec.reflectivity,
+            # source_type = self.reverb_spec.source_type,
+            # microphone_type = self.reverb_spec.microphone_type,
+            # microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["sph_type"],
+            # microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["sph_radius"],
+            # microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["mic"],
+            # add also default smir parameters
+            reverb_spec = self.reverb_spec,
+            microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["sph_type"],
+            microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["sph_radius"],
+            microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["mic"],
+            sample_rate = self.sr,
+            sound_speed = SMIR_SOUND_SPEED,
+            num_harmonics = SMIR_NUM_HARMONICS,
+            oversampling = SMIR_OVERSAMPLING_FACTOR,
+            sph_location = get_receiver_position(instanciated_reverb_spec.room_dimensions),
+            hp = SMIR_HIGH_PASS_FILTER,
+            reflection_order= SMIR_REFLECTION_ORDER,
+            reflection_coef_ang_dep = SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY,
+            # [radius, azimuth, elevation]
+            source_positions_sph = [[SMIR_DEFAULT_SOURCE_RADIUS,pos[0],pos[1]] for pos in fg_source_positions],
+
+        )
         jam.annotations.append(ann_reverb)
 
 
@@ -1977,40 +2018,39 @@ class Scaper(object):
         # Sample Rate of the session
         self.matlab.put('procFs', float(self.sr))
         # Default speed of sound
-        self.matlab.put('c', 343.0)
+        self.matlab.put('c', float(SMIR_SOUND_SPEED))
         # Buffer size given by the user
         self.matlab.put('nsample', float(self.reverb_config.IRlength))
 
         # Default number of harmonics
         # TODO? HOW IS THIS RELATED TO THE AMBISONICS ORDER?
-        self.matlab.put('N_harm', 36.0)
+        self.matlab.put('N_harm', float(SMIR_NUM_HARMONICS))
         # Default oversampling (no oversamplig)
-        self.matlab.put('K', 1.0)
+        self.matlab.put('K', float(SMIR_OVERSAMPLING_FACTOR))
 
         # Room dimensions given by the user (with float casting)
-        self.matlab.put('L', [float(l) for l in self.reverb_config.room_dimensions])
+        self.matlab.put('L', get_receiver_position(self.reverb_config.room_dimensions))
         # Receiver will be at the middle of the room
         # TODO: make it configurable??
-        self.matlab.put('sphLocation', [float(l) / 2.0 for l in self.reverb_config.room_dimensions])
+        self.matlab.put('sphLocation', get_receiver_position(self.reverb_spec.room_dimensions))
         # Source location will be given by the specific instance
-        radius = 2.0  # TODO choose
         azi = e.value['event_azimuth'],
         ele = e.value['event_elevation']
         self.matlab.put('s', (spherical_to_cartesian([float(e.value['event_azimuth']),
                                                       float(e.value['event_elevation']),
-                                                      float(radius)])))
+                                                      float(SMIR_DEFAULT_SOURCE_RADIUS)])))
 
         # Default no High Pass Filter
-        self.matlab.put('HP', 0.0)
-        # Default omnidirectional source directivity
-        self.matlab.put('src_type', 'o')
+        self.matlab.put('HP', float(SMIR_HIGH_PASS_FILTER))
+
+        self.matlab.put('src_type', 'o') # TODO
         # Source angle pointing to the receiver (default behavior by ommision)
         # src_ang
 
         # Reflection order by default
-        self.matlab.put('order', 10.0)
+        self.matlab.put('order', float(SMIR_REFLECTION_ORDER))
         # Not really sure what's this "room/angle dependent coeff, but let's keep it off
-        self.matlab.put('refl_coeff_ang_dep', 0.0)
+        self.matlab.put('refl_coeff_ang_dep', float(SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY))
 
         # Beta given by the user.
         # It might be either a float (T_60 in seconds)
