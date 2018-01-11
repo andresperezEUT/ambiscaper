@@ -16,7 +16,7 @@ import pandas as pd
 from .scaper_exceptions import ScaperError
 from .scaper_warnings import ScaperWarning
 from .util import _close_temp_files, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list, \
-    _validate_distribution, SUPPORTED_DIST
+    _validate_distribution, SUPPORTED_DIST, _get_event_idx_from_id, _generate_event_id_from_idx
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -58,7 +58,6 @@ Container for storing event specifications, either probabilistic (i.e. using
 distribution tuples to specify possible values) or instantiated (i.e. storing
 constants directly).
 '''
-
 
 
 def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
@@ -1439,11 +1438,11 @@ class Scaper(object):
         if isbackground:
             file_path = self.bg_path
             allowed_labels = self.bg_labels
-            event_id = 'bg'+str(event_idx)
+            event_id = _generate_event_id_from_idx(event_idx,'background')
         else:
             file_path = self.fg_path
             allowed_labels = self.fg_labels
-            event_id = 'fg' + str(event_idx)
+            event_id = _generate_event_id_from_idx(event_idx, 'foreground')
 
         # determine label
         if event.label[0] == "choose" and not event.label[1]:
@@ -2212,9 +2211,6 @@ class Scaper(object):
                     # don't warn again, since the parent folder also existed
                     # and the user already received a warning
 
-            # Keep track of the different events appearing
-            bg_events = []
-            fg_events = []
 
             # Define functions to handle the type of event
             def is_background(event):
@@ -2227,30 +2223,15 @@ class Scaper(object):
             # with _close_temp_files(processed_tmpfiles):
 
             # Iterate over all events specified in the event annotation
-            fg_event_idx = -1
+            # fg_event_idx = -1 TODO
             for event in annotation_event.data.iterrows():
 
                 # first item is index, second is event dictionary
                 e = event[1]
 
-                # e.value['time_stretch'] = 666
+                audio_event_filename = e.value['event_id']+'.wav'
+                ir_filename = 'ir_'+audio_event_filename
 
-                if is_background(event):
-                    audio_event_name = 'bg.wav'
-                    bg_events.append(event)
-                    if len(bg_events) > 1:
-                        raise ScaperError('Too many background files')
-
-                elif is_foreground(event):
-                    fg_event_idx += 1
-                    audio_event_name = 'fg' + str(len(fg_events)) + '.wav'
-                    ir_name = 'ir' + str(len(fg_events)) + '.wav'
-                    fg_events.append(event)
-
-                else:
-                    raise ScaperError(
-                        'Unsupported event role: {:s}'.format(
-                            e.value['role']))
 
                 # First of all, ensure pre-downmix to mono
                 downmix_tmpfiles.append(
@@ -2301,7 +2282,7 @@ class Scaper(object):
                 # (which can be found in this loop as "preprocessed_files[-1]")
 
                 preprocessed_files.append(
-                    os.path.join(destination_source_path, audio_event_name))
+                    os.path.join(destination_source_path, audio_event_filename))
 
                 # Build
                 fx_transformer.build(input_filepath=downmix_tmpfiles[-1].name,
@@ -2388,7 +2369,7 @@ class Scaper(object):
                             ### Model IR through smir_generator in matlab ###
 
                             # Save IRs as irX.wav in the same source folder
-                            filter_path = os.path.join(destination_source_path, ir_name)
+                            filter_path = os.path.join(destination_source_path, ir_filename)
                             self._generate_ambisonics_reverb_from_smir_spec(filter_path,e,annotation_reverb)
 
                         elif type(self.reverb_spec) is S3aReverbSpec:
@@ -2396,8 +2377,11 @@ class Scaper(object):
                             # They are stored at the chosen_IR_indices list
                             # Watch out with the indices (wav files numbering starting at 1)
 
-                            # Construct the filter name given the speaker index
-                            ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
+                            # Construct the filter name given the speaker index:
+                            # In each event iteration we selected a different speaker position
+                            # since event_id contains a numeration of the events,
+                            # we can retrieve the index from there
+                            event_idx = _get_event_idx_from_id(event_id,'foreground')
                             filter_name = S3A_FILTER_NAME + str(ir_idx) + S3A_FILTER_EXTENSION
                             filter_path = os.path.join(generate_RIR_path(self.reverb_spec), filter_name)
 
@@ -2408,7 +2392,7 @@ class Scaper(object):
                             # so this line will probably break in Windows
                             # TODO: handle Windows compatibility, test in Linux
                             try:
-                                symlink_path = os.path.join(destination_source_path, ir_name)
+                                symlink_path = os.path.join(destination_source_path, ir_filename)
                                 os.symlink(filter_path, symlink_path)
                             except OSError as err:
                                 if err.errno == 17:  # folder exists

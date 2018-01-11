@@ -15,7 +15,7 @@ duration = 10.0
 ambisonics_order = 1
 ambisonics_spread_slope = 1.0
 
-num_events = 1
+num_events = 3
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0
@@ -69,9 +69,9 @@ for n in range(n_soundscapes):
     sc.ref_db = ref_db
 
     # add background
-    # sc.add_background(label=('choose', []),
-    #                   source_file=('choose', []),
-    #                   source_time=('const', 0))
+    sc.add_background(label=('choose', []),
+                      source_file=('choose', []),
+                      source_time=('const', 0))
 
     n_events = num_events
     for _ in range(n_events):

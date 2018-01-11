@@ -8,11 +8,16 @@ from contextlib import contextmanager
 import logging
 import os
 import glob
+
 from .scaper_exceptions import ScaperError
 import scipy
 import numpy as np
 from numbers import Number
 import random
+
+
+event_foreground_id_string = 'fg'
+event_background_id_string = 'bg'
 
 
 @contextmanager
@@ -559,6 +564,40 @@ def find_element_in_list(element, list_arg):
 
 
 
+
+def _generate_event_id_from_idx(event_idx,role):
+
+    if role is 'foreground':
+        substring = event_foreground_id_string
+    elif role is 'background':
+        substring = event_background_id_string
+    else:
+        raise ScaperError(
+            'event role not known'+role
+        )
+
+    return substring+str(event_idx)
+
+
+def _get_event_idx_from_id(event_id,role):
+
+    if role is 'foreground':
+        substring = event_foreground_id_string
+    elif role is 'background':
+        substring = event_background_id_string
+    else:
+        raise ScaperError(
+            'event role not known'+role
+        )
+
+    # Remove role substring and get the integer number
+    return int(event_id.replace(substring,""))
+
+
+
+
+## TODO: COPYED FROM CORE TO AVOID CIRCULAR DEPENDENCIES
+
 SUPPORTED_DIST = {"const": lambda x: x,
                   "choose": lambda x: scipy.random.choice(x),
                   "uniform": random.uniform,
@@ -645,3 +684,6 @@ def _validate_distribution(dist_tuple):
                 '(std dev) is real and non-negative, the 4th item (trunc_min) '
                 'is a real number and the 5th item (trun_max) is a real '
                 'number that is equal to or greater than trunc_min.')
+
+
+
