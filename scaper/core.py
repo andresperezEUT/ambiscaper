@@ -1660,9 +1660,9 @@ class Scaper(object):
             reverb = self._instantiate_smir_reverb(reverb)
         else:
             # TODO
+            reverb = None
             raise ScaperWarning('TO BE IMPLEMENTED!')
             # self._instantiate_S3A_reverb(reverb)
-            reverb = None
 
         return reverb
 
@@ -1749,6 +1749,9 @@ class Scaper(object):
         microphone_type = _get_value_from_dist(reverb.microphone_type)
 
         # pack up instantiated values in an SmirReverbSpec
+        # NOTE: we set up as None the non-initialized value
+        # For that we must use the jams methods in strict=False mode!
+
         if reverb.t60 is not None:
             instantiated_reverb = SmirReverbSpec(IRlength=IRlength,
                                     room_dimensions=room_dimensions,
@@ -1859,15 +1862,6 @@ class Scaper(object):
                        value=value._asdict(),
                        confidence=1.0)
 
-        ############### andres
-
-        # ADD REVERB
-        value = self._instantiate_reverb(self.reverb_spec)
-        ann.append(time=0.0,    # TODO!
-                   duration=self.duration, # todo!
-                   value=value._asdict(),
-                   confidence=1.0)
-        #############################################
 
         # Compute max polyphony
         poly = max_polyphony(ann)
@@ -1906,6 +1900,23 @@ class Scaper(object):
 
         # Set jam metadata
         jam.file_metadata.duration = ann.duration
+
+
+        ############### andres
+
+        # ADD REVERB
+        ann_reverb = jams.Annotation(namespace='smir_reverb')
+
+        value = self._instantiate_reverb(self.reverb_spec)
+        ann_reverb.append(time=0.0,    # TODO!
+                   duration=self.duration, # todo!
+                   value=value._asdict(),
+                   confidence=1.0)
+
+        jam.annotations.append(ann_reverb)
+
+
+        #############################################
 
         # Return
         return jam
@@ -2508,7 +2519,6 @@ class Scaper(object):
         # reverb type selected...
 
         if (type(self.reverb_config) is SmirReverbSpec):
-
             # Start Matlab Session
             self.matlab = matlab_wrapper.MatlabSession(matlab_root=MATLAB_ROOT)
             # Add smir code into the path
@@ -2564,7 +2574,12 @@ class Scaper(object):
             allow_repeated_source=allow_repeated_source,
             reverb=0.69696969696969696969,  # todo
             disable_instantiation_warnings=disable_instantiation_warnings)
-        ann = jam.annotations.search(namespace='sound_event')[0]
+
+        # Implement the catch_warnings to avoid the timedelta deprecation message
+        # (only with newest versions)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ann = jam.annotations.search(namespace='sound_event')[0]
 
         # Generate the output folder structure
         # We will use the same file name as the folder
@@ -2586,7 +2601,11 @@ class Scaper(object):
                                  disable_sox_warnings=disable_sox_warnings)
 
         # Finally save JAMS to disk too
-        jam.save(os.path.join(destination_path, filename + '.jams'))
+        # NOTE: using strict=False for allowing None values of not-implemented
+        # values of smir_reverb (t60 or reflectivity)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            jam.save(os.path.join(destination_path, filename + '.jams'),strict=False)
 
         # Optionally save to CSV as well
         if generate_txt:

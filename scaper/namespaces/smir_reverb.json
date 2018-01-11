@@ -20,7 +20,7 @@
             },
             "microphone_type": {
               "type": "string"
-            },
+            }
           }
         },
         "dense": false,
