@@ -1098,7 +1098,7 @@ class Scaper(object):
         self.protected_labels = protected_labels[:]
 
         # Configure reverb to None by default
-        self.reverb_config = None
+        self.reverb_spec = None
 
     def add_background(self, label, source_file, source_time):
         '''
@@ -1730,19 +1730,19 @@ class Scaper(object):
         '''
 
         # Get IR length
-        IRlength = _get_value_from_dist(reverb.IRlength)
+        IRlength = float(_get_value_from_dist(reverb.IRlength))
 
         # Get room dimensions
-        room_dimensions = _get_value_from_dist(reverb.room_dimensions)
+        room_dimensions = [float(dim) for dim in _get_value_from_dist(reverb.room_dimensions)]
 
         # Get t60
         if reverb.t60 is not None:
-            t60 = _get_value_from_dist(reverb.t60)
+            t60 = float(_get_value_from_dist(reverb.t60))
             reflectivity = None
         # or get wall_reflectivity
         else:
             t60 = None
-            reflectivity = _get_value_from_dist(reverb.reflectivity)
+            reflectivity = [float(r) for r in _get_value_from_dist(reverb.reflectivity)]
 
         # Get source type
         source_type = _get_value_from_dist(reverb.source_type)
@@ -1941,7 +1941,7 @@ class Scaper(object):
             reverb_spec = self.reverb_spec,
             microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["sph_type"],
             microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["sph_radius"],
-            microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["mic"],
+            microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["capsule_position_sph"],
             sample_rate = self.sr,
             sound_speed = SMIR_SOUND_SPEED,
             num_harmonics = SMIR_NUM_HARMONICS,
@@ -2001,7 +2001,7 @@ class Scaper(object):
         return downmix_tmpfile
 
 
-    def _compute_smir_IRs(self,e):
+    def _compute_smir_IRs(self,e,instantiated_reverb_values):
         '''
         # TODO: calling matlab...
         :return:
@@ -2020,7 +2020,7 @@ class Scaper(object):
         # Default speed of sound
         self.matlab.put('c', float(SMIR_SOUND_SPEED))
         # Buffer size given by the user
-        self.matlab.put('nsample', float(self.reverb_config.IRlength))
+        self.matlab.put('nsample', float(instantiated_reverb_values['IRlength']))
 
         # Default number of harmonics
         # TODO? HOW IS THIS RELATED TO THE AMBISONICS ORDER?
@@ -2029,10 +2029,10 @@ class Scaper(object):
         self.matlab.put('K', float(SMIR_OVERSAMPLING_FACTOR))
 
         # Room dimensions given by the user (with float casting)
-        self.matlab.put('L', get_receiver_position(self.reverb_config.room_dimensions))
+        self.matlab.put('L', instantiated_reverb_values['room_dimensions'])
         # Receiver will be at the middle of the room
         # TODO: make it configurable??
-        self.matlab.put('sphLocation', get_receiver_position(self.reverb_spec.room_dimensions))
+        self.matlab.put('sphLocation', get_receiver_position(instantiated_reverb_values['room_dimensions']))
         # Source location will be given by the specific instance
         azi = e.value['event_azimuth'],
         ele = e.value['event_elevation']
@@ -2043,7 +2043,8 @@ class Scaper(object):
         # Default no High Pass Filter
         self.matlab.put('HP', float(SMIR_HIGH_PASS_FILTER))
 
-        self.matlab.put('src_type', 'o') # TODO
+        # Source directivity type given by the user
+        self.matlab.put('src_type', instantiated_reverb_values['source_type'])
         # Source angle pointing to the receiver (default behavior by ommision)
         # src_ang
 
@@ -2055,18 +2056,21 @@ class Scaper(object):
         # Beta given by the user.
         # It might be either a float (T_60 in seconds)
         # or wall reflectivity in list of len(6)
-        if isinstance(self.reverb_config.beta, list):
-            self.matlab.put('beta', [float(b) for b in self.reverb_config.beta])
+        if instantiated_reverb_values['t60'] is None:
+            # reflectivity
+            self.matlab.put('beta', instantiated_reverb_values['reflectivity'])
         else:
-            self.matlab.put('beta', float(self.reverb_config.beta))
+            # t60
+            self.matlab.put('beta', instantiated_reverb_values['t60'])
 
         # Sph_type, sph_radius, mic positions, given by the microphone type
+        mic = instantiated_reverb_values['microphone_type']
         self.matlab.put('sphType',
-                        SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_type"])
+                        SMIR_SUPPORTED_VIRTUAL_MICS[mic]["sph_type"])
         self.matlab.put('sphRadius',
-                        SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["sph_radius"])
+                        SMIR_SUPPORTED_VIRTUAL_MICS[mic]["sph_radius"])
         self.matlab.put('mic',
-                        SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"])
+                        SMIR_SUPPORTED_VIRTUAL_MICS[mic]["capsule_position_sph"])
 
         # Run the algorithm
         self.matlab.eval('run_smir_generator_from_python')
@@ -2076,21 +2080,25 @@ class Scaper(object):
         return h
 
 
-    def _generate_ambisonics_reverb_from_smir_spec(self,destination_path,event):
+    def _generate_ambisonics_reverb_from_smir_spec(self,destination_path,event,reverb_annotation):
         '''
         #TODO
         '''
 
+        # Retrieve instanciated values from the previously computed reverb annotation
+        instantiated_reverb_values = reverb_annotation.data.value[0]
+
         # Result of the method is the actual multichannel IRs
         # as recorded by the virtual microphones (A-Format if you want)
         # mic_IRs is a matrix of shape (num_capsules, num_samples)
-        mic_IRs = self._compute_smir_IRs(event)
+        mic_IRs = self._compute_smir_IRs(event,instantiated_reverb_values)
 
         # We need to convert them to ambisonics, i.e., perform ambisonics encoding on them
         # based on the capsule positions
         # TODO: how to ensure order limitation? (num_capsules >= num_sph or what?)
+        mic = instantiated_reverb_values['microphone_type']
         ambi_coefs = []
-        for mic_pos in SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_config.microphone_type]["mic"]:
+        for mic_pos in SMIR_SUPPORTED_VIRTUAL_MICS[mic]["capsule_position_sph"]:
             azi = mic_pos[0]
             ele = mic_pos[1]
             # ambi_coefs is a matrix of shape (num_capsules, num_ambisonics_channels)
@@ -2112,7 +2120,7 @@ class Scaper(object):
         return
 
 
-    def _generate_audio(self, destination_path, audio_filename, ann,
+    def _generate_audio(self, destination_path, audio_filename, annotation_array,
                         disable_sox_warnings=True):
         '''
         Generate audio based on a sound_event annotation and save to disk.
@@ -2123,8 +2131,10 @@ class Scaper(object):
             Path to the folder where to produce results
         audio_filename : str
             File name of the audio soundscape, stored at destination_path
+        TODO///
         ann : jams.Annotation
             Annotation of the sound_event namespace.
+        ////
         reverb : float or None
             Amount of reverb to apply to the generated soundscape between 0
             (no reverberation) and 1 (maximum reverberation). Use None
@@ -2144,10 +2154,21 @@ class Scaper(object):
         Scaper.generate
 
         '''
-        if ann.namespace != 'sound_event':
+
+        # Ignore pandas deprecation warning
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            annotation_event = annotation_array.search(namespace='sound_event')[0]
+            annotation_reverb = annotation_array.search(namespace='smir_reverb')[0]
+
+        if (annotation_event.namespace is not 'sound_event' or
+                    annotation_reverb.namespace is not 'smir_reverb' ):
             raise ScaperError(
-                'Annotation namespace must be sound_event, found: {:s}'.format(
-                    ann.namespace))
+                'Annotation namespaces not correct, found {:s} and {:s}'.format(
+                    annotation_event.namespace,
+                    annotation_reverb.namespace
+                )
+            )
 
         # disable sox warnings
         if disable_sox_warnings:
@@ -2197,9 +2218,9 @@ class Scaper(object):
             # Delete processed_tmpfiles only at the end of the method's lifetime
             # with _close_temp_files(processed_tmpfiles):
 
-            # Iterate over all events specified in the annotation
+            # Iterate over all events specified in the event annotation
             fg_event_idx = -1
-            for event in ann.data.iterrows():
+            for event in annotation_event.data.iterrows():
 
                 # first item is index, second is event dictionary
                 e = event[1]
@@ -2316,7 +2337,7 @@ class Scaper(object):
                 # 2.)   If there is reverb, then compute or retrieve the IRs according to the source positions,
                 #       and then convolve them with the sources
 
-                if self.reverb_config is None:
+                if self.reverb_spec is None:
 
                     if is_foreground(e):
                         # if foreground, apply both ambi coefs and spread
@@ -2355,14 +2376,14 @@ class Scaper(object):
                     else:
                         # Check reverb type and get IR
 
-                        if type(self.reverb_config) is SmirReverbSpec:
+                        if type(self.reverb_spec) is SmirReverbSpec:
                             ### Model IR through smir_generator in matlab ###
 
                             # Save IRs as irX.wav in the same source folder
                             filter_path = os.path.join(destination_source_path, ir_name)
-                            self._generate_ambisonics_reverb_from_smir_spec(filter_path,e)
+                            self._generate_ambisonics_reverb_from_smir_spec(filter_path,e,annotation_reverb)
 
-                        elif type(self.reverb_config) is S3aReverbSpec:
+                        elif type(self.reverb_spec) is S3aReverbSpec:
                             # Get the IRs associated to the source position
                             # They are stored at the chosen_IR_indices list
                             # Watch out with the indices (wav files numbering starting at 1)
@@ -2370,7 +2391,7 @@ class Scaper(object):
                             # Construct the filter name given the speaker index
                             ir_idx = self.chosen_IR_indices[fg_event_idx] + 1
                             filter_name = S3A_FILTER_NAME + str(ir_idx) + S3A_FILTER_EXTENSION
-                            filter_path = os.path.join(generate_RIR_path(self.reverb_config), filter_name)
+                            filter_path = os.path.join(generate_RIR_path(self.reverb_spec), filter_name)
 
                             # Create a symlink to the filter on the source folder
                             # We could just copy the filter there for consistency,
@@ -2558,16 +2579,16 @@ class Scaper(object):
         # The audio generation process will also probably vary depending on the
         # reverb type selected...
 
-        if (type(self.reverb_config) is SmirReverbSpec):
+        if (type(self.reverb_spec) is SmirReverbSpec):
             # Start Matlab Session
             self.matlab = matlab_wrapper.MatlabSession(matlab_root=MATLAB_ROOT)
             # Add smir code into the path
             self.matlab.eval('addpath ' + SMIR_FOLDER_PATH)
 
-        elif (type(self.reverb_config) is S3aReverbSpec):
+        elif (type(self.reverb_spec) is S3aReverbSpec):
 
             # Retrieve valid azimuth/elevation values
-            imposed_source_positions = retrieve_RIR_positions(self.reverb_config)
+            imposed_source_positions = retrieve_RIR_positions(self.reverb_spec)
 
             # We are going to modify the foreground specs, in order to impose source positions
             # Since we cannot modify directly an EventSpec (todo: why?)
@@ -2619,7 +2640,7 @@ class Scaper(object):
         # (only with newest versions)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            ann = jam.annotations.search(namespace='sound_event')[0]
+            annotation_array = jam.annotations
 
         # Generate the output folder structure
         # We will use the same file name as the folder
@@ -2637,7 +2658,7 @@ class Scaper(object):
         if not no_audio:
             self._generate_audio(destination_path,
                                  filename + '.wav',
-                                 ann,
+                                 annotation_array,
                                  disable_sox_warnings=disable_sox_warnings)
 
         # Finally save JAMS to disk too
@@ -2653,7 +2674,7 @@ class Scaper(object):
 
             df = pd.DataFrame(columns=['onset', 'offset', 'label'])
 
-            for idx, row in ann.data.iterrows():
+            for idx, row in annotation_array.search(namespace='sound_event')[0].data.iterrows():
                 if row.value['role'] == 'foreground':
                     # Since we are using the same :ann.data.iterrows(): method
                     # to parse the annotation values, the order in which the

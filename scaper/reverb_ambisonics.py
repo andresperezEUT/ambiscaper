@@ -556,7 +556,7 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
         "sph_type": 'rigid',
         "sph_radius": 0.02, # todo: get real measurement!
         "max_ambi_order": 1,
-        "mic":  [[0.0, 0.61547970867038726],       # FLU
+        "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
                 [np.pi, -0.61547970867038726],  # BLD
                 [3*np.pi/2, 0.61547970867038726]]   # BRU
@@ -566,7 +566,7 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
         "sph_type": 'rigid',
         "sph_radius": 0.02, # todo: get real measurement!
         "max_ambi_order": 1,
-        "mic":  [[0.0, 0.61547970867038726],       # FLU
+        "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
                 [np.pi, -0.61547970867038726],  # BLD
                 [3*np.pi/2, 0.61547970867038726]]   # BRU
@@ -576,7 +576,7 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
         "sph_type": 'rigid',
         "sph_radius": 0.042, # todo: get real measurement!
         "max_ambi_order": 4,
-        "mic":  [[0.0, 0.3665191429188092],
+        "capsule_position_sph":  [[0.0, 0.3665191429188092],
                 [0.5585053606381855, 0.0],
                 [0.0, -0.3665191429188092],
                 [5.7246799465414, 0.0],
