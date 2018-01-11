@@ -49,7 +49,7 @@ import matlab_wrapper
 # Define single event spec as namedtuple
 EventSpec = namedtuple(
     'EventSpec',
-    ['label', 'source_file',
+    ['label', 'source_file', 'event_id',
      'source_time', 'event_time', 'event_duration',
      'event_azimuth', 'event_elevation', 'event_spread',
      'snr', 'role', 'pitch_shift', 'time_stretch'], verbose=False)
@@ -1192,6 +1192,7 @@ class Scaper(object):
                              event_spread=event_spread,
                              snr=snr,
                              role=role,
+                             event_id=None,  # does not matter now, only on instanciated values
                              pitch_shift=pitch_shift,
                              time_stretch=time_stretch)
 
@@ -1320,6 +1321,7 @@ class Scaper(object):
                           event_spread=event_spread,
                           snr=snr,
                           role='foreground',
+                          event_id = None, # does not matter now, only on instanciated values
                           pitch_shift=pitch_shift,
                           time_stretch=time_stretch)
 
@@ -1373,7 +1375,8 @@ class Scaper(object):
         '''
         return
 
-    def _instantiate_event(self, event, isbackground=False,
+    def _instantiate_event(self, event, event_idx,
+                           isbackground=False,
                            allow_repeated_label=True,
                            allow_repeated_source=True,
                            used_labels=[],
@@ -1436,9 +1439,11 @@ class Scaper(object):
         if isbackground:
             file_path = self.bg_path
             allowed_labels = self.bg_labels
+            event_id = 'bg'+str(event_idx)
         else:
             file_path = self.fg_path
             allowed_labels = self.fg_labels
+            event_id = 'fg' + str(event_idx)
 
         # determine label
         if event.label[0] == "choose" and not event.label[1]:
@@ -1641,7 +1646,8 @@ class Scaper(object):
             pitch_shift = None
 
         # pack up instantiated values in an EventSpec
-        instantiated_event = EventSpec(label=label,
+        instantiated_event = EventSpec(event_id=event_id,
+                                       label=label,
                                        source_file=source_file,
                                        source_time=source_time,
                                        event_time=event_time,
@@ -1822,9 +1828,10 @@ class Scaper(object):
         # Add background sounds
         bg_labels = []
         bg_source_files = []
-        for event in self.bg_spec:
+        for event_idx, event in enumerate(self.bg_spec):
             value = self._instantiate_event(
                 event,
+                event_idx,
                 isbackground=True,
                 allow_repeated_label=allow_repeated_label,
                 allow_repeated_source=allow_repeated_source,
@@ -1846,9 +1853,10 @@ class Scaper(object):
         # Add foreground events
         fg_labels = []
         fg_source_files = []
-        for event in self.fg_spec:
+        for event_idx, event in enumerate(self.fg_spec):
             value = self._instantiate_event(
                 event,
+                event_idx,
                 isbackground=False,
                 allow_repeated_label=allow_repeated_label,
                 allow_repeated_source=allow_repeated_source,
@@ -2683,7 +2691,7 @@ class Scaper(object):
                     # manner, because it will always fit with the order given
                     # by the :_generate_audio(): method
                     # Just make sure that the nomenclature remains
-                    name = 'fg' + str(idx - 1)
+                    name = row.value['event_id']
                     newrow = ([row.time.total_seconds(),
                                row.time.total_seconds() +
                                row.duration.total_seconds(),
