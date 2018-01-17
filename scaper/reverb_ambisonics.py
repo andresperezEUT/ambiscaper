@@ -553,7 +553,7 @@ MATLAB_ROOT = "/Applications/MATLAB_R2017b.app"
 SMIR_SUPPORTED_VIRTUAL_MICS = {
 
     "soundfield": {
-        "sph_type": 'rigid',
+        "sph_type": 'open',
         "sph_radius": 0.02, # todo: get real measurement!
         "max_ambi_order": 1,
         "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
@@ -563,7 +563,7 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
     },
 
     "tetramic": {
-        "sph_type": 'rigid',
+        "sph_type": 'open',
         "sph_radius": 0.02, # todo: get real measurement!
         "max_ambi_order": 1,
         "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
