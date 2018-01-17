@@ -2102,7 +2102,20 @@ class Scaper(object):
 
         # We need to convert them to ambisonics, i.e., perform ambisonics encoding on them
         # based on the capsule positions
-        # TODO: how to ensure order limitation? (num_capsules >= num_sph or what?)
+
+        # The maximum ambisonics order L is defined by the number of microphone capsules:
+        #   K <= Q,
+        # where K is the number of ambisonics components K = (L+1)^2,
+        # and Q the number of capsules.
+        # For more information, please refer to
+        # "3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone"
+        # (Moreau, Daniel and Bertet, 2006). 
+        # http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
+
+        # TODO: ensure order limitation
+
+
+
         mic = instantiated_reverb_values['microphone_type']
         ambi_coefs = []
         for mic_pos in SMIR_SUPPORTED_VIRTUAL_MICS[mic]["capsule_position_sph"]:
