@@ -4,16 +4,16 @@
 Tests for functions in util.py
 '''
 
-from scaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list
-from scaper.util import _set_temp_logging_level
-from scaper.util import _validate_folder_path
-from scaper.util import _get_sorted_files
-from scaper.util import _populate_label_list
-from scaper.util import _trunc_norm
-from scaper.util import max_polyphony
-from scaper.util import polyphony_gini
-from scaper.util import is_real_number, is_real_array
-from scaper.scaper_exceptions import ScaperError
+from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list
+from ambiscaper.util import _set_temp_logging_level
+from ambiscaper.util import _validate_folder_path
+from ambiscaper.util import _get_sorted_files
+from ambiscaper.util import _populate_label_list
+from ambiscaper.util import _trunc_norm
+from ambiscaper.util import max_polyphony
+from ambiscaper.util import polyphony_gini
+from ambiscaper.util import is_real_number, is_real_array
+from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 import tempfile
 import os
 import logging
@@ -22,8 +22,8 @@ import shutil
 import numpy as np
 from scipy.stats import truncnorm
 import jams
-from scaper.core import EventSpec
-from scaper import Scaper
+from ambiscaper.core import EventSpec
+from ambiscaper import AmbiScaper
 
 
 # FIXTURES
@@ -95,7 +95,7 @@ def test_validate_folder_path():
 
     '''
     # bad folder path
-    pytest.raises(ScaperError, _validate_folder_path,
+    pytest.raises(AmbiScaperError, _validate_folder_path,
                   '/path/to/invalid/folder/')
 
     # good folder path should raise no error
@@ -140,7 +140,7 @@ def test_trunc_norm():
 
 def test_max_polyphony():
     '''
-    Test the computation of polyphony of a scaper soundscape instantiation.
+    Test the computation of polyphony of a ambiscaper soundscape instantiation.
 
     '''
     def __create_annotation_with_overlapping_events(n_events):
@@ -215,14 +215,14 @@ def test_polyphony_gini():
 
     # Annotation must have namespace sound_event, otherwise raise error
     ann = jams.Annotation('tag_open', duration=10)
-    gini = pytest.raises(ScaperError, polyphony_gini, ann)
+    gini = pytest.raises(AmbiScaperError, polyphony_gini, ann)
 
     # Annotation without duration set should raise error
     ann = jams.Annotation('sound_event', duration=None)
-    gini = pytest.raises(ScaperError, polyphony_gini, ann)
+    gini = pytest.raises(AmbiScaperError, polyphony_gini, ann)
 
     # Annotation with no foreground events returns a gini of 0
-    sc = Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
+    sc = AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
 
     # add background
     sc.add_background(label=('choose', []),
@@ -238,8 +238,8 @@ def test_polyphony_gini():
 
         print(event_time_list)
 
-        # create scaper
-        sc = Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
+        # create ambiscaper
+        sc = AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
 
         # add background
         sc.add_background(label=('choose', []),
@@ -317,7 +317,7 @@ def test_wrap_number():
 
     # test incorrect values
     def __test_bad_wrap_number(bad_entry):
-        pytest.raises(ScaperError, wrap_number, *bad_entry)
+        pytest.raises(AmbiScaperError, wrap_number, *bad_entry)
 
     bad_entries = [
         ['1',1j,3], # not a number
@@ -347,7 +347,7 @@ def test_delta_kronecker():
 
     # test incorrect values
     def __test_bad_delta_number(bad_entry):
-        pytest.raises(ScaperError, delta_kronecker, bad_entry, bad_entry)
+        pytest.raises(AmbiScaperError, delta_kronecker, bad_entry, bad_entry)
 
     bad_entries = [
         ['1',1.8,-2e-4,1j], # not a number
@@ -374,7 +374,7 @@ def test_cartesian_to_spherical():
 
     # test incorrect values
     def __test_bad_cartesian_list(bad_entry):
-        pytest.raises(ScaperError, cartesian_to_spherical, bad_entry)
+        pytest.raises(AmbiScaperError, cartesian_to_spherical, bad_entry)
         
     bad_entries = [
         1,
@@ -405,7 +405,7 @@ def test_cartesian_to_spherical():
 def test_spherical_to_cartesian():
     # test incorrect values
     def __test_bad_spherical_list(bad_entry):
-        pytest.raises(ScaperError, spherical_to_cartesian, bad_entry)
+        pytest.raises(AmbiScaperError, spherical_to_cartesian, bad_entry)
 
     bad_entries = [
         1,
@@ -438,7 +438,7 @@ def test_find_element_in_list():
     # basically, second argument not a list
 
     def __test_bad_list(bad_entry):
-        pytest.raises(ScaperError, find_element_in_list, *bad_entry)
+        pytest.raises(AmbiScaperError, find_element_in_list, *bad_entry)
 
     bad_entries = [
         [1, 2],

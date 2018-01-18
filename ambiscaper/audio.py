@@ -6,7 +6,7 @@ https://github.com/mathos/neg23/
 '''
 
 import subprocess
-from .scaper_exceptions import ScaperError
+from .ambiscaper_exceptions import AmbiScaperError
 
 
 def r128stats(filepath):

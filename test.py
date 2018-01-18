@@ -1,9 +1,9 @@
-import scaper
+import ambiscaper
 import numpy as np
 import os
 
 # OUTPUT FOLDER
-outfolder = '/Volumes/Dinge/scaper/generated/'
+outfolder = '/Volumes/Dinge/ambiscaper/generated/'
 
 # SCAPER SETTINGS
 foreground_folder = '~/audio/scaper/foreground/'
@@ -68,7 +68,7 @@ for n in range(n_soundscapes):
     print('Generating soundscape: {:d}/{:d}'.format(n+1, n_soundscapes))
 
     # create a scaper
-    sc = scaper.Scaper(duration, ambisonics_order, ambisonics_spread_slope, foreground_folder, background_folder)
+    sc = ambiscaper.AmbiScaper(duration, ambisonics_order, ambisonics_spread_slope, foreground_folder, background_folder)
     sc.protected_labels = []
     sc.ref_db = ref_db
 

@@ -2,10 +2,10 @@
 # -*- encoding: utf-8 -*-
 # CREATED: 10/11/16 6:07 PM by Justin Salamon <justin.salamon@nyu.edu>
 
-'''Exception classes for Scaper'''
+'''Exception classes for AmbiScaper'''
 
 
-class ScaperError(Exception):
-    '''The root Scaper exception class'''
+class AmbiScaperError(Exception):
+    '''The root AmbiScaper exception class'''
 
     pass

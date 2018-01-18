@@ -9,7 +9,7 @@ import logging
 import os
 import glob
 
-from .scaper_exceptions import ScaperError
+from .ambiscaper_exceptions import AmbiScaperError
 import scipy
 import numpy as np
 from numbers import Number
@@ -104,13 +104,13 @@ def _validate_folder_path(folder_path):
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If ```folder_path``` does not point to a valid folder.
 
     '''
 
     if not os.path.isdir(folder_path):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Folder path "{:s}" does not point to a valid folder'.format(
                 str(folder_path)))
 
@@ -119,7 +119,7 @@ def _populate_label_list(folder_path, label_list):
     '''
     Given a path to a folder and a list, add the names of all subfolders
     contained in this folder (excluding folders whose name starts with '.') to
-    the provided list. This is used in scaper to populate the lists of valid
+    the provided list. This is used in ambiscaper to populate the lists of valid
     foreground and background labels, which are determined by the names of the
     folders contained in ```fg_path`` and ```bg_path``` provided during
     initialization.
@@ -254,18 +254,18 @@ def polyphony_gini(ann, hop_size=0.01):
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the annotation does not have a duration value or if its namespace is
         not sound_event.
 
     '''
 
     if not ann.duration:
-        raise ScaperError('Annotation does not have a duration value set.')
+        raise AmbiScaperError('Annotation does not have a duration value set.')
 
-    if ann.namespace != 'sound_event':
-        raise ScaperError(
-            'Annotation namespace must be sound_event, found {:s}.'.format(
+    if ann.namespace != 'ambiscaper_sound_event':
+        raise AmbiScaperError(
+            'Annotation namespace must be ambiscaper_sound_event, found {:s}.'.format(
                 ann.namespace))
 
     # If there are no foreground events the gini coefficient is 0
@@ -377,17 +377,17 @@ def wrap_number(x, x_min, x_max):
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the arguments are not valid numbers, or if min is greater than max
 
     '''
     if (not isinstance(x, Number)
         or not isinstance(x_min, Number)
         or not isinstance(x_max, Number)):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Error wrapping number: not a number')
     if (x_min > x_max):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Error wrapping number: min greater than max'
         )
 
@@ -412,13 +412,13 @@ def delta_kronecker(q1,q2):
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the arguments are not valid numbers
 
     '''
     if (not isinstance(q1, int)
         or not isinstance(q2, int)):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Error on Kronecker delta: argument not int')
 
     if (q1==q2): return 1
@@ -446,7 +446,7 @@ def cartesian_to_spherical(cartesian_list):
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the input argument does not match the required type
 
     '''
@@ -454,13 +454,13 @@ def cartesian_to_spherical(cartesian_list):
     # Both arguments should be lists of 3 floats
     def _validate_args(list_arg):
         if not isinstance(list_arg,list):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Error on Cartesian to Spherical conversion: argument not a list, given ' + str(list_arg))
         if len(list_arg) is not 3:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Error on Cartesian to Spherical conversion: argument should have lenght of 3, given' + str(list_arg))
         if not any([isinstance(f,float) for f in list_arg]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Error on Cartesian to Spherical conversion: argument should contain floats, given' + str(list_arg))
 
     _validate_args(cartesian_list)
@@ -497,7 +497,7 @@ def spherical_to_cartesian(spherical_list):
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the input argument does not match the required type
 
     '''
@@ -505,13 +505,13 @@ def spherical_to_cartesian(spherical_list):
     # Both arguments should be lists of 3 floats
     def _validate_args(list_arg):
         if not isinstance(list_arg,list):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Error on Spherical to Cartesian conversion: argument not a list, given ' + str(list_arg))
         if len(list_arg) is not 3:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Error on Spherical to Cartesian conversion: argument should have lenght of 3, given ' + str(list_arg))
         if not any([isinstance(f,float) for f in list_arg]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Error on Spherical to Cartesian conversion: argument should contain floats, given ' + str(list_arg))
 
     _validate_args(spherical_list)
@@ -553,7 +553,7 @@ def find_element_in_list(element, list_arg):
     # element might have any kind of type,
     # but list_element must be a list
     if not isinstance(list_arg,list):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Error on find(): second argument not a list, given' + str(list_arg))
 
     try:
@@ -572,7 +572,7 @@ def _generate_event_id_from_idx(event_idx,role):
     elif role is 'background':
         substring = event_background_id_string
     else:
-        raise ScaperError(
+        raise AmbiScaperError(
             'event role not known'+role
         )
 
@@ -586,7 +586,7 @@ def _get_event_idx_from_id(event_id,role):
     elif role is 'background':
         substring = event_background_id_string
     else:
-        raise ScaperError(
+        raise AmbiScaperError(
             'event role not known'+role
         )
 
@@ -612,40 +612,40 @@ def _validate_distribution(dist_tuple):
     Parameters
     ----------
     dist_tuple : tuple
-        Tuple specifying a distribution to sample from. See Scaper.add_event
+        Tuple specifying a distribution to sample from. See AmbiScaper.add_event
         for details about the expected format of the tuple and allowed values.
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the tuple does not have a valid format.
 
     See Also
     --------
-    Scaper.add_event : Add a foreground sound event to the foreground
+    AmbiScaper.add_event : Add a foreground sound event to the foreground
     specification.
     '''
     # Make sure it's a tuple
     if not isinstance(dist_tuple, tuple):
-        raise ScaperError('Distribution tuple must be of type tuple.')
+        raise AmbiScaperError('Distribution tuple must be of type tuple.')
 
     # Make sure the tuple contains at least 2 items
     if len(dist_tuple) < 2:
-        raise ScaperError('Distribution tuple must be at least of length 2.')
+        raise AmbiScaperError('Distribution tuple must be at least of length 2.')
 
     # Make sure the first item is one of the supported distribution names
     if dist_tuple[0] not in SUPPORTED_DIST.keys():
-        raise ScaperError(
+        raise AmbiScaperError(
             "Unsupported distribution name: {:s}".format(dist_tuple[0]))
 
     # If it's a constant distribution, tuple must be of length 2
     if dist_tuple[0] == 'const':
         if len(dist_tuple) != 2:
-            raise ScaperError('"const" distribution tuple must be of length 2')
+            raise AmbiScaperError('"const" distribution tuple must be of length 2')
     # If it's a choose, tuple must be of length 2 and second item of type list
     elif dist_tuple[0] == 'choose':
         if len(dist_tuple) != 2 or not isinstance(dist_tuple[1], list):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'The "choose" distribution tuple must be of length 2 where '
                 'the second item is a list.')
     # If it's a uniform distribution, tuple must be of length 3, 2nd item must
@@ -655,7 +655,7 @@ def _validate_distribution(dist_tuple):
                 not is_real_number(dist_tuple[1]) or
                 not is_real_number(dist_tuple[2]) or
                     dist_tuple[1] > dist_tuple[2]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'The "uniform" distribution tuple be of length 2, where the '
                 '2nd item is a real number and the 3rd item is a real number '
                 'and greater/equal to the 2nd item.')
@@ -666,7 +666,7 @@ def _validate_distribution(dist_tuple):
                 not is_real_number(dist_tuple[1]) or
                 not is_real_number(dist_tuple[2]) or
                     dist_tuple[2] < 0):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'The "normal" distribution tuple must be of length 3, where '
                 'the 2nd item (mean) is a real number and the 3rd item (std '
                 'dev) is real and non-negative.')
@@ -678,7 +678,7 @@ def _validate_distribution(dist_tuple):
                 not is_real_number(dist_tuple[4]) or
                     dist_tuple[2] < 0 or
                     dist_tuple[4] < dist_tuple[3]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'The "truncnorm" distribution tuple must be of length 5, '
                 'where the 2nd item (mean) is a real number, the 3rd item '
                 '(std dev) is real and non-negative, the 4th item (trunc_min) '

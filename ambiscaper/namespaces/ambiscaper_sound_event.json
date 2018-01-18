@@ -1,4 +1,4 @@
-{"sound_event":
+{"ambiscaper_sound_event":
     {
         "value": {
           "type": "object",
@@ -33,6 +33,6 @@
           }
         },
         "dense": false,
-        "description": "Sound event following the scaper format."
+        "description": "Sound event following the AmbiScaper format."
     }
 }

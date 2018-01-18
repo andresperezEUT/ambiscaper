@@ -1,10 +1,10 @@
 # CREATED: 5/5/17 14:36 by Justin Salamon <justin.salamon@nyu.edu>
 
-from scaper.audio import r128stats, get_integrated_lufs
+from ambiscaper.audio import r128stats, get_integrated_lufs
 import numpy as np
 import os
 import pytest
-from scaper.scaper_exceptions import ScaperError
+from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from pkg_resources import resource_filename
 
 # fixtures
@@ -31,7 +31,7 @@ def test_get_integrated_lufs():
 
     # should get error (from r1238stats) if can't return lufs
     fakefile = 'tests/data/audio/foreground/siren/fakefile.wav'
-    pytest.raises(ScaperError, get_integrated_lufs, fakefile)
+    pytest.raises(AmbiScaperError, get_integrated_lufs, fakefile)
 
     # test correct functionality
     audiofiles = [SIREN_FILE, CARHORN_FILE, HUMANVOICE_FILE]
@@ -47,7 +47,7 @@ def test_r128stats():
 
     # should return false if can't get data
     fakefile = 'tests/data/audio/foreground/siren/fakefile.wav'
-    pytest.raises(ScaperError, r128stats, fakefile)
+    pytest.raises(AmbiScaperError, r128stats, fakefile)
 
     # test correct functionality
     audiofiles = [SIREN_FILE, CARHORN_FILE, HUMANVOICE_FILE]

@@ -13,7 +13,7 @@ setup(
     url='https://github.com/justinsalamon/scaper',
     download_url='http://github.com/justinsalamon/scaper/releases',
     packages=['scaper'],
-    package_data={'scaper': ['namespaces/sound_event.json']},
+    package_data={'scaper': ['namespaces/ambiscaper_sound_event.json']},
     long_description='A library for soundscape synthesis and augmentation',
     keywords='audio sound soundscape environmental dsp mixing',
     license='BSD-3-Clause',

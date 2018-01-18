@@ -16,20 +16,20 @@ elevation [-pi/2..pi/2]
 import numpy as np
 from numpy import pi
 from math import sin, cos, sqrt, factorial, exp
-from scaper.scaper_exceptions import ScaperError
+from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from scipy.special import sph_harm
 
-from scaper.util import delta_kronecker, is_real_number
+from ambiscaper.util import delta_kronecker, is_real_number
 
 
 
 def _validate_ambisonics_order(order):
 
     if (order<0):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Ambisonics order must be bigger than 0')
     if (not isinstance(order,int)):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Ambisonics order must be an integer')
 
 def _validate_ambisonics_degree(degree, order):
@@ -37,16 +37,16 @@ def _validate_ambisonics_degree(degree, order):
     _validate_ambisonics_order(order)
 
     if (not isinstance(degree,int)):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Ambisonics degree must be an integer')
     if (np.abs(degree) > order):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Ambisonics degree modulus must be minor or equal to ambisonics order')
 
 
 def _validate_ambisonics_angle(angle):
     if (not is_real_number(angle)):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Ambisonics angle must be a number')
 
 
@@ -57,11 +57,11 @@ def _validate_spread_coef(alpha):
     :return:
     '''
     if not is_real_number(alpha):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Ambisonics spread coef must be a real number')
 
     if (not 0.0 <= alpha <= 1.0):
-        raise ScaperError(
+        raise AmbiScaperError(
             'Ambisonics spread coef must be in the range [0.0, 1.0]')
 
 
@@ -69,9 +69,9 @@ def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
     # TODO comments
 
     if not is_real_number(ambisonics_spread_slope):
-        raise ScaperError('Ambisonics Spread Slope must be a real value')
+        raise AmbiScaperError('Ambisonics Spread Slope must be a real value')
     elif not 0 <= ambisonics_spread_slope <= 1:
-        raise ScaperError('Ambisonics Order must be 0 located on the range [0,1]')
+        raise AmbiScaperError('Ambisonics Order must be 0 located on the range [0,1]')
 
 
 

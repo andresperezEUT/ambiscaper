@@ -1,10 +1,10 @@
 
-import scaper
-from scaper.scaper_exceptions import ScaperError
-from scaper.scaper_warnings import ScaperWarning
-from scaper.util import _close_temp_files
+import ambiscaper
+from ambiscaper.ambiscaper_exceptions import AmbiScaperError
+from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
+from ambiscaper.util import _close_temp_files
 import pytest
-from scaper.core import EventSpec
+from ambiscaper.core import EventSpec
 import tempfile
 # from backports import tempfile
 import backports.tempfile
@@ -53,7 +53,7 @@ def test_generate_from_jams():
 
         jam.save(jam_file.name)
 
-        pytest.raises(ScaperError, scaper.generate_from_jams, jam_file.name,
+        pytest.raises(AmbiScaperError, ambiscaper.generate_from_jams, jam_file.name,
                       gen_file.name)
 
     # Test for valid jams files
@@ -72,8 +72,8 @@ def test_generate_from_jams():
         tmpfiles.append(gen_wav_file)
         tmpfiles.append(gen_jam_file)
 
-        # --- Define scaper --- *
-        sc = scaper.Scaper(10, 1, 1, FG_PATH, BG_PATH)
+        # --- Define ambiscaper --- *
+        sc = ambiscaper.AmbiScaper(10, 1, 1, FG_PATH, BG_PATH)
         sc.protected_labels = []
         sc.ref_db = -50
         sc.add_background(label=('choose', []),
@@ -98,7 +98,7 @@ def test_generate_from_jams():
         for _ in range(5):
             sc.generate(orig_wav_file.name, orig_jam_file.name,
                         disable_instantiation_warnings=True)
-            scaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
+            ambiscaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
 
             # validate audio
             orig_wav, sr = soundfile.read(orig_wav_file.name)
@@ -109,10 +109,10 @@ def test_generate_from_jams():
         for _ in range(5):
             sc.generate(orig_wav_file.name, orig_jam_file.name,
                         disable_instantiation_warnings=True)
-            scaper.trim(orig_wav_file.name, orig_jam_file.name,
+            ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                         orig_wav_file.name, orig_jam_file.name,
                         np.random.uniform(0, 5), np.random.uniform(5, 10))
-            scaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
+            ambiscaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
 
             # validate audio
             orig_wav, sr = soundfile.read(orig_wav_file.name)
@@ -123,28 +123,28 @@ def test_generate_from_jams():
         for _ in range(2):
             sc.generate(orig_wav_file.name, orig_jam_file.name,
                         disable_instantiation_warnings=True)
-            scaper.trim(orig_wav_file.name, orig_jam_file.name,
+            ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                         orig_wav_file.name, orig_jam_file.name,
                         np.random.uniform(0, 2), np.random.uniform(8, 10))
-            scaper.trim(orig_wav_file.name, orig_jam_file.name,
+            ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                         orig_wav_file.name, orig_jam_file.name,
                         np.random.uniform(0, 2), np.random.uniform(4, 6))
-            scaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
+            ambiscaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
 
         # Tripple trimming
         for _ in range(2):
             sc.generate(orig_wav_file.name, orig_jam_file.name,
                         disable_instantiation_warnings=True)
-            scaper.trim(orig_wav_file.name, orig_jam_file.name,
+            ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                         orig_wav_file.name, orig_jam_file.name,
                         np.random.uniform(0, 2), np.random.uniform(8, 10))
-            scaper.trim(orig_wav_file.name, orig_jam_file.name,
+            ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                         orig_wav_file.name, orig_jam_file.name,
                         np.random.uniform(0, 1), np.random.uniform(5, 6))
-            scaper.trim(orig_wav_file.name, orig_jam_file.name,
+            ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                         orig_wav_file.name, orig_jam_file.name,
                         np.random.uniform(0, 1), np.random.uniform(3, 4))
-            scaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
+            ambiscaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name)
 
             # validate audio
             orig_wav, sr = soundfile.read(orig_wav_file.name)
@@ -155,7 +155,7 @@ def test_generate_from_jams():
         for _ in range(5):
             sc.generate(orig_wav_file.name, orig_jam_file.name,
                         disable_instantiation_warnings=True)
-            scaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name,
+            ambiscaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name,
                                       fg_path=ALT_FG_PATH, bg_path=ALT_BG_PATH)
             # validate audio
             orig_wav, sr = soundfile.read(orig_wav_file.name)
@@ -163,7 +163,7 @@ def test_generate_from_jams():
             assert np.allclose(gen_wav, orig_wav, atol=1e-8, rtol=1e-8)
 
         # Ensure jam file saved correctly
-        scaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name,
+        ambiscaper.generate_from_jams(orig_jam_file.name, gen_wav_file.name,
                                   jams_outfile=gen_jam_file.name)
         orig_jam = jams.load(orig_jam_file.name)
         gen_jam = jams.load(gen_jam_file.name)
@@ -175,7 +175,7 @@ def test_trim():
     # Things we want to test:
     # 1. Jam trimmed correctly (mainly handled by jams.slice)
     # 2. value dict updated correctly (event_time, event_duration, source_time)
-    # 3. scaper sandbox updated correctly (n_events, poly, gini, duration)
+    # 3. ambiscaper sandbox updated correctly (n_events, poly, gini, duration)
     # 4. audio trimmed correctly
 
     tmpfiles = []
@@ -201,7 +201,7 @@ def test_trim():
         tmpfiles.append(trimstrict_jam_file)
 
         # --- Create soundscape and save to tempfiles --- #
-        sc = scaper.Scaper(10, 1, 1, FG_PATH, BG_PATH)
+        sc = ambiscaper.AmbiScaper(10, 1, 1, FG_PATH, BG_PATH)
         sc.protected_labels = []
         sc.ref_db = -50
         sc.add_background(label=('const', 'park'),
@@ -224,8 +224,8 @@ def test_trim():
         sc.generate(orig_wav_file.name, orig_jam_file.name,
                     disable_instantiation_warnings=True)
 
-        # --- Trim soundscape using scaper.trim with strict=False --- #
-        scaper.trim(orig_wav_file.name, orig_jam_file.name,
+        # --- Trim soundscape using ambiscaper.trim with strict=False --- #
+        ambiscaper.trim(orig_wav_file.name, orig_jam_file.name,
                     trim_wav_file.name, trim_jam_file.name,
                     3, 7, no_audio=False)
 
@@ -271,28 +271,28 @@ def test_trim():
 def test_get_value_from_dist():
 
     # const
-    x = scaper.core._get_value_from_dist(('const', 1))
+    x = ambiscaper.core._get_value_from_dist(('const', 1))
     assert x == 1
 
     # choose
     for _ in range(10):
-        x = scaper.core._get_value_from_dist(('choose', [1, 2, 3]))
+        x = ambiscaper.core._get_value_from_dist(('choose', [1, 2, 3]))
         assert x in [1, 2, 3]
 
     # uniform
     for _ in range(10):
-        x = scaper.core._get_value_from_dist(('choose', [1, 2, 3]))
+        x = ambiscaper.core._get_value_from_dist(('choose', [1, 2, 3]))
         assert x in [1, 2, 3]
 
     # normal
     for _ in range(10):
-        x = scaper.core._get_value_from_dist(('normal', 5, 1))
-        assert scaper.util.is_real_number(x)
+        x = ambiscaper.core._get_value_from_dist(('normal', 5, 1))
+        assert ambiscaper.util.is_real_number(x)
 
     # truncnorm
     for _ in range(10):
-        x = scaper.core._get_value_from_dist(('truncnorm', 5, 10, 0, 10))
-        assert scaper.util.is_real_number(x)
+        x = ambiscaper.core._get_value_from_dist(('truncnorm', 5, 10, 0, 10))
+        assert ambiscaper.util.is_real_number(x)
         assert 0 <= x <= 10
 
     # COPY TESTS FROM test_validate_distribution (to ensure validation applied)
@@ -302,7 +302,7 @@ def test_get_value_from_dist():
                 print(t, len(t))
             else:
                 print(t)
-            pytest.raises(ScaperError, scaper.core._get_value_from_dist, t)
+            pytest.raises(AmbiScaperError, ambiscaper.core._get_value_from_dist, t)
 
     # not tuple = error
     nontuples = [[], 5, 'yes']
@@ -344,7 +344,7 @@ def test_validate_distribution():
                 print(t, len(t))
             else:
                 print(t)
-            pytest.raises(ScaperError, scaper.core._validate_distribution, t)
+            pytest.raises(AmbiScaperError, ambiscaper.core._validate_distribution, t)
 
     # not tuple = error
     nontuples = [[], 5, 'yes']
@@ -381,19 +381,19 @@ def test_validate_label():
 
     # label must be in list of allowed labels
     allowed_labels = ['yes']
-    pytest.raises(ScaperError, scaper.core._validate_label, ('const', 'no'),
+    pytest.raises(AmbiScaperError, ambiscaper.core._validate_label, ('const', 'no'),
                   allowed_labels)
 
     # Choose list must be subset of allowed labels
     allowed_labels = ['yes', 'hello']
-    pytest.raises(ScaperError, scaper.core._validate_label, ('choose', ['no']),
+    pytest.raises(AmbiScaperError, ambiscaper.core._validate_label, ('choose', ['no']),
                   allowed_labels)
 
     # Label tuple must start with either 'const' or 'choose'
     bad_label_dists = [('uniform', 0, 1), ('normal', 0, 1),
                        ('truncnorm', 0, 1, 0, 1)]
     for bld in bad_label_dists:
-        pytest.raises(ScaperError, scaper.core._validate_label, bld,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_label, bld,
                       allowed_labels)
 
 
@@ -403,15 +403,15 @@ def test_validate_source_file():
     # create temp folder so we have path to file we know doesn't exist
     with backports.tempfile.TemporaryDirectory() as tmpdir:
         nonfile = os.path.join(tmpdir, 'notafile')
-        pytest.raises(ScaperError, scaper.core._validate_source_file,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_source_file,
                       ('const', nonfile), ('const', 'siren'))
 
     # label must be const and match file foldername
     sourcefile = 'tests/data/audio/foreground/siren/69-Siren-1.wav'
-    pytest.raises(ScaperError, scaper.core._validate_source_file,
+    pytest.raises(AmbiScaperError, ambiscaper.core._validate_source_file,
                   ('const', sourcefile), ('choose', []))
 
-    pytest.raises(ScaperError, scaper.core._validate_source_file,
+    pytest.raises(AmbiScaperError, ambiscaper.core._validate_source_file,
                   ('const', sourcefile), ('const', 'car_horn'))
 
     # if choose, all files in list of files must exist
@@ -419,21 +419,21 @@ def test_validate_source_file():
     with backports.tempfile.TemporaryDirectory() as tmpdir:
         nonfile = os.path.join(tmpdir, 'notafile')
         source_file_list = [sourcefile, nonfile]
-        pytest.raises(ScaperError, scaper.core._validate_source_file,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_source_file,
                       ('choose', source_file_list), ('const', 'siren'))
 
     # must be const or choose
     bad_label_dists = [('uniform', 0, 1), ('normal', 0, 1),
                        ('truncnorm', 0, 1, 0, 1)]
     for bld in bad_label_dists:
-        pytest.raises(ScaperError, scaper.core._validate_source_file, bld,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_source_file, bld,
                       ('const', 'siren'))
 
 
 def test_validate_time():
 
     def __test_bad_time_tuple(time_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_time, time_tuple)
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_time, time_tuple)
 
     # bad consts
     bad_time_values = [None, -1, 1j, 'yes', [], [5]]
@@ -451,7 +451,7 @@ def test_validate_time():
     __test_bad_time_tuple(('uniform', -1, 1))
 
     # using normal will issue a warning since it can generate neg values
-    pytest.warns(ScaperWarning, scaper.core._validate_time, ('normal', 5, 2))
+    pytest.warns(AmbiScaperWarning, ambiscaper.core._validate_time, ('normal', 5, 2))
 
     # truncnorm can't have negative min value
     __test_bad_time_tuple(('truncnorm', 0, 1, -1, 1))
@@ -460,7 +460,7 @@ def test_validate_time():
 def test_validate_duration():
 
     def __test_bad_duration_tuple(duration_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_duration,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_duration,
                       duration_tuple)
 
     # bad consts
@@ -480,7 +480,7 @@ def test_validate_duration():
     __test_bad_duration_tuple(('uniform', 0, 1))
 
     # using normal will issue a warning since it can generate neg values
-    pytest.warns(ScaperWarning, scaper.core._validate_duration,
+    pytest.warns(AmbiScaperWarning, ambiscaper.core._validate_duration,
                  ('normal', 5, 2))
 
     # truncnorm must be inside value range
@@ -491,7 +491,7 @@ def test_validate_duration():
 def test_validate_azimuth():
 
     def __test_bad_azimuth_tuple(azimuth_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_azimuth,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_azimuth,
                       azimuth_tuple)
 
     # bad consts
@@ -511,7 +511,7 @@ def test_validate_azimuth():
     __test_bad_azimuth_tuple(('uniform',0,3*np.pi))
 
     # using normal will issue a warning since it can generate values out of range
-    pytest.warns(ScaperWarning, scaper.core._validate_azimuth,
+    pytest.warns(AmbiScaperWarning, ambiscaper.core._validate_azimuth,
                  ('normal', 5, 2))
 
     # truncnorm must be inside value range
@@ -522,7 +522,7 @@ def test_validate_azimuth():
 def test_validate_elevation():
 
     def __test_bad_elevation_tuple(elevation_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_elevation,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_elevation,
                       elevation_tuple)
 
     # bad consts
@@ -542,7 +542,7 @@ def test_validate_elevation():
     __test_bad_elevation_tuple(('uniform',0,2*np.pi))
 
     # using normal will issue a warning since it can generate values out of range
-    pytest.warns(ScaperWarning, scaper.core._validate_elevation,
+    pytest.warns(AmbiScaperWarning, ambiscaper.core._validate_elevation,
                  ('normal', 5, 2))
 
     # truncnorm must be inside value range
@@ -552,7 +552,7 @@ def test_validate_elevation():
 def test_validate_spread():
 
     def __test_bad_spread_tuple(spread_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_spread,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_spread,
                       spread_tuple)
 
     # bad consts
@@ -573,7 +573,7 @@ def test_validate_spread():
     __test_bad_spread_tuple(('uniform',-2,2))
 
     # using normal will issue a warning since it can generate values out of range
-    pytest.warns(ScaperWarning, scaper.core._validate_spread,
+    pytest.warns(AmbiScaperWarning, ambiscaper.core._validate_spread,
                  ('normal', 5, 2))
 
     # truncnorm can't have negative or zero min value
@@ -585,7 +585,7 @@ def test_validate_spread():
 def test_validate_snr():
 
     def __test_bad_snr_tuple(snr_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_snr, snr_tuple)
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_snr, snr_tuple)
 
     # bad consts
     bad_snr_values = [None, 1j, 'yes', [], [5]]
@@ -603,7 +603,7 @@ def test_validate_snr():
 def test_validate_pitch_shift():
 
     def __test_bad_ps_tuple(ps_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_pitch_shift, ps_tuple)
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_pitch_shift, ps_tuple)
 
     # bad consts
     bad_ps_values = [None, 1j, 'yes', [], [5]]
@@ -621,7 +621,7 @@ def test_validate_pitch_shift():
 def test_validate_time_stretch():
 
     def __test_bad_ts_tuple(ts_tuple):
-        pytest.raises(ScaperError, scaper.core._validate_time_stretch,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_time_stretch,
                       ts_tuple)
 
     # bad consts
@@ -644,7 +644,7 @@ def test_validate_time_stretch():
 
     # Using normal dist must raise warning since can give neg or 0 values
     pytest.warns(
-        ScaperWarning, scaper.core._validate_time_stretch, ('normal', 5, 1))
+        AmbiScaperWarning, ambiscaper.core._validate_time_stretch, ('normal', 5, 1))
 
 
 def test_validate_event():
@@ -652,7 +652,7 @@ def test_validate_event():
     bad_allowed_labels = [0, 'yes', 1j, np.array([1, 2, 3])]
 
     for bal in bad_allowed_labels:
-        pytest.raises(ScaperError, scaper.core._validate_event,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_event,
                       label=('choose', []),
                       source_file=('choose', []),
                       source_time=('const', 0),
@@ -670,7 +670,7 @@ def test_validate_event():
 def test_validate_soundscape_duration():
 
     def __test_bad_soundscape_duration(duration):
-        pytest.raises(ScaperError, scaper.core._validate_soundscape_duration,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_soundscape_duration,
                       duration)
 
     # bad consts
@@ -682,7 +682,7 @@ def test_validate_soundscape_duration():
 def test_validate_ambisonics_order():
 
     def __test_bad_ambisonics_order(order):
-        pytest.raises(ScaperError, scaper.core._validate_ambisonics_order,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_ambisonics_order,
                       order)
 
     # bad consts
@@ -693,7 +693,7 @@ def test_validate_ambisonics_order():
 
 def test_validate_ambisonics_spread_slope():
     def __test_bad_ambisonics_spread_slope(order):
-        pytest.raises(ScaperError, scaper.core._validate_ambisonics_order,
+        pytest.raises(AmbiScaperError, ambiscaper.core._validate_ambisonics_order,
                       order)
 
     # bad consts
@@ -704,37 +704,37 @@ def test_validate_ambisonics_spread_slope():
 
 def test_scaper_init():
     '''
-    Test creation of Scaper object.
+    Test creation of AmbiScaper object.
     '''
 
     # bad duration
-    sc = pytest.raises(ScaperError, scaper.Scaper, -5, 1, 1,  FG_PATH, BG_PATH)
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, -5, 1, 1,  FG_PATH, BG_PATH)
 
     # bad ambisonics order
-    sc = pytest.raises(ScaperError, scaper.Scaper, 1, -1, 1, FG_PATH, BG_PATH)
-    sc = pytest.raises(ScaperError, scaper.Scaper, 1, 1.3, 1, FG_PATH, BG_PATH)
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 1, -1, 1, FG_PATH, BG_PATH)
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 1, 1.3, 1, FG_PATH, BG_PATH)
 
     # bad ambisonics spread slope
-    sc = pytest.raises(ScaperError, scaper.Scaper, 1, -1, 1.2, FG_PATH, BG_PATH)
-    sc = pytest.raises(ScaperError, scaper.Scaper, 1, 1.3, -2, FG_PATH, BG_PATH)
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 1, -1, 1.2, FG_PATH, BG_PATH)
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 1, 1.3, -2, FG_PATH, BG_PATH)
 
     # all args valid
-    sc = scaper.Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
     assert sc.fg_path == FG_PATH
     assert sc.bg_path == BG_PATH
 
     # bad fg path
-    sc = pytest.raises(ScaperError, scaper.Scaper, 10.0, 3, 1,
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 10.0, 3, 1,
                        'tests/data/audio/wrong',
                        BG_PATH)
 
     # bad bg path
-    sc = pytest.raises(ScaperError, scaper.Scaper, 10.0, 3, 1,
+    sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 10.0, 3, 1,
                        FG_PATH,
                        'tests/data/audio/wrong')
 
     # ensure fg_labels and bg_labels populated properly
-    sc = scaper.Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
     assert sorted(sc.fg_labels) == sorted(FB_LABELS)
     assert sorted(sc.bg_labels) == sorted(BG_LABELS)
 
@@ -747,10 +747,10 @@ def test_scaper_init():
 
 def test_scaper_add_background():
     '''
-    Test Scaper.add_background function
+    Test AmbiScaper.add_background function
 
     '''
-    sc = scaper.Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
 
     # Set concrete background label
     # label, source_file, source_time
@@ -776,7 +776,7 @@ def test_scaper_add_background():
 
 def test_scaper_add_event():
 
-    sc = scaper.Scaper(10.0, 3, 1, FG_PATH, BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
 
     # Initially fg_spec should be empty
     assert sc.fg_spec == []
@@ -827,7 +827,7 @@ def test_scaper_instantiate_event():
                          time_stretch=('uniform', 0.8, 1.2))
 
     # test valid case
-    sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
     instantiated_event = sc._instantiate_event(
         fg_event, isbackground=False, allow_repeated_label=True,
         allow_repeated_source=True, used_labels=[], used_source_files=[],
@@ -843,7 +843,7 @@ def test_scaper_instantiate_event():
     assert 0 <= instantiated_event.event_spread <= 1
     assert 10 <= instantiated_event.snr <= 20
     assert instantiated_event.role == 'foreground'
-    assert scaper.util.is_real_number(instantiated_event.pitch_shift)
+    assert ambiscaper.util.is_real_number(instantiated_event.pitch_shift)
     assert 0.8 <= instantiated_event.time_stretch <= 1.2
 
     # when a label needs to be replaced because it's used already
@@ -877,7 +877,7 @@ def test_scaper_instantiate_event():
             '42-Human-Vocal-Voice-taxi-2_edit.wav')
 
     # Protected labels must have original source duration and source time 0
-    sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH,
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH,
                        protected_labels='human_voice')
     fg_event10 = fg_event._replace(
         label=('const', 'human_voice'),
@@ -891,15 +891,15 @@ def test_scaper_instantiate_event():
     assert instantiated_event.event_duration == 0.806236
 
     # repeated label when not allowed throws error
-    sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
-    pytest.raises(ScaperError, sc._instantiate_event, fg_event,
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    pytest.raises(AmbiScaperError, sc._instantiate_event, fg_event,
                   isbackground=False,
                   allow_repeated_label=False,
                   allow_repeated_source=True,
                   used_labels=['siren'])
 
     # repeated source when not allowed throws error
-    pytest.raises(ScaperError, sc._instantiate_event, fg_event,
+    pytest.raises(AmbiScaperError, sc._instantiate_event, fg_event,
                   isbackground=False,
                   allow_repeated_label=True,
                   allow_repeated_source=False,
@@ -910,44 +910,44 @@ def test_scaper_instantiate_event():
     # event duration longer than source duration: warning
     fg_event2 = fg_event._replace(label=('const', 'car_horn'),
                                   event_duration=('const', 5))
-    pytest.warns(ScaperWarning, sc._instantiate_event, fg_event2)
+    pytest.warns(AmbiScaperWarning, sc._instantiate_event, fg_event2)
 
     # event duration longer than soundscape duration: warning
     fg_event3 = fg_event._replace(event_time=('const', 0),
                                   event_duration=('const', 15),
                                   time_stretch=None)
-    pytest.warns(ScaperWarning, sc._instantiate_event, fg_event3)
+    pytest.warns(AmbiScaperWarning, sc._instantiate_event, fg_event3)
 
     # stretched event duration longer than soundscape duration: warning
     fg_event4 = fg_event._replace(event_time=('const', 0),
                                   event_duration=('const', 6),
                                   time_stretch=('const', 2))
-    pytest.warns(ScaperWarning, sc._instantiate_event, fg_event4)
+    pytest.warns(AmbiScaperWarning, sc._instantiate_event, fg_event4)
 
     # source_time + event_duration > source_duration: warning
     fg_event5 = fg_event._replace(event_time=('const', 0),
                                   event_duration=('const', 8),
                                   source_time=('const', 20))
-    pytest.warns(ScaperWarning, sc._instantiate_event, fg_event5)
+    pytest.warns(AmbiScaperWarning, sc._instantiate_event, fg_event5)
 
     # event_time + event_duration > soundscape duration: warning
     fg_event6 = fg_event._replace(event_time=('const', 8),
                                   event_duration=('const', 5),
                                   time_stretch=None)
-    pytest.warns(ScaperWarning, sc._instantiate_event, fg_event6)
+    pytest.warns(AmbiScaperWarning, sc._instantiate_event, fg_event6)
 
     # event_time + stretched event_duration > soundscape duration: warning
     fg_event7 = fg_event._replace(event_time=('const', 5),
                                   event_duration=('const', 4),
                                   time_stretch=('const', 2))
-    pytest.warns(ScaperWarning, sc._instantiate_event, fg_event7)
+    pytest.warns(AmbiScaperWarning, sc._instantiate_event, fg_event7)
 
 
 def test_scaper_instantiate():
 
     # Here we just instantiate a known fixed spec and check if that jams
     # we get back is as expected.
-    sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background
@@ -1011,7 +1011,7 @@ def test_scaper_instantiate():
     # print(regjam)
 
     # Note: can't compare directly, since:
-    # 1. scaper/and jams liberary versions may change
+    # 1. ambiscaper/and jams liberary versions may change
     # 2. raw annotation sandbox stores specs as OrderedDict and tuples, whereas
     # loaded ann (regann) simplifies those to dicts and lists
     # assert jam == regression_jam
@@ -1035,29 +1035,29 @@ def test_scaper_instantiate():
     assert ann.annotation_metadata == regann.annotation_metadata
 
     # 3.2 compare sandboxes
-    # Note: can't compare sandboxes directly, since in raw jam scaper sandbox
+    # Note: can't compare sandboxes directly, since in raw jam ambiscaper sandbox
     # stores event specs in EventSpec object (named tuple), whereas in loaded
     # jam these will get converted to list of lists.
     # assert ann.sandbox == regann.sandbox
     assert len(ann.sandbox.keys()) == len(regann.sandbox.keys()) == 1
-    assert 'scaper' in ann.sandbox.keys()
-    assert 'scaper' in regann.sandbox.keys()
+    assert 'ambiscaper' in ann.sandbox.keys()
+    assert 'ambiscaper' in regann.sandbox.keys()
 
     # everything but the specs can be compared directly:
-    for k, kreg in zip(sorted(ann.sandbox.scaper.keys()),
-                       sorted(regann.sandbox.scaper.keys())):
+    for k, kreg in zip(sorted(ann.sandbox.ambiscaper.keys()),
+                       sorted(regann.sandbox.ambiscaper.keys())):
         assert k == kreg
         if k not in ['bg_spec', 'fg_spec']:
-            assert ann.sandbox.scaper[k] == regann.sandbox.scaper[kreg]
+            assert ann.sandbox.ambiscaper[k] == regann.sandbox.ambiscaper[kreg]
 
     # to compare specs need to covert raw specs to list of lists
     assert (
         [[list(x) if type(x) == tuple else x for x in e] for e in
-         ann.sandbox.scaper['bg_spec']] == regann.sandbox.scaper['bg_spec'])
+         ann.sandbox.ambiscaper['bg_spec']] == regann.sandbox.ambiscaper['bg_spec'])
 
     assert (
         [[list(x) if type(x) == tuple else x for x in e] for e in
-         ann.sandbox.scaper['fg_spec']] == regann.sandbox.scaper['fg_spec'])
+         ann.sandbox.ambiscaper['fg_spec']] == regann.sandbox.ambiscaper['fg_spec'])
 
     # 3.3. compare namespace, time and duration
     assert ann.namespace == regann.namespace
@@ -1073,7 +1073,7 @@ def test_generate_audio():
     # Regression test: same spec, same audio (not this will fail if we update
     # any of the audio processing techniques used (e.g. change time stretching
     # algorithm.
-    sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background
@@ -1162,24 +1162,24 @@ def test_generate_audio():
 
         # namespace must be sound_event
         jam.annotations[0].namespace = 'tag_open'
-        pytest.raises(ScaperError, sc._generate_audio, wav_file.name,
+        pytest.raises(AmbiScaperError, sc._generate_audio, wav_file.name,
                       jam.annotations[0])
 
         # unsupported event role must raise error
         jam.annotations[0].namespace = 'sound_event'
         jam.annotations[0].data.loc[3]['value']['role'] = 'ewok'
-        pytest.raises(ScaperError, sc._generate_audio, wav_file.name,
+        pytest.raises(AmbiScaperError, sc._generate_audio, wav_file.name,
                       jam.annotations[0])
 
         # soundscape with no events will raise warning and won't generate audio
-        sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+        sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
         sc.ref_db = -50
         jam = sc._instantiate(disable_instantiation_warnings=True)
-        pytest.warns(ScaperWarning, sc._generate_audio, wav_file.name,
+        pytest.warns(AmbiScaperWarning, sc._generate_audio, wav_file.name,
                      jam.annotations[0])
 
         # soundscape with only one event will use transformer (regression test)
-        sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+        sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
         sc.ref_db = -20
         # background
         sc.add_background(
@@ -1199,7 +1199,7 @@ def test_generate_audio():
 def test_generate():
 
     # Final regression test on all files
-    sc = scaper.Scaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc = ambiscaper.AmbiScaper(10.0, 3, 1, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background
@@ -1286,6 +1286,6 @@ def test_generate():
 
         # reverb value must be in (0, 1) range
         for reverb in [-1, 2]:
-            pytest.raises(ScaperError, sc.generate, wav_file.name,
+            pytest.raises(AmbiScaperError, sc.generate, wav_file.name,
                           jam_file.name, reverb=reverb,
                           disable_instantiation_warnings=True)

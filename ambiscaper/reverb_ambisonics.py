@@ -18,11 +18,10 @@ import os
 import glob
 import warnings
 
-# from scaper.core import validate_distribution
-from scaper.scaper_warnings import ScaperWarning
-from scaper.util import _validate_distribution
-from scaper.scaper_exceptions import ScaperError
-from scaper.util import find_element_in_list, cartesian_to_spherical
+from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
+from ambiscaper.util import _validate_distribution
+from ambiscaper.ambiscaper_exceptions import AmbiScaperError
+from ambiscaper.util import find_element_in_list, cartesian_to_spherical
 
 
 
@@ -51,12 +50,12 @@ def _validate_smir_reverb_spec(IRlength, room_dimensions,
 
     Raises
     ------
-    ScaperError :
+    AmbiScaperError :
         If any of the input parameters has an invalid format or value.
 
     See Also
     --------
-    Scaper.add_event : Add a foreground sound event to the foreground
+    AmbiScaper.add_event : Add a foreground sound event to the foreground
     specification.
     '''
 
@@ -70,7 +69,7 @@ def _validate_smir_reverb_spec(IRlength, room_dimensions,
     # If both are defined, just raise a warning
     if reflectivity is None:
         if t60 is None:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: Neither t60 nor reflectivity defined!')
         else:
             # T60
@@ -79,7 +78,7 @@ def _validate_smir_reverb_spec(IRlength, room_dimensions,
         # REFLECTIVITY
         _validate_wall_reflectivity(reflectivity)
     else:
-        raise ScaperWarning(
+        raise AmbiScaperWarning(
             'reverb_config: Both t60 and reflectivity defined!')
 
     # SOURCE TYPE
@@ -111,24 +110,24 @@ def _validate_IR_length(IRlenght_tuple):
 
         # IR length: positive integer
         if IRlenght_tuple[1] is None:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: IR length is None')
         elif not __valid_IR_length_values(IRlenght_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: IR length must be a positive integer')
 
     # Otherwise it must be specified using "choose"
     elif IRlenght_tuple[0] == "choose":
         if not IRlenght_tuple[1]:  # list is empty
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: IR length list empty')
         elif not all(__valid_IR_length_values(length) for length in IRlenght_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: IR length must be a positive integer')
 
     # No other labels allowed"
     else:
-        raise ScaperError(
+        raise AmbiScaperError(
             'IR length must be specified using a "const" or "choose" tuple.')
 
 def _validate_room_dimensions(room_dimensions_tuple):
@@ -154,21 +153,21 @@ def _validate_room_dimensions(room_dimensions_tuple):
     # If room_dimensions is specified explicitly
     if room_dimensions_tuple[0] == "const":
         if not _valid_room_dimensions_values(room_dimensions_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: room dimensions must be a list of 3 elements')
 
     elif room_dimensions_tuple[0] == "choose":
         if not room_dimensions_tuple[1]:  # list is empty
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: room_dimensions_tuple list empty')
         elif not all(_valid_room_dimensions_values(room_dimensions)
                      for room_dimensions in room_dimensions_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                      'reverb_config: room dimensions must be a list of 3 elements')
 
     elif room_dimensions_tuple[0] == "uniform":
         if room_dimensions_tuple[1] < 0:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "uniform" distribution tuple for room dimensions must have '
                 'min_value >= 0')
 
@@ -178,11 +177,11 @@ def _validate_room_dimensions(room_dimensions_tuple):
             'negative values, in which case the distribution will be '
             're-sampled until a positive value is returned: this can result '
             'in an infinite loop!',
-            ScaperWarning)
+            AmbiScaperWarning)
 
     elif room_dimensions_tuple[0] == "truncnorm":
         if room_dimensions_tuple[3] < 0:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "truncnorm" distirbution tuple for room dimensions must specify a non-'
                 'negative trunc_min value.')
 
@@ -208,21 +207,21 @@ def _validate_t60(t60_tuple):
     # If t60 is specified explicitly
     if t60_tuple[0] == "const":
         if not _valid_t60_values(t60_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: t60 must be a float >0')
 
     elif t60_tuple[0] == "choose":
         if not t60_tuple[1]:  # list is empty
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: t60_tuple list empty')
         elif not all(_valid_t60_values(t60)
                      for t60 in t60_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: t60 must be a float >0')
 
     elif t60_tuple[0] == "uniform":
         if t60_tuple[1] < 0:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "uniform" distribution tuple for t60 must have '
                 'min_value >= 0')
 
@@ -232,11 +231,11 @@ def _validate_t60(t60_tuple):
             'negative values, in which case the distribution will be '
             're-sampled until a positive value is returned: this can result '
             'in an infinite loop!',
-            ScaperWarning)
+            AmbiScaperWarning)
 
     elif t60_tuple[0] == "truncnorm":
         if t60_tuple[3] < 0:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "truncnorm" distirbution tuple for t60 must specify a non-'
                 'negative trunc_min value.')
 
@@ -263,25 +262,25 @@ def _validate_wall_reflectivity(wall_reflectivity_tuple):
     # If wall_reflectivity is specified explicitly
     if wall_reflectivity_tuple[0] == "const":
         if not _valid_wall_reflectivity_values(wall_reflectivity_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: wall_reflectivity must be a list of 3 elements')
 
     elif wall_reflectivity_tuple[0] == "choose":
         if not wall_reflectivity_tuple[1]:  # list is empty
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: wall_reflectivity_tuple list empty')
         elif not all(_valid_wall_reflectivity_values(wall_reflectivity)
                      for wall_reflectivity in wall_reflectivity_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: wall_reflectivity must be a list of 3 elements')
 
     elif wall_reflectivity_tuple[0] == "uniform":
         if wall_reflectivity_tuple[1] < 0:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "uniform" distribution tuple for wall_reflectivity must have '
                 'min_value >= 0')
         elif wall_reflectivity_tuple[2] > 1:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "uniform" distribution tuple for wall_reflectivity must have '
                 'max_value <= 1')
 
@@ -291,15 +290,15 @@ def _validate_wall_reflectivity(wall_reflectivity_tuple):
             'values outside [0,1], in which case the distribution will be '
             're-sampled until a positive value is returned: this can result '
             'in an infinite loop!',
-            ScaperWarning)
+            AmbiScaperWarning)
 
     elif wall_reflectivity_tuple[0] == "truncnorm":
         if wall_reflectivity_tuple[3] < 0:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "uniform" distribution tuple for wall_reflectivity must have '
                 'min_value >= 0')
         elif wall_reflectivity_tuple[4] > 1:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'A "uniform" distribution tuple for wall_reflectivity must have '
                 'max_value <= 1')
 
@@ -311,11 +310,11 @@ def _validate_source_type(source_type_tuple):
     Parameters
     ----------
     source_type_tuple : tuple
-        Label tuple (see ```Scaper.add_event``` for required format).
+        Label tuple (see ```AmbiScaper.add_event``` for required format).
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the validation fails.
 
     '''
@@ -326,17 +325,17 @@ def _validate_source_type(source_type_tuple):
     # source_type value is one of the allowed labels.
     if source_type_tuple[0] == "const":
         if not source_type_tuple[1] in SMIR_ALLOWED_SOURCE_TYPES:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Source type value must match one of the available labels: '
                 '{:s}'.format(str(SMIR_ALLOWED_SOURCE_TYPES)))
     elif source_type_tuple[0] == "choose":
         if source_type_tuple[1]:  # list is not empty
             if not set(source_type_tuple[1]).issubset(set(SMIR_ALLOWED_SOURCE_TYPES)):
-                raise ScaperError(
+                raise AmbiScaperError(
                     'Source type provided must be a subset of the available '
                     'labels: {:s}'.format(str(SMIR_ALLOWED_SOURCE_TYPES)))
     else:
-        raise ScaperError(
+        raise AmbiScaperError(
             'Source type must be specified using a "const" or "choose" tuple.')
 
 def _validate_microphone_type(mic_type_tuple):
@@ -347,11 +346,11 @@ def _validate_microphone_type(mic_type_tuple):
     Parameters
     ----------
     mic_type_tuple : tuple
-        Label tuple (see ```Scaper.add_event``` for required format).
+        Label tuple (see ```AmbiScaper.add_event``` for required format).
 
     Raises
     ------
-    ScaperError
+    AmbiScaperError
         If the validation fails.
 
     '''
@@ -362,17 +361,17 @@ def _validate_microphone_type(mic_type_tuple):
     # mic_type value is one of the allowed labels.
     if mic_type_tuple[0] == "const":
         if not mic_type_tuple[1] in SMIR_SUPPORTED_VIRTUAL_MICS.keys():
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Microphone type value must match one of the available labels: '
                 '{:s}'.format(str(SMIR_SUPPORTED_VIRTUAL_MICS.keys())))
     elif mic_type_tuple[0] == "choose":
         if mic_type_tuple[1]:  # list is not empty
             if not set(mic_type_tuple[1]).issubset(set(SMIR_SUPPORTED_VIRTUAL_MICS.keys())):
-                raise ScaperError(
+                raise AmbiScaperError(
                     'Microphone type provided must be a subset of the available '
                     'labels: {:s}'.format(str(SMIR_SUPPORTED_VIRTUAL_MICS.keys())))
     else:
-        raise ScaperError(
+        raise AmbiScaperError(
             'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
@@ -411,13 +410,13 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
             # The provided name should exist in s3a_
             reverb_folder_path = os.path.join(S3A_FOLDER_PATH, reverb_name)
             if not os.path.exists(os.path.expanduser(reverb_folder_path)):
-                raise ScaperError(
+                raise AmbiScaperError(
                     'reverb_config: folder does not exist: ' + reverb_name)
 
             # Inside the reverb folder should be a "Soundfield" folder
             soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
             if not os.path.exists(os.path.expanduser(soundfield_path)):
-                raise ScaperError(
+                raise AmbiScaperError(
                     'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(
                         reverb_folder_path))
 
@@ -432,12 +431,12 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
 
             # Check
             if num_wav_files is not num_lines:
-                raise ScaperError(
+                raise AmbiScaperError(
                     'reverb_config: the number of audio files does not match with the speaker description')
 
             result = True
 
-        except ScaperError:
+        except AmbiScaperError:
             pass
             result = False
 
@@ -449,13 +448,13 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
 
         # reverb name: allowed string
         if reverb_name_tuple[1] is None:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: reverb name is None')
         elif not __valid_s3a_reverb_name_types(reverb_name_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: reverb name must be a string')
         elif not __valid_s3a_reverb_name_configuration(reverb_name_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: reverb name not valid:' + reverb_name_tuple[1])
 
     # Otherwise it must be specified using "choose"
@@ -463,15 +462,15 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
     elif reverb_name_tuple[0] == "choose":
 
         if not all(__valid_s3a_reverb_name_types(length) for length in reverb_name_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: reverb name must be a positive integer')
         elif not all(__valid_s3a_reverb_name_configuration(name) for name in reverb_name_tuple[1]):
-            raise ScaperError(
+            raise AmbiScaperError(
                 'reverb_config: reverb names not valid: ' + reverb_name_tuple[1])
 
     # No other labels allowed"
     else:
-        raise ScaperError(
+        raise AmbiScaperError(
             'Reverb name must be specified using a "const" or "choose" tuple.')
 
 
