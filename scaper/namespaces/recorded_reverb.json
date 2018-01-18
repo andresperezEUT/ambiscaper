@@ -1,0 +1,14 @@
+{"recorded_reverb":
+    {
+        "value": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "dense": false,
+        "description": "Recorded Reverb following the AmbiScaper format."
+    }
+}
