@@ -1,4 +1,4 @@
-# scaper
+# AmbiScaper
 
 <img src="http://www.justinsalamon.com/uploads/4/3/9/4/4394963/scaper-logo_orig.png" width="400" height="108">
 
