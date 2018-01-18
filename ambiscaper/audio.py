@@ -28,7 +28,7 @@ def r128stats(filepath):
         summary_index = stats.rfind('Summary:')
 
         if summary_index == -1:
-            raise ScaperError(
+            raise AmbiScaperError(
                 'Unable to find LUFS summary, stats string:\n{:s}'.format(
                     stats))
 
@@ -43,7 +43,7 @@ def r128stats(filepath):
                       'LRA Threshold': lra_thresh, 'LRA Low': lra_low,
                       'LRA High': lra_high}
     except Exception as e:
-        raise ScaperError(
+        raise AmbiScaperError(
             'Unable to obtain LUFS data for {:s}, error message:\n{:s}'.format(
                 filepath, e.__str__()))
 

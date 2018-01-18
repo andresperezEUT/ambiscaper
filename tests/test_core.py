@@ -232,7 +232,7 @@ def test_trim():
         # --- Validate output --- #
         # validate JAMS
         trimjam = jams.load(trim_jam_file.name)
-        trimann = trimjam.annotations.search(namespace='sound_event')[0]
+        trimann = trimjam.annotations.search(namespace='ambiscaper_sound_event')[0]
 
         # Time and duration of annotation observation must be changed, but
         # values in the value dict must remained unchanged!
@@ -686,7 +686,7 @@ def test_validate_ambisonics_order():
                       order)
 
     # bad consts
-    bad_order_values = [None, 1j, 'yes', [], [5], -5, 0.5]
+    bad_order_values = [None, 'yes', [], [5], -5, 0.5]
     for bv in bad_order_values:
         __test_bad_ambisonics_order(bv)
 
@@ -1160,13 +1160,13 @@ def test_generate_audio():
         regwav, sr = soundfile.read(REG_WAV_PATH)
         assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
 
-        # namespace must be sound_event
+        # namespace must be ambiscaper_sound_event
         jam.annotations[0].namespace = 'tag_open'
         pytest.raises(AmbiScaperError, sc._generate_audio, wav_file.name,
                       jam.annotations[0])
 
         # unsupported event role must raise error
-        jam.annotations[0].namespace = 'sound_event'
+        jam.annotations[0].namespace = 'ambiscaper_sound_event'
         jam.annotations[0].data.loc[3]['value']['role'] = 'ewok'
         pytest.raises(AmbiScaperError, sc._generate_audio, wav_file.name,
                       jam.annotations[0])
