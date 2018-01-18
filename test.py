@@ -57,6 +57,10 @@ pitch = 1
 time_stretch_dist = 'const'
 time_stretch = 2
 
+# reverb = 'simulated'
+reverb = 'recorded'
+# reverb = None
+
 # Generate 1000 soundscapes using a truncated normal distribution of start times
 
 for n in range(n_soundscapes):
@@ -69,9 +73,9 @@ for n in range(n_soundscapes):
     sc.ref_db = ref_db
 
     # add background
-    sc.add_background(label=('choose', []),
-                      source_file=('choose', []),
-                      source_time=('const', 0))
+    # sc.add_background(label=('choose', []),
+    #                   source_file=('choose', []),
+    #                   source_time=('const', 0))
 
     n_events = num_events
     for _ in range(n_events):
@@ -91,15 +95,18 @@ for n in range(n_soundscapes):
 
 
     # Simulated Reverb
-    sc.add_simulated_reverb(IRlength=('const', 1024),
-                            room_dimensions=('const',[6,3,3]),
-                            t60=('uniform',0.1,0.5),
-                            source_type=('const','o'),
-                            microphone_type=('const','soundfield'))
+    if reverb is 'simulated':
+        sc.add_simulated_reverb(IRlength=('const', 1024),
+                                room_dimensions=('const',[6,3,3]),
+                                t60=('uniform',0.1,0.5),
+                                source_type=('const','o'),
+                                microphone_type=('const','soundfield'))
 
     # Recorded Reverb
-    # sc.set_reverb(scaper.core.S3aReverbSpec(
-    #     name = 'MainChurch'))
+    elif reverb is 'recorded':
+        sc.add_recorded_reverb(name=('choose',[]))
+
+    # Nothing: no reverb
 
     # generate
     destination_path = os.path.join(outfolder,"soundscape{:d}".format(n))

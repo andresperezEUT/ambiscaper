@@ -33,7 +33,8 @@ from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
 from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, \
     SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, \
-    SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY
+    SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_s3a_reverb_spec, \
+    retrieve_available_recorded_IRs
 from .reverb_ambisonics import retrieve_RIR_positions
 from .reverb_ambisonics import MATLAB_ROOT
 from .reverb_ambisonics import S3A_FILTER_NAME
@@ -1366,12 +1367,19 @@ class Scaper(object):
         return
 
 
-    def add_recorded_reverb(self, reverb_name):
+    def add_recorded_reverb(self, name):
         '''
         TODO
         :param reverb_name:
         :return:
         '''
+
+        # SAFETY_CHECKS
+        _validate_s3a_reverb_spec(name)
+
+        # Create reverb spec
+        self.reverb_spec = S3aReverbSpec(name=name)
+
         return
 
     def _instantiate_event(self, event, event_idx,
@@ -1443,6 +1451,7 @@ class Scaper(object):
             file_path = self.fg_path
             allowed_labels = self.fg_labels
             event_id = _generate_event_id_from_idx(event_idx, 'foreground')
+
 
         # determine label
         if event.label[0] == "choose" and not event.label[1]:
@@ -1661,20 +1670,18 @@ class Scaper(object):
         # Return
         return instantiated_event
 
-    def _instantiate_reverb(self,reverb):
+    def _instantiate_reverb(self):
 
         if type (self.reverb_spec) is SmirReverbSpec:
-            reverb = self._instantiate_smir_reverb(reverb)
+            return self._instantiate_smir_reverb()
+        elif type(self.reverb_spec) is S3aReverbSpec:
+            return self._instantiate_s3a_reverb()
         else:
-            # TODO
-            reverb = None
-            raise ScaperWarning('TO BE IMPLEMENTED!')
-            # self._instantiate_S3A_reverb(reverb)
-
-        return reverb
+            raise ScaperError(
+                'Unknown reverb type')
 
 
-    def _instantiate_smir_reverb(self, reverb,
+    def _instantiate_smir_reverb(self,
                            #       isbackground=False,
                            # allow_repeated_label=True,
                            # allow_repeated_source=True,
@@ -1734,6 +1741,10 @@ class Scaper(object):
 
         '''
 
+        reverb = self.reverb_spec
+
+        # We cast manually everything to float, so Matlab will understand it
+
         # Get IR length
         IRlength = float(_get_value_from_dist(reverb.IRlength))
 
@@ -1776,6 +1787,23 @@ class Scaper(object):
         # Return
         return instantiated_reverb
 
+
+    def _instantiate_s3a_reverb(self,
+                                disable_instantiation_warnings=False):
+
+        name = self.reverb_spec.name
+
+        # If 'choose' and list is empty, then choose from all available IRs
+        if name[0] == "choose" and not name[1]:
+            name_tuple = list(name)
+            name_tuple[1] = retrieve_available_recorded_IRs()
+            name_tuple = tuple(name_tuple)
+        else:
+            name_tuple = name
+        name = _get_value_from_dist(name_tuple)
+
+        return S3aReverbSpec(name=name)
+
     def _instantiate(self, allow_repeated_label=True,
                      allow_repeated_source=True, reverb=None,
                      disable_instantiation_warnings=False):
@@ -1816,13 +1844,122 @@ class Scaper(object):
 
         '''
         jam = jams.JAMS()
+
+        ############### andres
+
+        # Let's instanciate the reverb before the sound events.
+        # Since the recorded reverbs impose a limitation on the source positions,
+        # we will need this information beforehand.
+
+        # Instantiate reverb values
+
+        if self.reverb_spec:
+            instantiated_reverb_spec = self._instantiate_reverb()
+
+            if isinstance(instantiated_reverb_spec,SmirReverbSpec):
+
+                ann_reverb = jams.Annotation(namespace='smir_reverb')
+
+                # Add specs and other info to sandbox
+                # TODO: this way is more concise, because it specifies each tuple name and values
+                # TODO: But, it is not compatible with the sound_event Sandbox, which is not labelled
+                # TODO: What should we do?
+                ann_reverb.sandbox.scaper = jams.Sandbox(
+
+                    # all this?
+                    # IRlength = self.reverb_spec.IRlength,
+                    # room_dimensions = self.reverb_spec.room_dimensions,
+                    # t60 = self.reverb_spec.t60,
+                    # reflectivity = self.reverb_spec.reflectivity,
+                    # source_type = self.reverb_spec.source_type,
+                    # microphone_type = self.reverb_spec.microphone_type,
+                    # microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["sph_type"],
+                    # microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["sph_radius"],
+                    # microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["mic"],
+                    # add also default smir parameters
+                    reverb_spec = self.reverb_spec,
+                    microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[instantiated_reverb_spec.microphone_type]["sph_type"],
+                    microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[instantiated_reverb_spec.microphone_type]["sph_radius"],
+                    microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[instantiated_reverb_spec.microphone_type]["capsule_position_sph"],
+                    sample_rate = self.sr,
+                    sound_speed = SMIR_SOUND_SPEED,
+                    num_harmonics = SMIR_NUM_HARMONICS,
+                    oversampling = SMIR_OVERSAMPLING_FACTOR,
+                    sph_location = get_receiver_position(instantiated_reverb_spec.room_dimensions),
+                    hp = SMIR_HIGH_PASS_FILTER,
+                    reflection_order= SMIR_REFLECTION_ORDER,
+                    reflection_coef_ang_dep = SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY,
+                    # [radius, azimuth, elevation]
+                    # todo: is it needed?
+                    # source_positions_sph = [[SMIR_DEFAULT_SOURCE_RADIUS,pos[0],pos[1]] for pos in fg_source_positions],
+            )
+
+            elif isinstance(instantiated_reverb_spec, S3aReverbSpec):
+
+                ann_reverb = jams.Annotation(namespace='recorded_reverb')
+
+                # TODO: should we add some info to sandbox??
+
+                # Retrieve loudspeaker positions
+                imposed_source_positions = retrieve_RIR_positions(instantiated_reverb_spec.name)
+
+                # Since we cannot modify directly an EventSpec (todo: why?)
+                # we will copy all valid args from each event, and create a new set of events
+                # which will be attached to the fg_spec list
+                imposed_fg_spec = []
+                self.chosen_IR_indices = []
+
+                for e in self.fg_spec:
+                    # For the moment, just choose random on the imposed positions for each event
+                    # TODO: do we want
+                    random_index = random.randint(0, len(imposed_source_positions) - 1)
+                    random_position = imposed_source_positions[random_index]
+                    imposed_azimuth = ('const', random_position[0])
+                    imposed_elevation = ('const', random_position[1])
+                    imposed_spread = ('const', 0.0)
+
+                    # Store the random indinces, so later in the generate_audio method we can
+                    # easily retrieve the associated IRs
+                    # Achtung! indices start at 0, but audio files start at 1...
+                    self.chosen_IR_indices.append(random_index)
+
+                    # Create a new event copying the other relevant informationo
+                    imposed_fg_spec.append(EventSpec(event_id=e.event_id,
+                                                     label=e.label,
+                                                     source_file=e.source_file,
+                                                     source_time=e.source_time,
+                                                     event_time=e.event_time,
+                                                     event_duration=e.event_duration,
+                                                     event_azimuth=imposed_azimuth,  # changed!
+                                                     event_elevation=imposed_elevation,  # changed!
+                                                     event_spread=imposed_spread,  # changed!
+                                                     snr=e.snr,
+                                                     role=e.role,
+                                                     pitch_shift=e.pitch_shift,
+                                                     time_stretch=e.time_stretch))
+
+                # Actually substitute the old events for the new imposed ones
+                self.fg_spec = []
+                [self.fg_spec.append(e) for e in imposed_fg_spec]
+
+
+            ann_reverb.append(time=0.0,   # TODO: does it have any meaning for a reverb?
+                       duration=0.0,      # TODO: does it have any meaning for a reverb?
+                       value=instantiated_reverb_spec._asdict(),
+                       confidence=1.0)
+
+            jam.annotations.append(ann_reverb)
+
+
+        #############################################
+
+        # INSTANTIATE BACKGROUND AND FOREGROUND EVENTS AND ADD TO ANNOTATION
+        # NOTE: logic for instantiating bg and fg events is NOT the same.
+
         ann = jams.Annotation(namespace='sound_event')
 
         # Set annotation duration (might be changed later due to cropping)
         ann.duration = self.duration
-
-        # INSTANTIATE BACKGROUND AND FOREGROUND EVENTS AND ADD TO ANNOTATION
-        # NOTE: logic for instantiating bg and fg events is NOT the same.
 
         # Add background sounds
         bg_labels = []
@@ -1915,56 +2052,6 @@ class Scaper(object):
         # Set jam metadata
         jam.file_metadata.duration = ann.duration
 
-
-        ############### andres
-
-        # ADD REVERB
-        ann_reverb = jams.Annotation(namespace='smir_reverb')
-
-        instanciated_reverb_spec = self._instantiate_reverb(self.reverb_spec)
-        ann_reverb.append(time=0.0,   # TODO: does it have any meaning for a reverb?
-                   duration=0.0,      # TODO: does it have any meaning for a reverb?
-                   value=instanciated_reverb_spec._asdict(),
-                   confidence=1.0)
-
-        # Add specs and other info to sandbox
-        # TODO: this way is more concise, because it specifies each tuple name and values
-        # TODO: But, it is not compatible with the sound_event Sandbox, which is not labelled
-        # TODO: What should we do?
-
-        ann_reverb.sandbox.scaper = jams.Sandbox(
-
-            # all this?
-            # IRlength = self.reverb_spec.IRlength,
-            # room_dimensions = self.reverb_spec.room_dimensions,
-            # t60 = self.reverb_spec.t60,
-            # reflectivity = self.reverb_spec.reflectivity,
-            # source_type = self.reverb_spec.source_type,
-            # microphone_type = self.reverb_spec.microphone_type,
-            # microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["sph_type"],
-            # microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["sph_radius"],
-            # microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[self.reverb_spec.microphone_type[1]]["mic"],
-            # add also default smir parameters
-            reverb_spec = self.reverb_spec,
-            microphone_sphere_type = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["sph_type"],
-            microphone_sphere_radius = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["sph_radius"],
-            microphone_capsule_coordinates = SMIR_SUPPORTED_VIRTUAL_MICS[instanciated_reverb_spec.microphone_type]["capsule_position_sph"],
-            sample_rate = self.sr,
-            sound_speed = SMIR_SOUND_SPEED,
-            num_harmonics = SMIR_NUM_HARMONICS,
-            oversampling = SMIR_OVERSAMPLING_FACTOR,
-            sph_location = get_receiver_position(instanciated_reverb_spec.room_dimensions),
-            hp = SMIR_HIGH_PASS_FILTER,
-            reflection_order= SMIR_REFLECTION_ORDER,
-            reflection_coef_ang_dep = SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY,
-            # [radius, azimuth, elevation]
-            source_positions_sph = [[SMIR_DEFAULT_SOURCE_RADIUS,pos[0],pos[1]] for pos in fg_source_positions],
-
-        )
-        jam.annotations.append(ann_reverb)
-
-
-        #############################################
 
         # Return
         return jam
@@ -2179,16 +2266,22 @@ class Scaper(object):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             annotation_event = annotation_array.search(namespace='sound_event')[0]
-            annotation_reverb = annotation_array.search(namespace='smir_reverb')[0]
 
-        if (annotation_event.namespace is not 'sound_event' or
-                    annotation_reverb.namespace is not 'smir_reverb' ):
-            raise ScaperError(
-                'Annotation namespaces not correct, found {:s} and {:s}'.format(
-                    annotation_event.namespace,
-                    annotation_reverb.namespace
+            for namespace in ['smir_reverb','recorded_reverb']:
+                ann = annotation_array.search(namespace=namespace)
+                if ann:
+                    annotation_reverb = ann[0]
+
+            if not annotation_reverb and self.reverb_spec: # check for empty list
+                raise ScaperError(
+                    'Error: no annotation reverb found, but reverb spec defined'
                 )
-            )
+
+        # Error: no events!
+        if not annotation_event:
+            raise ScaperError(
+                'Annotation namespaces not correct!')
+
 
         # disable sox warnings
         if disable_sox_warnings:
@@ -2339,7 +2432,8 @@ class Scaper(object):
                 # 2.)   If there is reverb, then compute or retrieve the IRs according to the source positions,
                 #       and then convolve them with the sources
 
-                if self.reverb_spec is None:
+                # If we DON'T have reverb...
+                if not annotation_reverb:
 
                     if is_foreground(e):
                         # if foreground, apply both ambi coefs and spread
@@ -2369,92 +2463,112 @@ class Scaper(object):
                                       combine_type='merge',
                                       input_volumes=input_volumes.tolist())
 
+
                 # There is ambisonics reverb:
                 # Create or find the desired IR, and then convolve with the source
                 else:
                     if not is_foreground(e):
                         # Just apply reverb to foreground sounds
                         return
-                    else:
-                        # Check reverb type and get IR
 
-                        if type(self.reverb_spec) is SmirReverbSpec:
-                            ### Model IR through smir_generator in matlab ###
+                     # Check reverb type and get IR
 
-                            # Save IRs as irX.wav in the same source folder
-                            filter_path = os.path.join(destination_source_path, ir_filename)
-                            self._generate_ambisonics_reverb_from_smir_spec(filter_path,e,annotation_reverb)
+                    #########################
+                    #########################
+                    #########################
 
-                        elif type(self.reverb_spec) is S3aReverbSpec:
-                            # Get the IRs associated to the source position
-                            # They are stored at the chosen_IR_indices list
-                            # Watch out with the indices (wav files numbering starting at 1)
+                    # for r in annotation_reverb.data.iterrows():
+                    #     print(r[1].value['name'])
 
-                            # Construct the filter name given the speaker index:
-                            # In each event iteration we selected a different speaker position
-                            # since event_id contains a numeration of the events,
-                            # we can retrieve the index from there
-                            event_idx = _get_event_idx_from_id(event_id,'foreground')
-                            filter_name = S3A_FILTER_NAME + str(ir_idx) + S3A_FILTER_EXTENSION
-                            filter_path = os.path.join(generate_RIR_path(self.reverb_spec), filter_name)
+                    if annotation_reverb.namespace is 'smir_reverb':
+                    # if type(self.reverb_spec) is SmirReverbSpec:
+                        ### Model IR through smir_generator in matlab ###
 
-                            # Create a symlink to the filter on the source folder
-                            # We could just copy the filter there for consistency,
-                            # but that would increase too much the output size
-                            # ACHTUNG!!! os.symlink is only defined for Unix,
-                            # so this line will probably break in Windows
-                            # TODO: handle Windows compatibility, test in Linux
-                            try:
-                                symlink_path = os.path.join(destination_source_path, ir_filename)
-                                os.symlink(filter_path, symlink_path)
-                            except OSError as err:
-                                if err.errno == 17:  # folder exists
-                                    warnings.warn(
-                                        'Could not create symlink: file exists: ' + symlink_path
-                                    )
-                                else:
-                                    raise
+                        # Save IRs as irX.wav in the same source folder
+                        used_filter_path = os.path.join(destination_source_path, ir_filename)
+                        self._generate_ambisonics_reverb_from_smir_spec(used_filter_path,e,annotation_reverb)
+
+                    elif annotation_reverb.namespace is 'recorded_reverb':
+                        # Get the IRs associated to the source position
+                        # They are stored at the chosen_IR_indices list
+                        # Watch out with the indices (wav files numbering starting at 1)
+
+                        # TODO: implement that in a more elegant way
+                        reverb_name = annotation_reverb.data.value[0]['name']
 
 
-                        # In both reverb cases, at this point we have the IR at the location pointed by filter_path
-                        # So we just convolve it with the source and save the result
+                        # Construct the filter name given the speaker index:
+                        # In each event iteration we selected a different speaker position
+                        # since event_id contains a numeration of the events,
+                        # we can retrieve the index from there
 
-                        # Open the filter
-                        # filter_data is deinterleaved. e.g. channel 0 is filter_data[:, 0], etc
-                        # TODO: check sr and change it in case
-                        filter_data, filter_sample_rate = sf.read(filter_path)
+                        event_idx = _get_event_idx_from_id(e.value['event_id'],'foreground')
 
-                        # Ensure that num channels is what it should be according to ambisonics order..
-                        # TODO!
-                        num_channels = np.shape(filter_data)[1]
+                        # FILTER NUMERATION STARTS WITH 1!!
+                        ir_idx = self.chosen_IR_indices[event_idx] + 1
 
-                        # Open the preprocessed file
-                        # TODO: check sr of file and filter...
-                        file_data, file_sample_rate = sf.read(preprocessed_files[-1])
+                        # ir_irx holds the index of the ir to be used with the actual source
 
-                        # fftconvolve will try to convolve the signals in every dimension
-                        # i.e., if we have two files with 4 channels, the result will have 7 channel
-                        # Obviously that's not what we want, so the provisional workaround
-                        # is to convolve each filter channel individually,
-                        # and then put all them together when wav rendering
-                        output_signal_list = []
-                        for i in range(num_channels):
-                            output_signal_list.append(scipy.signal.fftconvolve(file_data, filter_data[:, i]))
+                        used_filter_name = S3A_FILTER_NAME + str(ir_idx) + S3A_FILTER_EXTENSION
+                        used_filter_path = os.path.join(generate_RIR_path(reverb_name), used_filter_name)
 
-                        output_signal = np.transpose(np.array(output_signal_list))
+                        # Create a symlink to the used filter on the source folder
+                        # We could just copy the filter there for consistency,
+                        # but that would increase too much the output size
+                        # ACHTUNG!!! os.symlink is only defined for Unix,
+                        # so this line will probably break in Windows
+                        # TODO: handle Windows compatibility, test in Linux
+                        try:
+                            symlink_path = os.path.join(destination_source_path, ir_filename)
+                            os.symlink(used_filter_path, symlink_path)
+                        except OSError as err:
+                            if err.errno == 17:  # folder exists
+                                warnings.warn(
+                                    'Could not create symlink: file exists: ' + symlink_path
+                                )
+                            else:
+                                raise
 
-                        # The convolved signal is already in ambisonics format
-                        # What we can do now is to process it as a wavfile
-                        # and store it with the processed_tmpfiles
-                        # So we reuse the code for the anechoic case
 
-                        # Prepare tmp file for output
-                        processed_tmpfiles.append(
-                            tempfile.NamedTemporaryFile(
-                                suffix='.wav', delete=False))
+                    # In both reverb cases, at this point we have the IR at the location pointed by used_filter_path
+                    # So we just convolve it with the source and save the result
 
-                        # Change here the subtype for other format types
-                        sf.write(processed_tmpfiles[-1].name, output_signal, self.sr, subtype='PCM_16')
+                    # Open the filter
+                    # filter_data is deinterleaved. e.g. channel 0 is filter_data[:, 0], etc
+                    # TODO: check sr and change it in case
+                    filter_data, filter_sample_rate = sf.read(used_filter_path)
+
+                    # Ensure that num channels is what it should be according to ambisonics order..
+                    # TODO!
+                    num_channels = np.shape(filter_data)[1]
+
+                    # Open the preprocessed file
+                    # TODO: check sr of file and filter...
+                    file_data, file_sample_rate = sf.read(preprocessed_files[-1])
+
+                    # fftconvolve will try to convolve the signals in every dimension
+                    # i.e., if we have two files with 4 channels, the result will have 7 channel
+                    # Obviously that's not what we want, so the provisional workaround
+                    # is to convolve each filter channel individually,
+                    # and then put all them together when wav rendering
+                    output_signal_list = []
+                    for i in range(num_channels):
+                        output_signal_list.append(scipy.signal.fftconvolve(file_data, filter_data[:, i]))
+
+                    output_signal = np.transpose(np.array(output_signal_list))
+
+                    # The convolved signal is already in ambisonics format
+                    # What we can do now is to process it as a wavfile
+                    # and store it with the processed_tmpfiles
+                    # So we reuse the code for the anechoic case
+
+                    # Prepare tmp file for output
+                    processed_tmpfiles.append(
+                        tempfile.NamedTemporaryFile(
+                            suffix='.wav', delete=False))
+
+                    # Change here the subtype for other format types
+                    sf.write(processed_tmpfiles[-1].name, output_signal, self.sr, subtype='PCM_16')
 
             # Finally combine all the files and optionally apply reverb
             # If we have more than one tempfile (i.e.g background + at
@@ -2590,49 +2704,49 @@ class Scaper(object):
             # Add smir code into the path
             self.matlab.eval('addpath ' + SMIR_FOLDER_PATH)
 
-        elif (type(self.reverb_spec) is S3aReverbSpec):
-
-            # Retrieve valid azimuth/elevation values
-            imposed_source_positions = retrieve_RIR_positions(self.reverb_spec)
-
-            # We are going to modify the foreground specs, in order to impose source positions
-            # Since we cannot modify directly an EventSpec (todo: why?)
-            # we will copy all valid args from each event, and create a new set of events
-            # which will be attached to the fg_spec list
-            imposed_fg_spec = []
-            self.chosen_IR_indices = []
-
-            for e in self.fg_spec:
-                # For the moment, just choose random on the imposed positions for each event
-                # TODO: do we want
-                random_index = random.randint(0, len(imposed_source_positions) - 1)
-                random_position = imposed_source_positions[random_index]
-                imposed_azimuth = ('const', random_position[0])
-                imposed_elevation = ('const', random_position[1])
-                imposed_spread = ('const', 0.0)
-
-                # Store the random indinces, so later in the generate_audio method we can
-                # easily retrieve the associated IRs
-                # Achtung! indices start at 0, but audio files start at 1...
-                self.chosen_IR_indices.append(random_index)
-
-                # Create a new event copying the other relevant informationo
-                imposed_fg_spec.append(EventSpec(label=e.label,
-                                                 source_file=e.source_file,
-                                                 source_time=e.source_time,
-                                                 event_time=e.event_time,
-                                                 event_duration=e.event_duration,
-                                                 event_azimuth=imposed_azimuth,  # changed!
-                                                 event_elevation=imposed_elevation,  # changed!
-                                                 event_spread=imposed_spread,  # changed!
-                                                 snr=e.snr,
-                                                 role=e.role,
-                                                 pitch_shift=e.pitch_shift,
-                                                 time_stretch=e.time_stretch))
-
-            # Actually substitute the old events for the new imposed ones
-            self.fg_spec = []
-            [self.fg_spec.append(e) for e in imposed_fg_spec]
+        # elif (type(self.reverb_spec) is S3aReverbSpec):
+        #
+        #     # Retrieve valid azimuth/elevation values
+        #     imposed_source_positions = retrieve_RIR_positions(self.reverb_spec)
+        #
+        #     # We are going to modify the foreground specs, in order to impose source positions
+        #     # Since we cannot modify directly an EventSpec (todo: why?)
+        #     # we will copy all valid args from each event, and create a new set of events
+        #     # which will be attached to the fg_spec list
+        #     imposed_fg_spec = []
+        #     self.chosen_IR_indices = []
+        #
+        #     for e in self.fg_spec:
+        #         # For the moment, just choose random on the imposed positions for each event
+        #         # TODO: do we want
+        #         random_index = random.randint(0, len(imposed_source_positions) - 1)
+        #         random_position = imposed_source_positions[random_index]
+        #         imposed_azimuth = ('const', random_position[0])
+        #         imposed_elevation = ('const', random_position[1])
+        #         imposed_spread = ('const', 0.0)
+        #
+        #         # Store the random indinces, so later in the generate_audio method we can
+        #         # easily retrieve the associated IRs
+        #         # Achtung! indices start at 0, but audio files start at 1...
+        #         self.chosen_IR_indices.append(random_index)
+        #
+        #         # Create a new event copying the other relevant informationo
+        #         imposed_fg_spec.append(EventSpec(label=e.label,
+        #                                          source_file=e.source_file,
+        #                                          source_time=e.source_time,
+        #                                          event_time=e.event_time,
+        #                                          event_duration=e.event_duration,
+        #                                          event_azimuth=imposed_azimuth,  # changed!
+        #                                          event_elevation=imposed_elevation,  # changed!
+        #                                          event_spread=imposed_spread,  # changed!
+        #                                          snr=e.snr,
+        #                                          role=e.role,
+        #                                          pitch_shift=e.pitch_shift,
+        #                                          time_stretch=e.time_stretch))
+        #
+        #     # Actually substitute the old events for the new imposed ones
+        #     self.fg_spec = []
+        #     [self.fg_spec.append(e) for e in imposed_fg_spec]
 
         # Create specific instance of a soundscape based on the spec
         jam = self._instantiate(

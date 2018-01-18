@@ -376,49 +376,103 @@ def _validate_microphone_type(mic_type_tuple):
             'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
-def _validate_s3a_reverb_spec(reverb_config):
-    # Folder structure should be something like:
-    # - S3A_top_folder (:s3a_folder_path: defined in ambisonics.py)
-    #     - reverb_name (:name: in the config struct)
-    #         - (maybe a pdf)
-    #         - "Soundfield"
-    #             - "lsN.wav" with the N actual impulse responses, starting from 1
-    #             - "LsPos.txt" with the loudspeaker positions
-    #             - (maybe a "Metadata_SoundField.txt")
+def _validate_s3a_reverb_spec(reverb_name_tuple):
 
-    # Check that reverb name is str
-    if reverb_config.name is None:
+    # Just one element for the moment
+    _validate_s3a_reverb_name(reverb_name_tuple)
+
+    return
+
+
+def _validate_s3a_reverb_name(reverb_name_tuple):
+
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(reverb_name_tuple)
+
+    # Make sure that type matches
+    def __valid_s3a_reverb_name_types(reverb_name):
+        if (not isinstance(reverb_name, str)):
+            return False
+        else:
+            return True
+
+    # Make sure that the audio and position files exist and are valid
+    def __valid_s3a_reverb_name_configuration(reverb_name):
+        # Folder structure should be something like:
+        # - S3A_top_folder (:s3a_folder_path: defined in ambisonics.py)
+        #     - reverb_name (:name: in the config struct)
+        #         - (maybe a pdf)
+        #         - "Soundfield"
+        #             - "lsN.wav" with the N actual impulse responses, starting from 1
+        #             - "LsPos.txt" with the loudspeaker positions
+        #             - (maybe a "Metadata_SoundField.txt")
+
+        try:
+            # The provided name should exist in s3a_
+            reverb_folder_path = os.path.join(S3A_FOLDER_PATH, reverb_name)
+            if not os.path.exists(os.path.expanduser(reverb_folder_path)):
+                raise ScaperError(
+                    'reverb_config: folder does not exist: ' + reverb_name)
+
+            # Inside the reverb folder should be a "Soundfield" folder
+            soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
+            if not os.path.exists(os.path.expanduser(soundfield_path)):
+                raise ScaperError(
+                    'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(
+                        reverb_folder_path))
+
+            # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
+
+            # Count number of audio files (the actual IRs)
+            num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
+
+            # Count number of lines in speakers file
+            speakers_positions_file = os.path.join(soundfield_path, S3A_LOUDSPEAKER_POSITIONS_TXTFILE)
+            num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
+
+            # Check
+            if num_wav_files is not num_lines:
+                raise ScaperError(
+                    'reverb_config: the number of audio files does not match with the speaker description')
+
+            result = True
+
+        except ScaperError:
+            pass
+            result = False
+
+        return result
+
+
+    # If reverb name is specified explicitly
+    if reverb_name_tuple[0] == "const":
+
+        # reverb name: allowed string
+        if reverb_name_tuple[1] is None:
+            raise ScaperError(
+                'reverb_config: reverb name is None')
+        elif not __valid_s3a_reverb_name_types(reverb_name_tuple[1]):
+            raise ScaperError(
+                'reverb_config: reverb name must be a string')
+        elif not __valid_s3a_reverb_name_configuration(reverb_name_tuple[1]):
+            raise ScaperError(
+                'reverb_config: reverb name not valid:' + reverb_name_tuple[1])
+
+    # Otherwise it must be specified using "choose"
+    # Empty list is allowed, meaning all avaiable IRS
+    elif reverb_name_tuple[0] == "choose":
+
+        if not all(__valid_s3a_reverb_name_types(length) for length in reverb_name_tuple[1]):
+            raise ScaperError(
+                'reverb_config: reverb name must be a positive integer')
+        elif not all(__valid_s3a_reverb_name_configuration(name) for name in reverb_name_tuple[1]):
+            raise ScaperError(
+                'reverb_config: reverb names not valid: ' + reverb_name_tuple[1])
+
+    # No other labels allowed"
+    else:
         raise ScaperError(
-            'reverb_config: path is None')
-    elif type(reverb_config.name) is not str:
-        raise ScaperError(
-            'reverb path not a string')
-
-    # The provided name should exist in s3a_
-    reverb_folder_path = os.path.join(S3A_FOLDER_PATH, reverb_config.name)
-    if not os.path.exists(os.path.expanduser(reverb_folder_path)):
-        raise ScaperError(
-            'reverb_config: folder does not exist: ' + reverb_folder_path)
-
-    # Inside the reverb folder should be a "Soundfield" folder
-    soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
-    if not os.path.exists(os.path.expanduser(soundfield_path)):
-        raise ScaperError(
-            'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(reverb_folder_path))
-
-    # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
-
-    # Count number of audio files (the actual IRs)
-    num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
-
-    # Count number of lines in speakers file
-    speakers_positions_file = os.path.join(soundfield_path, S3A_LOUDSPEAKER_POSITIONS_TXTFILE);
-    num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
-
-    # Check
-    if num_wav_files is not num_lines:
-        raise ScaperError(
-            'reverb_config: the number of audio files does not match with the speaker description')
+            'Reverb name must be specified using a "const" or "choose" tuple.')
 
 
 
@@ -443,17 +497,26 @@ def get_max_ambi_order_from_reverb_config(reverb_config):
         return 1
 
 
-def generate_RIR_path(s3a_reverg_config):
+
+
+def retrieve_available_recorded_IRs():
+
+    # List all dirs inside S3A folder path
+    # TODO: implement it in a more elegant way
+
+    return [e for e in os.listdir(S3A_FOLDER_PATH) if not e == 'README.md' and not e == '.DS_Store']
+
+def generate_RIR_path(recorded_reverb_name):
     '''
     TODO
     :param s3a_reverg_config:
     :return:
     '''
     # TODO: remove hardcoded reference to Soundfield
-    return os.path.expanduser(os.path.join(S3A_FOLDER_PATH, s3a_reverg_config.name, 'Soundfield'))
+    return os.path.expanduser(os.path.join(S3A_FOLDER_PATH, recorded_reverb_name, 'Soundfield'))
 
 
-def retrieve_RIR_positions(s3a_reverg_config):
+def retrieve_RIR_positions(recorded_reverb_name):
     '''
     TODO
 
@@ -473,7 +536,7 @@ def retrieve_RIR_positions(s3a_reverg_config):
     # Go to Soundfield folder
     # todo: maybe better implementation for txt file open?
 
-    speakers_positions_file = os.path.join(generate_RIR_path(s3a_reverg_config), S3A_LOUDSPEAKER_POSITIONS_TXTFILE)
+    speakers_positions_file = os.path.join(generate_RIR_path(recorded_reverb_name), S3A_LOUDSPEAKER_POSITIONS_TXTFILE)
 
     # Retrieve the file content into speaker_positions
     speaker_positions_cartesian = []
