@@ -1,6 +1,6 @@
 # AmbiScaper
 
-<img src="http://www.justinsalamon.com/uploads/4/3/9/4/4394963/scaper-logo_orig.png" width="400" height="108">
+<img src="https://github.com/andresperezlopez/ambiscaper/blob/rename/docs/ambiscaper_logo.png" width="400" height="108">
 
 A library for soundscape synthesis and augmentation
 
