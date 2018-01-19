@@ -48,7 +48,7 @@ import matlab_wrapper
 # Define single event spec as namedtuple
 EventSpec = namedtuple(
     'EventSpec',
-    ['label', 'source_file', 'event_id',
+    ['source_file', 'event_id',
      'source_time', 'event_time', 'event_duration',
      'event_azimuth', 'event_elevation', 'event_spread',
      'snr', 'role', 'pitch_shift', 'time_stretch'], verbose=False)
@@ -146,13 +146,11 @@ def generate_from_jams(jams_infile, audio_outfile, fg_path=None, bg_path=None,
     duration = ann.sandbox.ambiscaper['duration']
     ambisonics_order = ann.sandbox.ambiscaper['ambisonics_order']
     tau = ann.sandbox.ambiscaper['ambisonics_spread_slope']
-    protected_labels = ann.sandbox.ambiscaper['protected_labels']
     sc = AmbiScaper(duration,
                 ambisonics_order,
                 tau,
                 new_fg_path,
-                new_bg_path,
-                protected_labels)
+                new_bg_path)
 
     # Set synthesis parameters
     sc.ref_db = ann.sandbox.ambiscaper['ref_db']
@@ -383,46 +381,7 @@ def _get_value_from_dist(dist_tuple):
 #                 'number that is equal to or greater than trunc_min.')
 
 
-def _validate_label(label, allowed_labels):
-    '''
-    Validate that a label tuple is in the right format and that it's values
-    are valid.
-
-    Parameters
-    ----------
-    label : tuple
-        Label tuple (see ```AmbiScaper.add_event``` for required format).
-    allowed_labels : list
-        List of allowed labels.
-
-    Raises
-    ------
-    AmbiScaperError
-        If the validation fails.
-
-    '''
-    # Make sure it's a valid distribution tuple
-    _validate_distribution(label)
-
-    # Make sure it's one of the allowed distributions for a label and that the
-    # label value is one of the allowed labels.
-    if label[0] == "const":
-        if not label[1] in allowed_labels:
-            raise AmbiScaperError(
-                'Label value must match one of the available labels: '
-                '{:s}'.format(str(allowed_labels)))
-    elif label[0] == "choose":
-        if label[1]:  # list is not empty
-            if not set(label[1]).issubset(set(allowed_labels)):
-                raise AmbiScaperError(
-                    'Label list provided must be a subset of the available '
-                    'labels: {:s}'.format(str(allowed_labels)))
-    else:
-        raise AmbiScaperError(
-            'Label must be specified using a "const" or "choose" tuple.')
-
-
-def _validate_source_file(source_file_tuple, label_tuple):
+def _validate_source_file(source_file_tuple):
     '''
     Validate that a source_file tuple is in the right format a that it's values
     are valid.
@@ -431,8 +390,6 @@ def _validate_source_file(source_file_tuple, label_tuple):
     ----------
     source_file : tuple
         Source file tuple (see ```AmbiScaper.add_event``` for required format).
-    label : str
-        Label tuple (see ```AmbiScaper.add_event``` for required format).
 
     Raises
     ------
@@ -442,7 +399,6 @@ def _validate_source_file(source_file_tuple, label_tuple):
     '''
     # Make sure it's a valid distribution tuple
     _validate_distribution(source_file_tuple)
-    _validate_distribution(label_tuple)
 
     # If source file is specified explicitly
     if source_file_tuple[0] == "const":
@@ -450,11 +406,6 @@ def _validate_source_file(source_file_tuple, label_tuple):
         if not os.path.isfile(source_file_tuple[1]):
             raise AmbiScaperError(
                 "Source file not found: {:s}".format(source_file_tuple[1]))
-        # 2. the label must match the file's parent folder name
-        parent_name = os.path.basename(os.path.dirname(source_file_tuple[1]))
-        if label_tuple[0] != "const" or label_tuple[1] != parent_name:
-            raise AmbiScaperError(
-                "Source file's parent folder name does not match label.")
     # Otherwise it must be specified using "choose"
     elif source_file_tuple[0] == "choose":
         if source_file_tuple[1]:  # list is not empty
@@ -466,37 +417,6 @@ def _validate_source_file(source_file_tuple, label_tuple):
         raise AmbiScaperError(
             'Source file must be specified using a "const" or "choose" tuple.')
 
-
-# def _validate_ambisonics_order(ambisonics_order_tuple):
-#     '''
-#         Validate that the ambisonics order tuple is in the right format and that it's values
-#     are valid.
-#     '''
-#
-#     # Make sure it's a valid distribution tuple
-#     _validate_distribution(ambisonics_order_tuple)
-#
-#     # Make sure it's one of the allowed distributions for ambisonics order and that the
-#     # label value is one of the allowed labels.
-#     if ambisonics_order_tuple[0] == "const":
-#         if not isinstance(ambisonics_order_tuple[1],int):
-#             raise AmbiScaperError(
-#                 'Ambisonics Order must be an Integer')
-#         elif (ambisonics_order_tuple[1] < 0 or ambisonics_order_tuple[1] > ambiscaper.ambisonics.MAX_AMBISONICS_ORDER):
-#             raise AmbiScaperError(
-#                 'Ambisonics Order must be in the range [0..' + ambiscaper.ambisonics.MAX_AMBISONICS_ORDER)
-#
-#     elif ambisonics_order_tuple[0] == "choose":
-#         if ambisonics_order_tuple[1]:  # list is not empty
-#             if not all( isinstance(i,int) for i in ambisonics_order_tuple[1]):
-#                 raise AmbiScaperError(
-#                     'Ambisonics Order must be an Integer')
-#             elif not all( i >=0 and i<=ambiscaper.ambisonics.MAX_AMBISONICS_ORDER for i in ambisonics_order_tuple[i] ):
-#                 raise AmbiScaperError(
-#                     'Ambisonics Order must be in the range [0..' + ambiscaper.ambisonics.MAX_AMBISONICS_ORDER)
-#     else:
-#         raise AmbiScaperError(
-#             'Ambisonics Order must be specified using a "const" or "choose" tuple.')
 
 
 def _validate_time(time_tuple):
@@ -908,16 +828,15 @@ def _validate_time_stretch(time_stretch_tuple):
                 # values?
 
 
-def _validate_event(label, source_file,
+def _validate_event(source_file,
                     source_time, event_time, event_duration,
                     event_azimuth, event_elevation, event_spread,
-                    snr, allowed_labels, pitch_shift, time_stretch):
+                    snr, pitch_shift, time_stretch):
     '''
     Check that event parameter values are valid.
 
     Parameters
     ----------
-    label : tuple
     source_file : tuple
     source_time : tuple
     event_time : tuple
@@ -926,8 +845,6 @@ def _validate_event(label, source_file,
     event_elevation : tuple
     event_spread : tuple
     snr : tuple
-    allowed_labels : list
-        List of allowed labels for the event.
     pitch_shift : tuple or None
     time_stretch: tuple or None
 
@@ -941,16 +858,10 @@ def _validate_event(label, source_file,
     AmbiScaper.add_event : Add a foreground sound event to the foreground
     specification.
     '''
-    # allowed_labels must be a list. All other parameters will be validated
-    # individually.
-    if not isinstance(allowed_labels, list):
-        raise AmbiScaperError('allowed_labels must be of type list.')
+
 
     # SOURCE FILE
-    _validate_source_file(source_file, label)
-
-    # LABEL
-    _validate_label(label, allowed_labels)
+    _validate_source_file(source_file)
 
     # SOURCE TIME
     _validate_time(source_time)
@@ -1003,18 +914,6 @@ class AmbiScaper(object):
         Path to foreground folder.
     bg_path : str
         Path to background folder.
-    protected_labels : list
-        Provide a list of protected foreground labels. When a foreground
-        label is in the protected list it means that when a sound event
-        matching the label gets added to a soundscape instantiation the
-        duration of the source audio file cannot be altered, and the
-        duration value that was provided in the specification will be
-        ignored.
-
-        Adding labels to the protected list is useful for sound events
-        whose semantic validity would be lost if the sound were trimmed
-        before the sound event ends, for example an animal vocalization
-        such as a dog bark.
 
     '''
 
@@ -1023,8 +922,7 @@ class AmbiScaper(object):
                  ambisonics_order,
                  ambisonics_spread_slope,
                  fg_path,
-                 bg_path,
-                 protected_labels=[]):
+                 bg_path):
         '''
         Create a AmbiScaper object.
 
@@ -1041,18 +939,6 @@ class AmbiScaper(object):
             Path to foreground folder.
         bg_path : str
             Path to background folder.
-        protected_labels : list
-            Provide a list of protected foreground labels. When a foreground
-            label is in the protected list it means that when a sound event
-            matching the label gets added to a soundscape instantiation the
-            duration of the source audio file cannot be altered, and the
-            duration value that was provided in the specification will be
-            ignored.
-
-            Adding labels to the protected list is useful for sound events
-            whose semantic validity would be lost if the sound were trimmed
-            before the sound event ends, for example an animal vocalization
-            such as a dog bark.
 
         '''
         # Validate soundscape duration
@@ -1086,19 +972,10 @@ class AmbiScaper(object):
         self.fg_path = expanded_fg_path
         self.bg_path = expanded_bg_path
 
-        # Populate label lists from folder paths
-        self.fg_labels = []
-        self.bg_labels = []
-        _populate_label_list(self.fg_path, self.fg_labels)
-        _populate_label_list(self.bg_path, self.bg_labels)
-
-        # Copy list of protected labels
-        self.protected_labels = protected_labels[:]
-
         # Configure reverb to None by default
         self.reverb_spec = None
 
-    def add_background(self, label, source_file, source_time):
+    def add_background(self, source_file, source_time):
         '''
         Add a background recording to the background specification.
 
@@ -1110,22 +987,9 @@ class AmbiScaper(object):
 
         Parameters
         ----------
-        label : tuple
-            Specifies the label of the background. See Notes below for the
-            expected format of this tuple and the allowed values.
-            NOTE: The label specified by this tuple must match one
-            of the labels in the AmbiScaper's background label list
-            ``AmbiScaper.bg_labels``. Furthermore, if ``source_file`` is
-            specified using "const" (see Notes), then ``label`` must also be
-            specified using "const" and its value (see Notes) must
-            match the source file's parent folder's name.
         source_file : tuple
             Specifies the audio file to use as the source. See Notes below for
             the expected format of this tuple and the allowed values.
-            NOTE: If ``source_file`` is specified using "const" (see Notes),
-            then ``label`` must also be specified using "const" and its
-            value (see Notes) must match the source file's parent folder's
-            name.
         source_time : tuple
             Specifies the desired start time in the source file. See Notes
             below for the expected format of this tuple and the allowed values.
@@ -1142,10 +1006,10 @@ class AmbiScaper(object):
 
         * ``("const", value)`` : a constant, given by ``value``.
         * ``("choose", valuelist)`` : choose a value from
-          ``valuelist`` at random (uniformly). The ``label`` and
-          ``source_file`` parameters also support providing an empty
+          ``valuelist`` at random (uniformly). The
+          ``source_file`` parameter also support providing an empty
           ``valuelist`` i.e. ``("choose", [])``, in which case the
-          value will be chosen at random from all available labels or files
+          value will be chosen at random from all available files
           as determined automatically by AmbiScaper by examining the file
           structure of ``bg_path`` provided during initialization.
         * ``("uniform", min_value, max_value)`` : sample a random
@@ -1156,9 +1020,9 @@ class AmbiScaper(object):
           standard deviation ``stddev``.
 
         IMPORTANT: not all parameters support all distribution tuples. In
-        particular, ``label`` and ``source_file`` only support ``"const"`` and
+        particular, ``source_file`` only support ``"const"`` and
         ``"choose"``, whereas ``source_time`` supports all distribution tuples.
-        As noted above, only ``label`` and ``source_file`` support providing an
+        As noted above, only ``source_file`` support providing an
         empty ``valuelist`` with ``"choose"``.
         '''
 
@@ -1174,14 +1038,13 @@ class AmbiScaper(object):
         time_stretch = None
 
         # Validate parameter format and values
-        _validate_event(label, source_file,
+        _validate_event(source_file,
                         source_time, event_time, event_duration,
                         event_azimuth, event_elevation, event_spread,
-                        snr, self.bg_labels, None, None)
+                        snr, None, None)
 
         # Create background sound event
-        bg_event = EventSpec(label=label,
-                             source_file=source_file,
+        bg_event = EventSpec(source_file=source_file,
                              source_time=source_time,
                              event_time=event_time,
                              event_duration=event_duration,
@@ -1197,7 +1060,7 @@ class AmbiScaper(object):
         # Add event to background spec
         self.bg_spec.append(bg_event)
 
-    def add_event(self, label, source_file,
+    def add_event(self, source_file,
                   source_time, event_time, event_duration,
                   event_azimuth, event_elevation, event_spread,
                   snr, pitch_shift, time_stretch):
@@ -1206,22 +1069,9 @@ class AmbiScaper(object):
 
         Parameters
         ----------
-        label : tuple
-            Specifies the label of the sound event. See Notes below for the
-            expected format of this tuple and the allowed values.
-            NOTE: The label specified by this tuple must match one
-            of the labels in the AmbiScaper's foreground label list
-            ``AmbiScaper.fg_labels``. Furthermore, if ``source_file`` is
-            specified using "const" (see Notes), then ``label`` must also be
-            specified using "const" and its ``value `` (see Notes) must
-            match the source file's parent folder's name.
         source_file : tuple
             Specifies the audio file to use as the source. See Notes below for
             the expected format of this tuple and the allowed values.
-            NOTE: If ``source_file`` is specified using "const" (see Notes),
-            then ``label`` must also be specified using "const" and its
-            ``value`` (see Notes) must match the source file's parent
-            folder's name.
         source_time : tuple
             Specifies the desired start time in the source file. See Notes
             below for the expected format of this tuple and the allowed values.
@@ -1272,10 +1122,10 @@ class AmbiScaper(object):
 
         * ``("const", value)`` : a constant, given by ``value``.
         * ``("choose", valuelist)`` : choose a value from
-          ``valuelist`` at random (uniformly). The ``label`` and
-          ``source_file`` parameters also support providing an empty
+          ``valuelist`` at random (uniformly). The
+          ``source_file`` parameter also support providing an empty
           ``valuelist`` i.e. ``("choose", [])``, in which case the
-          value will be chosen at random from all available labels or
+          value will be chosen at random from all available
           source files as determined automatically by AmbiScaper by examining
           the file structure of ``fg_path`` provided during
           initialization.
@@ -1287,9 +1137,9 @@ class AmbiScaper(object):
           standard deviation ``stddev``.
 
         IMPORTANT: not all parameters support all distribution tuples. In
-        particular, ``label`` and ``source_file`` only support ``"const"`` and
+        particular, ``source_file`` only support ``"const"`` and
         ``"choose"``, whereas the remaining parameters support all distribution
-        tuples. As noted above, only ``label`` and ``source_file`` support
+        tuples. As noted above, only ``source_file`` support
         providing an empty ``valuelist`` with ``"choose"``.
 
         See Also
@@ -1302,15 +1152,8 @@ class AmbiScaper(object):
 
         '''
 
-        # SAFETY CHECKS
-        _validate_event(label, source_file,
-                        source_time, event_time, event_duration,
-                        event_azimuth, event_elevation, event_spread,
-                        snr, self.fg_labels, pitch_shift, time_stretch)
-
         # Create event
-        event = EventSpec(label=label,
-                          source_file=source_file,
+        event = EventSpec(source_file=source_file,
                           source_time=source_time,
                           event_time=event_time,
                           event_duration=event_duration,
@@ -1382,16 +1225,14 @@ class AmbiScaper(object):
 
     def _instantiate_event(self, event, event_idx,
                            isbackground=False,
-                           allow_repeated_label=True,
                            allow_repeated_source=True,
-                           used_labels=[],
                            used_source_files=[],
                            disable_instantiation_warnings=False):
         '''
         Instantiate an event specification.
 
         Given an event specification containing distribution tuples,
-        instantiate the event, i.e. samples values for the label, source_file,
+        instantiate the event, i.e. samples values for the source_file,
         source_time, event_time, event_duration and snr from their respective
         distribution tuples, and return the sampled values in as a new event
         specification.
@@ -1403,19 +1244,11 @@ class AmbiScaper(object):
         isbackground : bool
             Flag indicating whether the event to instantiate is a background
             event or not (False implies it is a foreground event).
-        allow_repeated_label : bool
-            When True (default) any label can be used, including a label that
-            has already been used for another event. When False, only a label
-            that is not already in ``used_labels`` can be selected.
         allow_repeated_source : bool
-            When True (default) any source file matching the selected label can
+            When True (default) any source file can
             be used, including a source file that has already been used for
             another event. When False, only a source file that is not already
             in ``used_source_files`` can be selected.
-        used_labels : list
-            List labels that have already been used in the current soundscape
-            instantiation. The label selected for instantiating the event will
-            be appended to this list unless its already in it.
         used_source_files : list
             List of full paths to source files that have already been used in
             the current soundscape instantiation. The source file selected for
@@ -1439,47 +1272,19 @@ class AmbiScaper(object):
             to select.
 
         '''
-        # set paths and labels depending on whether its a foreground/background
+        # set paths depending on whether its a foreground/background
         # event
         if isbackground:
             file_path = self.bg_path
-            allowed_labels = self.bg_labels
             event_id = _generate_event_id_from_idx(event_idx,'background')
         else:
             file_path = self.fg_path
-            allowed_labels = self.fg_labels
             event_id = _generate_event_id_from_idx(event_idx, 'foreground')
 
 
-        # determine label
-        if event.label[0] == "choose" and not event.label[1]:
-            label_tuple = list(event.label)
-            label_tuple[1] = allowed_labels
-            label_tuple = tuple(label_tuple)
-        else:
-            label_tuple = event.label
-        label = _get_value_from_dist(label_tuple)
-
-        # Make sure we can use this label
-        if (not allow_repeated_label) and (label in used_labels):
-            if (len(allowed_labels) == len(used_labels) or
-                        label_tuple[0] == "const"):
-                raise AmbiScaperError(
-                    "Cannot instantiate event {:s}: all available labels "
-                    "have already been used and "
-                    "allow_repeated_label=False.".format(label))
-            else:
-                while label in used_labels:
-                    label = _get_value_from_dist(label_tuple)
-
-        # Update the used labels list
-        if label not in used_labels:
-            used_labels.append(label)
-
         # determine source file
         if event.source_file[0] == "choose" and not event.source_file[1]:
-            source_files = _get_sorted_files(
-                os.path.join(file_path, label))
+            source_files = _get_sorted_files(file_path)
             source_file_tuple = list(event.source_file)
             source_file_tuple[1] = source_files
             source_file_tuple = tuple(source_file_tuple)
@@ -1490,13 +1295,12 @@ class AmbiScaper(object):
 
         # Make sure we can use this source file
         if (not allow_repeated_source) and (source_file in used_source_files):
-            source_files = _get_sorted_files(os.path.join(file_path, label))
+            source_files = _get_sorted_files(file_path)
             if (len(source_files) == len(used_source_files) or
                         source_file_tuple[0] == "const"):
                 raise AmbiScaperError(
                     "Cannot instantiate event {:s}: all available source "
-                    "files have already been used and "
-                    "allow_repeated_source=False.".format(label))
+                    "files have already been used")
             else:
                 while source_file in used_source_files:
                     source_file = _get_value_from_dist(source_file_tuple)
@@ -1508,18 +1312,13 @@ class AmbiScaper(object):
         # Get the duration of the source audio file
         source_duration = sox.file_info.duration(source_file)
 
-        # If the foreground event's label is in the protected list, use the
-        # source file's duration without modification.
-        if label in self.protected_labels:
-            event_duration = source_duration
-        else:
-            # determine event duration
-            # For background events the duration is fixed to self.duration
-            # (which must be > 0), but for foreground events it could
-            # potentially be non-positive, hence the loop.
-            event_duration = -np.Inf
-            while event_duration <= 0:
-                event_duration = _get_value_from_dist(event.event_duration)
+        # Determine event duration
+        # For background events the duration is fixed to self.duration
+        # (which must be > 0), but for foreground events it could
+        # potentially be non-positive, hence the loop.
+        event_duration = -np.Inf
+        while event_duration <= 0:
+            event_duration = _get_value_from_dist(event.event_duration)
 
         # Check if chosen event duration is longer than the duration of the
         # selected source file, if so adjust the event duration.
@@ -1528,9 +1327,9 @@ class AmbiScaper(object):
             event_duration = source_duration
             if not disable_instantiation_warnings:
                 warnings.warn(
-                    "{:s} event duration ({:.2f}) is greater that source "
+                    "Event duration ({:.2f}) is greater that source "
                     "duration ({:.2f}), changing to {:.2f}".format(
-                        label, old_duration, source_duration, event_duration),
+                        old_duration, source_duration, event_duration),
                     AmbiScaperWarning)
 
         # Get the event azimuth
@@ -1562,10 +1361,10 @@ class AmbiScaper(object):
                 event_duration = self.duration
                 if not disable_instantiation_warnings:
                     warnings.warn(
-                        "{:s} event duration ({:.2f}) is greater than the "
+                        "Event duration ({:.2f}) is greater than the "
                         "soundscape duration ({:.2f}), changing to "
                         "{:.2f}".format(
-                            label, old_duration, self.duration, self.duration),
+                            old_duration, self.duration, self.duration),
                         AmbiScaperWarning)
         else:
             if (event_duration_stretched > self.duration):
@@ -1573,11 +1372,11 @@ class AmbiScaper(object):
                 event_duration = self.duration / float(time_stretch)
                 if not disable_instantiation_warnings:
                     warnings.warn(
-                        "{:s} event duration ({:.2f}) with stretch factor "
+                        "Event duration ({:.2f}) with stretch factor "
                         "{:.2f} gives {:.2f} which is greater than the "
                         "soundscape duration ({:.2f}), changing to "
                         "{:.2f}".format(
-                            label, old_duration, time_stretch,
+                            old_duration, time_stretch,
                             event_duration_stretched, self.duration,
                             event_duration),
                         AmbiScaperWarning)
@@ -1595,10 +1394,10 @@ class AmbiScaper(object):
             source_time = source_duration - event_duration
             if not disable_instantiation_warnings:
                 warnings.warn(
-                    '{:s} source time ({:.2f}) is too great given event '
+                    'Source time ({:.2f}) is too great given event '
                     'duration ({:.2f}) and source duration ({:.2f}), changed '
                     'to {:.2f}.'.format(
-                        label, old_source_time, event_duration,
+                        old_source_time, event_duration,
                         source_duration, source_time),
                     AmbiScaperWarning)
 
@@ -1619,10 +1418,10 @@ class AmbiScaper(object):
                 event_time = self.duration - event_duration
                 if not disable_instantiation_warnings:
                     warnings.warn(
-                        '{:s} event time ({:.2f}) is too great given event '
+                        'Event time ({:.2f}) is too great given event '
                         'duration ({:.2f}) and soundscape duration ({:.2f}), '
                         'changed to {:.2f}.'.format(
-                            label, old_event_time, event_duration,
+                            old_event_time, event_duration,
                             self.duration, event_time),
                         AmbiScaperWarning)
         else:
@@ -1631,10 +1430,10 @@ class AmbiScaper(object):
                 event_time = self.duration - event_duration_stretched
                 if not disable_instantiation_warnings:
                     warnings.warn(
-                        '{:s} event time ({:.2f}) is too great given '
+                        'Event time ({:.2f}) is too great given '
                         'stretched event duration ({:.2f}) and soundscape '
                         'duration ({:.2f}), changed to {:.2f}.'.format(
-                            label, old_event_time, event_duration_stretched,
+                            old_event_time, event_duration_stretched,
                             self.duration, event_time),
                         AmbiScaperWarning)
 
@@ -1653,7 +1452,6 @@ class AmbiScaper(object):
 
         # pack up instantiated values in an EventSpec
         instantiated_event = EventSpec(event_id=event_id,
-                                       label=label,
                                        source_file=source_file,
                                        source_time=source_time,
                                        event_time=event_time,
@@ -1680,63 +1478,11 @@ class AmbiScaper(object):
 
 
     def _instantiate_smir_reverb(self,
-                           #       isbackground=False,
-                           # allow_repeated_label=True,
-                           # allow_repeated_source=True,
-                           # used_labels=[],
-                           # used_source_files=[],
                            disable_instantiation_warnings=False):
         '''
-        Instantiate an event specification.
 
-        Given an event specification containing distribution tuples,
-        instantiate the event, i.e. samples values for the label, source_file,
-        source_time, event_time, event_duration and snr from their respective
-        distribution tuples, and return the sampled values in as a new event
-        specification.
-
-        Parameters
-        ----------
-        event : EventSpec
-            Event specification containing distribution tuples.
-        isbackground : bool
-            Flag indicating whether the event to instantiate is a background
-            event or not (False implies it is a foreground event).
-        allow_repeated_label : bool
-            When True (default) any label can be used, including a label that
-            has already been used for another event. When False, only a label
-            that is not already in ``used_labels`` can be selected.
-        allow_repeated_source : bool
-            When True (default) any source file matching the selected label can
-            be used, including a source file that has already been used for
-            another event. When False, only a source file that is not already
-            in ``used_source_files`` can be selected.
-        used_labels : list
-            List labels that have already been used in the current soundscape
-            instantiation. The label selected for instantiating the event will
-            be appended to this list unless its already in it.
-        used_source_files : list
-            List of full paths to source files that have already been used in
-            the current soundscape instantiation. The source file selected for
-            instantiating the event will be appended to this list unless its
-            already in it.
-        disable_instantiation_warnings : bool
-            When True (default is False), warnings stemming from event
-            instantiation (primarily about automatic duration adjustments) are
-            disabled. Not recommended other than for testing purposes.
-
-        Returns
-        -------
-        instantiated_event : EventSpec
-            Event specification containing values sampled from the distribution
-            tuples of the input event specification.
-
-        Raises
-        ------
-        AmbiScaperError
-            If allow_repeated_source is False and there is no valid source file
-            to select.
-
+        :param disable_instantiation_warnings:
+        :return:
         '''
 
         reverb = self.reverb_spec
@@ -1802,8 +1548,8 @@ class AmbiScaper(object):
 
         return S3aReverbSpec(name=name)
 
-    def _instantiate(self, allow_repeated_label=True,
-                     allow_repeated_source=True, reverb=None,
+    def _instantiate(self,
+                     allow_repeated_source=True,
                      disable_instantiation_warnings=False):
         '''
         Instantiate a specific soundscape in JAMS format based on the current
@@ -1814,17 +1560,11 @@ class AmbiScaper(object):
 
         Parameters
         ----------
-        allow_repeated_label : bool
-            When True (default) the same label can be used more than once
-            in a soundscape instantiation. When False every label can
-            only be used once.
         allow_repeated_source : bool
             When True (default) the same source file can be used more than once
             in a soundscape instantiation. When False every source file can
             only be used once.
-        reverb : float or None
-            Has no effect on this function other than being documented in the
-            instantiated annotation's sandbox. Passed by ``AmbiScaper.generate``.
+
         disable_instantiation_warnings : bool
             When True (default is False), warnings stemming from event
             instantiation (primarily about automatic duration adjustments) are
@@ -1941,7 +1681,6 @@ class AmbiScaper(object):
 
                     # Create a new event copying the other relevant informationo
                     imposed_fg_spec.append(EventSpec(event_id=e.event_id,
-                                                     label=e.label,
                                                      source_file=e.source_file,
                                                      source_time=e.source_time,
                                                      event_time=e.event_time,
@@ -1978,16 +1717,13 @@ class AmbiScaper(object):
         ann.duration = self.duration
 
         # Add background sounds
-        bg_labels = []
         bg_source_files = []
         for event_idx, event in enumerate(self.bg_spec):
             value = self._instantiate_event(
                 event,
                 event_idx,
                 isbackground=True,
-                allow_repeated_label=allow_repeated_label,
                 allow_repeated_source=allow_repeated_source,
-                used_labels=bg_labels,
                 used_source_files=bg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
 
@@ -2003,16 +1739,13 @@ class AmbiScaper(object):
         fg_source_positions = []
 
         # Add foreground events
-        fg_labels = []
         fg_source_files = []
         for event_idx, event in enumerate(self.fg_spec):
             value = self._instantiate_event(
                 event,
                 event_idx,
                 isbackground=False,
-                allow_repeated_label=allow_repeated_label,
                 allow_repeated_source=allow_repeated_source,
-                used_labels=fg_labels,
                 used_source_files=fg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
 
@@ -2047,9 +1780,6 @@ class AmbiScaper(object):
             bg_path=self.bg_path,
             fg_spec=self.fg_spec,
             bg_spec=self.bg_spec,
-            fg_labels=self.fg_labels,
-            bg_labels=self.bg_labels,
-            protected_labels=self.protected_labels,
             ref_db=self.ref_db,
             ambisonics_order=self.ambisonics_order,
             ambisonics_spread_slope=self.ambisonics_spread_slope,
@@ -2058,10 +1788,7 @@ class AmbiScaper(object):
             n_events=n_events,
             polyphony_max=poly,
             polyphony_gini=gini,
-            allow_repeated_label=allow_repeated_label,
-            allow_repeated_source=allow_repeated_source,
-            reverb=reverb)
-
+            allow_repeated_source=allow_repeated_source)
         # Add annotation to jams
         jam.annotations.append(ann)
 
@@ -2614,62 +2341,13 @@ class AmbiScaper(object):
 
 
     def generate(self, destination_path,
-                 allow_repeated_label=True, allow_repeated_source=True,
-                 reverb_type=None,
-                 reverb_config=None,
-                 disable_sox_warnings=True, no_audio=False,
-                 generate_txt=False, txt_sep='\t',
+                 allow_repeated_source=True,
+                 disable_sox_warnings=True,
+                 no_audio=False,
+                 generate_txt=False,
+                 txt_sep='\t',
                  disable_instantiation_warnings=False):
-        '''
-        Generate a soundscape based on the current specification and save to
-        disk as both an audio file and a JAMS file describing the soundscape.
-        Both audio and annotation files will be contained in :destination_path:
-        with the same name and adequate file extension
 
-        Parameters
-        ----------
-        destination_path: str
-            Path to the folder where to produce results
-        allow_repeated_label : bool
-            When True (default) the same label can be used more than once
-            in a soundscape instantiation. When False every label can
-            only be used once.
-        allow_repeated_source : bool
-            When True (default) the same source file can be used more than once
-            in a soundscape instantiation. When False every source file can
-            only be used once.
-        disable_sox_warnings : bool
-            When True (default), warnings from the pysox module are suppressed
-            unless their level is ``'CRITICAL'``.
-        no_audio : bool
-            If true only generates a JAMS file and no audio is saved to disk.
-        generate: bool
-            If True, in addition to the JAMS file output a simplified
-            annotation in a space separated format [onset  offset  label],
-            saved in the same path path (good for loading labels in audacity).
-        test_sep: str
-            The separator to use when saving a simplified annotation as a text
-            file (default is tab for compatibility with Audacity label files).
-            Only relevant if txt_path is not None.
-        disable_instantiation_warnings : bool
-            When True (default is False), warnings stemming from event
-            instantiation (primarily about automatic duration adjustments) are
-            disabled. Not recommended other than for testing purposes.
-
-        Raises
-        ------
-        AmbiScaperError
-            If the reverb parameter is passed an invalid value.
-        AmbiScaperWarning
-            If the destination folder already exists
-
-        See Also
-        --------
-        AmbiScaper._instantiate
-
-        AmbiScaper._generate_audio
-
-        '''
 
         # First, we will check reverb config.
         # Currently we support two types of ambisonics reverb:
@@ -2688,55 +2366,10 @@ class AmbiScaper(object):
             # Add smir code into the path
             self.matlab.eval('addpath ' + SMIR_FOLDER_PATH)
 
-        # elif (type(self.reverb_spec) is S3aReverbSpec):
-        #
-        #     # Retrieve valid azimuth/elevation values
-        #     imposed_source_positions = retrieve_RIR_positions(self.reverb_spec)
-        #
-        #     # We are going to modify the foreground specs, in order to impose source positions
-        #     # Since we cannot modify directly an EventSpec (todo: why?)
-        #     # we will copy all valid args from each event, and create a new set of events
-        #     # which will be attached to the fg_spec list
-        #     imposed_fg_spec = []
-        #     self.chosen_IR_indices = []
-        #
-        #     for e in self.fg_spec:
-        #         # For the moment, just choose random on the imposed positions for each event
-        #         # TODO: do we want
-        #         random_index = random.randint(0, len(imposed_source_positions) - 1)
-        #         random_position = imposed_source_positions[random_index]
-        #         imposed_azimuth = ('const', random_position[0])
-        #         imposed_elevation = ('const', random_position[1])
-        #         imposed_spread = ('const', 0.0)
-        #
-        #         # Store the random indinces, so later in the generate_audio method we can
-        #         # easily retrieve the associated IRs
-        #         # Achtung! indices start at 0, but audio files start at 1...
-        #         self.chosen_IR_indices.append(random_index)
-        #
-        #         # Create a new event copying the other relevant informationo
-        #         imposed_fg_spec.append(EventSpec(label=e.label,
-        #                                          source_file=e.source_file,
-        #                                          source_time=e.source_time,
-        #                                          event_time=e.event_time,
-        #                                          event_duration=e.event_duration,
-        #                                          event_azimuth=imposed_azimuth,  # changed!
-        #                                          event_elevation=imposed_elevation,  # changed!
-        #                                          event_spread=imposed_spread,  # changed!
-        #                                          snr=e.snr,
-        #                                          role=e.role,
-        #                                          pitch_shift=e.pitch_shift,
-        #                                          time_stretch=e.time_stretch))
-        #
-        #     # Actually substitute the old events for the new imposed ones
-        #     self.fg_spec = []
-        #     [self.fg_spec.append(e) for e in imposed_fg_spec]
 
         # Create specific instance of a soundscape based on the spec
         jam = self._instantiate(
-            allow_repeated_label=allow_repeated_label,
             allow_repeated_source=allow_repeated_source,
-            reverb=0.69696969696969696969,  # todo
             disable_instantiation_warnings=disable_instantiation_warnings)
 
         # Implement the catch_warnings to avoid the timedelta deprecation message
@@ -2775,17 +2408,10 @@ class AmbiScaper(object):
         if generate_txt:
             txt_path = os.path.join(destination_path, filename + '.txt')
 
-            df = pd.DataFrame(columns=['onset', 'offset', 'label'])
+            df = pd.DataFrame(columns=['onset', 'offset', 'name'])
 
             for idx, row in annotation_array.search(namespace='ambiscaper_sound_event')[0].data.iterrows():
                 if row.value['role'] == 'foreground':
-                    # Since we are using the same :ann.data.iterrows(): method
-                    # to parse the annotation values, the order in which the
-                    # events will appear remains.
-                    # Therefore is safe to name the text labels in the following
-                    # manner, because it will always fit with the order given
-                    # by the :_generate_audio(): method
-                    # Just make sure that the nomenclature remains
                     name = row.value['event_id']
                     newrow = ([row.time.total_seconds(),
                                row.time.total_seconds() +

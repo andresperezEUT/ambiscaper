@@ -10,7 +10,7 @@ outfolder = '/Volumes/Dinge/ambiscaper/generated/'
 foreground_folder = '/Users/andres.perez/audio/freesound'
 background_folder = '~/audio/scaper/background/'
 
-n_soundscapes = 1
+n_soundscapes = 10
 ref_db = -50
 duration = 20.0
 ambisonics_order = 2
@@ -80,8 +80,7 @@ for n in range(n_soundscapes):
 
     n_events = num_events
     for _ in range(n_events):
-        sc.add_event(label=('choose', []),
-                     source_file=('choose', []),
+        sc.add_event(source_file=('choose', []),
                      source_time=(source_time_dist, source_time),
                      event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max),
                      event_duration=(event_duration_dist, event_duration_min, event_duration_max),
@@ -113,7 +112,6 @@ for n in range(n_soundscapes):
     destination_path = os.path.join(outfolder,"soundscape{:d}".format(n))
 
     sc.generate(destination_path=destination_path,
-                allow_repeated_label=True,
                 allow_repeated_source=True,
                 disable_sox_warnings=True,
                 no_audio=False,
