@@ -9,7 +9,8 @@
 import numpy as np
 from numpy import pi, sqrt
 import pytest
-from ambiscaper.ambisonics import get_spherical_harmonic_normalization_coef
+from ambiscaper.ambisonics import get_spherical_harmonic_normalization_coef, _validate_ambisonics_spread_slope, \
+    change_channel_ordering_fuma_2_acn, change_normalization_fuma_2_sn3d
 from ambiscaper.ambisonics import get_ambisonics_spread_coefs
 from ambiscaper.ambisonics import get_number_of_ambisonics_channels
 from ambiscaper.ambisonics import get_ambisonics_coefs
@@ -356,6 +357,14 @@ def test_validate_ambisonics_spread_coefs():
         __test_bad_ambisonics_spread_coefs(bsv)
 
 
+def test_validate_ambisonics_spread_slope():
+    def __test_bad_ambisonics_spread_slope(slope):
+        pytest.raises(AmbiScaperError,_validate_ambisonics_spread_slope,slope)
+
+    bad_spread_slope_values = [-0.5,3,'1', None]
+    for bsv in bad_spread_slope_values:
+        __test_bad_ambisonics_spread_slope(bsv)
+
 def test_get_spread_gain():
 
     def __assert_correct_spread_gains(alpha, tau, ambisonics_order, max_ambisonics_order, value):
@@ -528,3 +537,57 @@ def test_get_ambisonics_spread_coefs():
     tau = 0.25
     correct_args = [alpha, tau, L, [3.7]+[0.1 for _ in range(num_channels-1)]]
     __assert_correct_spread_coefs(*correct_args)
+
+
+def test_change_channel_ordering_fuma_2_acn():
+
+    # Bad input values
+    def __test_bad_input(array):
+        pytest.raises(AmbiScaperError,change_channel_ordering_fuma_2_acn,array)
+
+    # Not an np array
+    bad_values = ['1', None, [1,2,3], [[1,2],[3,4]]]
+    for bv in bad_values:
+        __test_bad_input(bv)
+
+    # Not correct shape (must be 4 channels - order 1)
+    bad_values = [np.asarray([[1,2,3],[4,5,6]]),
+                  np.asarray([[1,2,3,4,5],[6,7,8,9,10]])]
+    for bv in bad_values:
+        __test_bad_input(bv)
+
+
+    # Assert correct values
+    def __assert_correct_input(correct_arg, groundtruth):
+        np.testing.assert_array_equal(groundtruth,change_channel_ordering_fuma_2_acn(correct_arg))
+
+    correct_arg = np.asarray([[0,1,2,3],[4,5,6,7]])
+    groundtruth = np.asarray([[0,2,3,1],[4,6,7,5]])
+    __assert_correct_input(correct_arg, groundtruth)
+
+
+def test_change_normalization_fuma_2_sn3d():
+
+    # Bad input values
+    def __test_bad_input(array):
+        pytest.raises(AmbiScaperError,change_normalization_fuma_2_sn3d,array)
+
+    # Not an np array
+    bad_values = ['1', None, [1,2,3], [[1,2],[3,4]]]
+    for bv in bad_values:
+        __test_bad_input(bv)
+
+    # Not correct shape (must be 4 channels - order 1)
+    bad_values = [np.asarray([[1,2,3],[4,5,6]]),
+                  np.asarray([[1,2,3,4,5],[6,7,8,9,10]])]
+    for bv in bad_values:
+        __test_bad_input(bv)
+
+
+    # Assert correct values
+    def __assert_correct_input(correct_arg, groundtruth):
+        np.testing.assert_array_equal(groundtruth,change_normalization_fuma_2_sn3d(correct_arg))
+
+    correct_arg = np.asarray([[1,1,1,1],[2,2,2,2]])
+    groundtruth = np.asarray([[np.sqrt(2),1,1,1],[2*np.sqrt(2),2,2,2]])
+    __assert_correct_input(correct_arg, groundtruth)

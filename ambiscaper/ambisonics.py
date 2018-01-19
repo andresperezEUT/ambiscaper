@@ -8,9 +8,9 @@ unlimited order
 reference system with right-hand rule
 azimuth [0..2pi]
 elevation [-pi/2..pi/2]
--X positive to (0,0)
--Y positive to (pi/2,0)
--Z positive to (_,pi/2)
+- X positive to (0,0)
+- Y positive to (pi/2,0)
+- Z positive to (_,pi/2)
 
 '''
 import numpy as np
@@ -20,7 +20,6 @@ from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from scipy.special import sph_harm
 
 from ambiscaper.util import delta_kronecker, is_real_number
-
 
 
 def _validate_ambisonics_order(order):
@@ -231,6 +230,65 @@ def _energy_sum(alpha, tau, max_ambisonics_order):
     # sqrt((2*n)+1) because we are working in SN3D
     return sum([sqrt((2*n)+1) * (pow(_get_spread_gain(a, t, n, L), 2)) for n in range(L + 1)])
 
+# Just for order 1
+FUMA_2_ACN_BFORMAT_CHANNEL_ORDERING_DICT = {
+    0: 0,
+    1: 3,
+    2: 1,
+    3: 2
+}
+
+def change_channel_ordering_fuma_2_acn(fuma_array):
+    '''
+    TODO
+    :param fuma_array:
+    :return:
+    '''
+
+    # Input must be a numpy array
+    if not isinstance(fuma_array,np.ndarray):
+        raise AmbiScaperError(
+            'Error: ACN conversion: input array not a numpy ndarray')
+    # Method only valid for 1st order
+    elif np.shape(fuma_array)[1] is not 4:
+        raise AmbiScaperError(
+            'Error: ACN conversion: input array is not order 1')
+
+    # Create new array with same shape
+    acn_array = np.ndarray(shape=np.shape(fuma_array))
+    # Copy them one by one
+    for i in range(4):
+        acn_array[:, FUMA_2_ACN_BFORMAT_CHANNEL_ORDERING_DICT[i]] = fuma_array[:, i]
+
+    return acn_array
+
+# Just first order
+def change_normalization_fuma_2_sn3d(fuma_array):
+    '''
+
+    :param fuma_array:
+    :return:
+    '''
+
+    # Input must be a numpy array
+    if not isinstance(fuma_array,np.ndarray):
+        raise AmbiScaperError(
+            'Error: SN3D conversion: input array not a numpy ndarray')
+    # Method only valid for 1st order
+    elif np.shape(fuma_array)[1] is not 4:
+        raise AmbiScaperError(
+            'Error: SN3D conversion: input array is not order 1')
+
+    # Create new array with same shape
+    sn3d_array = np.ndarray(shape=np.shape(fuma_array))
+    # W channel: multiply by sqrt(2)
+    sn3d_array[:, 0] = fuma_array[:, 0] * np.sqrt(2)
+    # All 1st order channels remain same
+    for i in range(1,4):
+        sn3d_array[:, i] = fuma_array[:, i]
+
+
+    return sn3d_array
 
 
 ################################################

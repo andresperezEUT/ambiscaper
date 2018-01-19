@@ -23,7 +23,8 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
-from .ambisonics import get_number_of_ambisonics_channels
+from .ambisonics import get_number_of_ambisonics_channels, change_channel_ordering_fuma_2_acn, \
+    change_normalization_fuma_2_sn3d
 from .ambisonics import _validate_ambisonics_order
 from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
@@ -2542,6 +2543,12 @@ class AmbiScaper(object):
                     # Ensure that num channels is what it should be according to ambisonics order..
                     # TODO!
                     num_channels = np.shape(filter_data)[1]
+
+                    # The S3A filters are in fuma, so perform rescaling and channel reordering...
+                    if annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
+                        ordered_filter_data = change_channel_ordering_fuma_2_acn(filter_data)
+                        normalized_filter_data = change_normalization_fuma_2_sn3d(ordered_filter_data)
+                        filter_data = normalized_filter_data
 
                     # Open the preprocessed file
                     # TODO: check sr of file and filter...
