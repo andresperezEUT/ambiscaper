@@ -6,16 +6,17 @@ import os
 outfolder = '/Volumes/Dinge/ambiscaper/generated/'
 
 # SCAPER SETTINGS
-foreground_folder = '~/audio/scaper/foreground/'
+# foreground_folder = '~/audio/scaper/foreground/'
+foreground_folder = '/Users/andres.perez/audio/freesound'
 background_folder = '~/audio/scaper/background/'
 
 n_soundscapes = 1
 ref_db = -50
-duration = 10.0
-ambisonics_order = 1
+duration = 20.0
+ambisonics_order = 2
 ambisonics_spread_slope = 1.0
 
-num_events = 3
+num_events = 1
 
 event_time_dist = 'truncnorm'
 event_time_mean = 5.0

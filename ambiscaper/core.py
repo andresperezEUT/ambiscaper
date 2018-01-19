@@ -1849,10 +1849,28 @@ class AmbiScaper(object):
         # Since the recorded reverbs impose a limitation on the source positions,
         # we will need this information beforehand.
 
-        # Instantiate reverb values
 
         if self.reverb_spec:
+
+            # INSTANTIATE REVERB VALUES
             instantiated_reverb_spec = self._instantiate_reverb()
+
+            # LIMIT AMBISONICS ORDER
+            # The Ambisonic IRs might present a limitation on the ambisonics order
+            # (lack of higher order recordings, or not enough simulated capsules)
+            # We compute and store here the maximum order allowed,
+            # and downgrade it if necessary
+            max_ambi_order =  get_max_ambi_order_from_reverb_config(instantiated_reverb_spec,
+                                                                    self.ambisonics_order)
+
+            if max_ambi_order < self.ambisonics_order:
+                warnings.warn(
+                    'User-defined Ambisonics order L=' + str(self.ambisonics_order) +
+                    ' is higher than the maximum order allowed by the reverb spec. ' +
+                    'Downgrading to ' + str(max_ambi_order),
+                    AmbiScaperWarning)
+                self.ambisonics_order = max_ambi_order
+
 
             if isinstance(instantiated_reverb_spec,SmirReverbSpec):
 
@@ -2187,20 +2205,6 @@ class AmbiScaper(object):
 
         # We need to convert them to ambisonics, i.e., perform ambisonics encoding on them
         # based on the capsule positions
-
-        # The maximum ambisonics order L is defined by the number of microphone capsules:
-        #   K <= Q,
-        # where K is the number of ambisonics components K = (L+1)^2,
-        # and Q the number of capsules.
-        # For more information, please refer to
-        # "3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone"
-        # (Moreau, Daniel and Bertet, 2006). 
-        # http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
-
-        # TODO: ensure order limitation
-
-
-
         mic = instantiated_reverb_values['microphone_type']
         ambi_coefs = []
         for mic_pos in SMIR_SUPPORTED_VIRTUAL_MICS[mic]["capsule_position_sph"]:
@@ -2608,34 +2612,6 @@ class AmbiScaper(object):
             [os.remove(t.name) for t in downmix_tmpfiles]
             [os.remove(t.name) for t in processed_tmpfiles]
 
-
-    def set_reverb(self, reverb_config):
-        '''
-        TODO
-        :param reverb_config:
-        :return:
-        '''
-
-        # Check reverb validity
-        _validate_reverb_config(reverb_config, self.ambisonics_order)
-
-        # Ensure that we are able to provide the target ambisonics order
-        # with the given mic configuration; downgrade it if necessary
-        max_ambi_order = get_max_ambi_order_from_reverb_config(reverb_config)
-
-        # If the maximum ambisonics order given the reverb limitations
-        # is smaller than the target, then raise a Warning
-        # and modify the current order to adapt it
-        if self.ambisonics_order > max_ambi_order:
-            self.ambisonics_order = max_ambi_order
-            # TODO: use custom warnings but not raise them! find solution
-            warnings.warn(
-                'Target ambisonics order is higher than the defined by the reverb spec. '
-                'Downgrading it to ' + str(max_ambi_order)
-            )
-
-        # If reverb config ok, store it
-        self.reverb_config = reverb_config
 
     def generate(self, destination_path,
                  allow_repeated_label=True, allow_repeated_source=True,

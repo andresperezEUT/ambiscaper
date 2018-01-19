@@ -475,7 +475,7 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
 
 
 
-def get_max_ambi_order_from_reverb_config(reverb_config):
+def get_max_ambi_order_from_reverb_config(reverb_spec, ambisonics_order):
     '''
     TODO
     :param reverb_config:
@@ -483,18 +483,30 @@ def get_max_ambi_order_from_reverb_config(reverb_config):
     :return:
     '''
 
-    # smir
-    if type(reverb_config) is SmirReverbSpec:
-        # Max ambisonics order is defined in the mic spec...
-        return SMIR_SUPPORTED_VIRTUAL_MICS[reverb_config.microphone_type]['max_ambi_order']
+    # The maximum ambisonics order L is defined by the number of microphone capsules:
+    #   K <= Q,
+    # where K is the number of ambisonics components K = (L+1)^2,
+    # and Q the number of capsules.
+    # For more information, please refer to
+    # "3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone"
+    # (Moreau, Daniel and Bertet, 2006).
+    # http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
+    K = (ambisonics_order + 1) * (ambisonics_order + 1)
 
-    # s3a
-    elif type(reverb_config) is S3aReverbSpec:
-        # Check the maximum ambisonics order
-        # Max ambisonics order given by the number of channels of the IRs
+    if isinstance(reverb_spec, SmirReverbSpec):
+        Q = len(SMIR_SUPPORTED_VIRTUAL_MICS[reverb_spec.microphone_type]['capsule_position_sph'])
+
+    elif isinstance(reverb_spec, S3aReverbSpec):
         # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
-        return 1
+        Q = 4
+    else:
+        Q = K
 
+    downgraded_ambisonics_order = ambisonics_order
+    if K > Q:
+        downgraded_ambisonics_order = int(np.floor(np.sqrt(Q)-1))
+
+    return downgraded_ambisonics_order
 
 
 
@@ -617,7 +629,6 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
     "soundfield": {
         "sph_type": 'open',
         "sph_radius": 0.02, # todo: get real measurement!
-        "max_ambi_order": 1,
         "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
                 [np.pi, -0.61547970867038726],  # BLD
@@ -627,7 +638,6 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
     "tetramic": {
         "sph_type": 'open',
         "sph_radius": 0.02, # todo: get real measurement!
-        "max_ambi_order": 1,
         "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
                 [np.pi, -0.61547970867038726],  # BLD
@@ -637,7 +647,6 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
     "em32":  {
         "sph_type": 'rigid',
         "sph_radius": 0.042, # todo: get real measurement!
-        "max_ambi_order": 4,
         "capsule_position_sph":  [[0.0, 0.3665191429188092],
                 [0.5585053606381855, 0.0],
                 [0.0, -0.3665191429188092],
