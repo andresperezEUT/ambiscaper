@@ -378,10 +378,10 @@ def _validate_microphone_type(mic_type_tuple):
             'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
-def _validate_s3a_reverb_spec(reverb_name_tuple):
+def _validate_s3a_reverb_spec(reverb_name):
 
     # Just one element for the moment
-    _validate_s3a_reverb_name(reverb_name_tuple)
+    _validate_s3a_reverb_name(reverb_name)
 
     return
 
@@ -463,13 +463,20 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
     # Otherwise it must be specified using "choose"
     # Empty list is allowed, meaning all avaiable IRS
     elif reverb_name_tuple[0] == "choose":
-
-        if not all(__valid_s3a_reverb_name_types(length) for length in reverb_name_tuple[1]):
+        # Not a list
+        if not isinstance(reverb_name_tuple[1],list):
+            raise AmbiScaperError(
+                'reverb_config: no list for choose')
+        # Empty list
+        elif len(reverb_name_tuple[1]) is 0:
+            raise AmbiScaperError(
+                'reverb_config: empty list for choose')
+        elif not all(__valid_s3a_reverb_name_types(length) for length in reverb_name_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb name must be a positive integer')
         elif not all(__valid_s3a_reverb_name_configuration(name) for name in reverb_name_tuple[1]):
             raise AmbiScaperError(
-                'reverb_config: reverb names not valid: ' + reverb_name_tuple[1])
+                'reverb_config: reverb names not valid: ' + str(reverb_name_tuple[1]))
 
     # No other labels allowed"
     else:
@@ -478,12 +485,11 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
 
 
 
-def get_max_ambi_order_from_reverb_config(reverb_spec, ambisonics_order):
+def get_max_ambi_order_from_reverb_config(reverb_spec):
     '''
-    TODO
-    :param reverb_config:
-    :param target_ambisonics_order:
-    :return:
+    Compute the maximum ambisonics order given a microphone configuration
+    :param reverb_spec: a valid reverb spec
+    :return: The maximum ambisonics order allowed
     '''
 
     # The maximum ambisonics order L is defined by the number of microphone capsules:
@@ -494,7 +500,6 @@ def get_max_ambi_order_from_reverb_config(reverb_spec, ambisonics_order):
     # "3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone"
     # (Moreau, Daniel and Bertet, 2006).
     # http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
-    K = (ambisonics_order + 1) * (ambisonics_order + 1)
 
     if isinstance(reverb_spec, SmirReverbSpec):
         Q = len(SMIR_SUPPORTED_VIRTUAL_MICS[reverb_spec.microphone_type]['capsule_position_sph'])
@@ -503,29 +508,36 @@ def get_max_ambi_order_from_reverb_config(reverb_spec, ambisonics_order):
         # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
         Q = 4
     else:
-        Q = K
+        raise AmbiScaperError(
+            'Not valid reverb_spec'
+        )
 
-    downgraded_ambisonics_order = ambisonics_order
-    if K > Q:
-        downgraded_ambisonics_order = int(np.floor(np.sqrt(Q)-1))
-
-    return downgraded_ambisonics_order
+    return int(np.floor(np.sqrt(Q)-1))
 
 
 
 def retrieve_available_recorded_IRs():
+    '''
+    List all dirs inside S3A folder path
+    :return: List
+    '''
 
-    # List all dirs inside S3A folder path
     # TODO: implement it in a more elegant way
-
     return [e for e in os.listdir(S3A_FOLDER_PATH) if not e == 'README.md' and not e == '.DS_Store']
 
 def generate_RIR_path(recorded_reverb_name):
     '''
-    TODO
-    :param s3a_reverg_config:
-    :return:
+    Return full path to recorded IR data given a recorded reverb name
+    :param s3a_reverg_config: string pointing to a valid reverb name
+    Raises: AmbiScaper Error with not valid reverb name
     '''
+    if not isinstance(recorded_reverb_name,str):
+        raise AmbiScaperError(
+            'Not valid recorded reverb name type')
+    elif find_element_in_list(recorded_reverb_name,retrieve_available_recorded_IRs()) is None:
+        raise AmbiScaperError(
+            'Reverb name does not exist: ', recorded_reverb_name)
+
     # TODO: remove hardcoded reference to Soundfield
     return os.path.expanduser(os.path.join(S3A_FOLDER_PATH, recorded_reverb_name, 'Soundfield'))
 

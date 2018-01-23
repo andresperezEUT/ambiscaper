@@ -1519,8 +1519,7 @@ class AmbiScaper(object):
             # (lack of higher order recordings, or not enough simulated capsules)
             # We compute and store here the maximum order allowed,
             # and downgrade it if necessary
-            max_ambi_order =  get_max_ambi_order_from_reverb_config(instantiated_reverb_spec,
-                                                                    self.ambisonics_order)
+            max_ambi_order =  get_max_ambi_order_from_reverb_config(instantiated_reverb_spec)
 
             if max_ambi_order < self.ambisonics_order:
                 warnings.warn(

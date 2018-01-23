@@ -3,8 +3,11 @@ import pytest
 import ambiscaper
 from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
-from ambiscaper.reverb_ambisonics import _validate_IR_length
+from ambiscaper.reverb_ambisonics import _validate_IR_length, S3aReverbSpec, SmirReverbSpec, \
+    get_max_ambi_order_from_reverb_config, retrieve_available_recorded_IRs, generate_RIR_path
 
+
+#################### SMIR
 
 def test_validate_smir_reverb_spec():
 
@@ -254,3 +257,104 @@ def test_validate_microphone_type():
         raise AmbiScaperError
 
 
+
+
+#################### RECORDED
+
+def test_validate_s3a_reverb_name():
+
+    def __test_bad_tuple(tuple):
+        pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_s3a_reverb_name, tuple)
+
+    # bad consts
+    bad_values = [None, -1, 1j, 'yes', 'CoolReverb']
+
+    for bv in bad_values:
+        __test_bad_tuple(('const', bv))
+
+    # empty list for choose
+    __test_bad_tuple(('choose', []))
+    __test_bad_tuple(('choose', 'CoolReverb'))
+
+    # bad consts in list for choose
+    for bv in bad_values:
+        __test_bad_tuple(('choose', [bv]))
+
+    # no other labels allowed
+    __test_bad_tuple(('uniform', -1, 1))
+    __test_bad_tuple(('normal', -1, 1))
+    __test_bad_tuple(('truncnorm', -1, 1, 0 ,))
+
+    def __assert_correct_tuple(tuple):
+        try:
+            ambiscaper.reverb_ambisonics._validate_s3a_reverb_name(tuple)
+        except AmbiScaperError:
+            raise AmbiScaperError
+
+    __assert_correct_tuple(('const','MainChurch'))
+    __assert_correct_tuple(('choose',['Vislab','OldChurch']))
+
+def test_get_max_ambi_order_from_reverb_config():
+
+    def __test_not_valid(arg):
+        pytest.raises(AmbiScaperError, get_max_ambi_order_from_reverb_config, arg)
+
+    # spec
+    not_valid_values = [
+        ['reverb_spec',1],
+    ]
+    for not_valid_value in not_valid_values:
+        __test_not_valid(not_valid_value)
+
+    def __test_incorrect_values(arg,groundtruth):
+        assert groundtruth != get_max_ambi_order_from_reverb_config(arg)
+
+    # [spec, groundtruth]
+    incorrect_values = [
+        [S3aReverbSpec(name='OldChurch'),2],
+        [SmirReverbSpec(IRlength=1024,
+                        room_dimensions=[1.0, 1.0, 1.0],
+                        t60=0.5,
+                        reflectivity=None,
+                        source_type='o',
+                        microphone_type='soundfield'), 2],
+    ]
+    for iv in incorrect_values:
+        __test_incorrect_values(*iv)
+
+
+    def __test_correct_values(arg,groundtruth):
+        assert groundtruth == get_max_ambi_order_from_reverb_config(arg)
+
+    # [spec, groundtruth]
+    correct_values = [
+        [S3aReverbSpec(name='OldChurch'),1],
+        [SmirReverbSpec(IRlength=1024,
+                        room_dimensions=[1.0, 1.0, 1.0],
+                        t60=0.5,
+                        reflectivity=None,
+                        source_type='o',
+                        microphone_type='soundfield'), 1],
+    ]
+    for cv in correct_values:
+        __test_correct_values(*cv)
+
+
+def test_retrieve_available_recorded_IRs():
+
+    # At this moment we have these
+    groundtruth = ['AudioBooth','MainChurch','OldChurch','Studio1','Vislab']
+
+    # Check with unordered lists
+    assert set(retrieve_available_recorded_IRs()) == set(groundtruth)
+
+def test_generate_RIR_path():
+
+    # Not valid arg
+    pytest.raises(AmbiScaperError,generate_RIR_path,'FakeReverb')
+    pytest.raises(AmbiScaperError,generate_RIR_path,123)
+
+    # test valid
+    # Hardcoded path
+    path = "/Users/andres.perez/source/ambiscaper/IRs/AudioBooth/Soundfield"
+    assert path == generate_RIR_path('AudioBooth')
