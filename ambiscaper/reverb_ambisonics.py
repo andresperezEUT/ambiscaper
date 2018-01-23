@@ -78,8 +78,11 @@ def _validate_smir_reverb_spec(IRlength, room_dimensions,
         # REFLECTIVITY
         _validate_wall_reflectivity(reflectivity)
     else:
+        # T60
+        _validate_t60(t60)
         raise AmbiScaperWarning(
-            'reverb_config: Both t60 and reflectivity defined!')
+            'reverb_config: Both t60 and reflectivity defined!' +
+            'Using t60 by default')
 
     # SOURCE TYPE
     _validate_source_type(source_type)
@@ -263,7 +266,7 @@ def _validate_wall_reflectivity(wall_reflectivity_tuple):
     if wall_reflectivity_tuple[0] == "const":
         if not _valid_wall_reflectivity_values(wall_reflectivity_tuple[1]):
             raise AmbiScaperError(
-                'reverb_config: wall_reflectivity must be a list of 3 elements')
+                'reverb_config: wall_reflectivity must be a list of 6 floats between 0 and 1')
 
     elif wall_reflectivity_tuple[0] == "choose":
         if not wall_reflectivity_tuple[1]:  # list is empty
@@ -272,7 +275,7 @@ def _validate_wall_reflectivity(wall_reflectivity_tuple):
         elif not all(_valid_wall_reflectivity_values(wall_reflectivity)
                      for wall_reflectivity in wall_reflectivity_tuple[1]):
             raise AmbiScaperError(
-                'reverb_config: wall_reflectivity must be a list of 3 elements')
+                'reverb_config: wall_reflectivity must be a list of 6 floats between 0 and 1')
 
     elif wall_reflectivity_tuple[0] == "uniform":
         if wall_reflectivity_tuple[1] < 0:

@@ -4,7 +4,9 @@
 Tests for functions in util.py
 '''
 
-from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, spherical_to_cartesian, find_element_in_list
+from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, \
+    spherical_to_cartesian, find_element_in_list, event_background_id_string, event_foreground_id_string, \
+    _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution
 from ambiscaper.util import _set_temp_logging_level
 from ambiscaper.util import _validate_folder_path
 from ambiscaper.util import _get_sorted_files
@@ -463,3 +465,101 @@ def test_find_element_in_list():
     ]
     for correct_entry in correct_entries:
         __test_correct_find_element_in_list(*correct_entry)
+
+
+def test_generate_event_id_from_idx():
+
+    def __test_bad_args(bad_args):
+        pytest.raises(AmbiScaperError, _generate_event_id_from_idx, *bad_args)
+
+    bad_entries = [
+        [1.0, 'foreground'],
+        [None, 'foreground'],
+        [-3, 'foreground'],
+        [0, 'not_correct_label'],
+    ]
+
+    for bad_entry in bad_entries:
+        __test_bad_args(bad_entry)
+
+    def __test_correct_args(correct_args,groundtruth):
+        assert groundtruth == _generate_event_id_from_idx(*correct_args)
+
+    # idx, label, groundtruth
+    correct_entries = [
+        [[0,'foreground'],event_foreground_id_string+str(0)],
+        [[1,'background'],event_background_id_string+str(1)],
+    ]
+
+    for correct_entry in correct_entries:
+        __test_correct_args(correct_entry[0],correct_entry[1])
+
+
+def test_generate_event_idx_from_id():
+
+    def __test_bad_args(bad_args):
+        pytest.raises(AmbiScaperError, _get_event_idx_from_id, *bad_args)
+
+    bad_entries = [
+        ['fg', 'foreground'],
+        [None, 'foreground'],
+        ['gg0', 'foreground'],
+        ['fgZero', 'foreground'],
+        ['fg0', 'not_correct_label'],
+    ]
+
+    for bad_entry in bad_entries:
+        __test_bad_args(bad_entry)
+
+    def __test_correct_args(correct_args,groundtruth):
+        assert groundtruth == _get_event_idx_from_id(*correct_args)
+
+    # idx, label, groundtruth
+    correct_entries = [
+        [['fg0','foreground'],0],
+        [['bg1','background'],1],
+    ]
+
+    for correct_entry in correct_entries:
+        __test_correct_args(correct_entry[0],correct_entry[1])
+
+
+def test_validate_distribution():
+
+    def __test_bad_tuple_list(tuple_list):
+        for t in tuple_list:
+            if isinstance(t, tuple):
+                print(t, len(t))
+            else:
+                print(t)
+            pytest.raises(AmbiScaperError, _validate_distribution, t)
+
+    # not tuple = error
+    nontuples = [[], 5, 'yes']
+    __test_bad_tuple_list(nontuples)
+
+    # tuple must be at least length 2
+    shortuples = [tuple(), tuple(['const'])]
+    __test_bad_tuple_list(shortuples)
+
+    # unsupported distribution tuple name
+    badnames = [('invalid', 1), ('constant', 1, 2, 3)]
+    __test_bad_tuple_list(badnames)
+
+    # supported dist tuples, but bad arugments
+    badargs = [('const', 1, 2),
+               ('choose', 1), ('choose', [], 1),
+               ('uniform', 1), ('uniform', 1, 2, 3), ('uniform', 2, 1),
+               ('uniform', 'one', 2), ('uniform', 1, 'two'),
+               ('uniform', 0, 1j), ('uniform', 1j, 2),
+               ('normal', 1),
+               ('normal', 1, 2, 3), ('normal', 1, -1),
+               ('normal', 0, 1j), ('normal', 1j, 1), ('normal', 'one', 2),
+               ('normal', 1, 'two'),
+               ('truncnorm', 1), ('truncnorm', 1, 2, 3),
+               ('truncnorm', 1, -1, 0, 1),
+               ('truncnorm', 0, 1j, 0, 1), ('truncnorm', 1j, 1, 0, 1),
+               ('truncnorm', 'one', 2, 0, 1), ('truncnorm', 1, 'two', 0, 1),
+               ('truncnorm', 1, 2, 'three', 5), ('truncnorm', 1, 2, 3, 'four'),
+               ('truncnorm', 0, 2, 2, 0)]
+    __test_bad_tuple_list(badargs)

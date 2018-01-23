@@ -563,9 +563,27 @@ def find_element_in_list(element, list_arg):
         return None
 
 
-
-
 def _generate_event_id_from_idx(event_idx,role):
+    '''
+    Given an event_idx (an integer),
+    generate the event identifier string (event_id)
+    by appending the corresponding role label
+
+    Parameters
+    ----------
+    :param event_idx: integer
+    :param role: 'foreground' or 'background'
+
+    Returns
+    ------
+    The correctly formed event_id string
+
+    Raises
+    ------
+    AmbiScaperError
+        If the input arguments does not match the required types
+
+    '''
 
     if role is 'foreground':
         substring = event_foreground_id_string
@@ -574,12 +592,41 @@ def _generate_event_id_from_idx(event_idx,role):
     else:
         raise AmbiScaperError(
             'event role not known'+role
+        )
+
+    if not isinstance(event_idx,int):
+        raise AmbiScaperError(
+            'event_idx not an integer: ' + str(type(event_idx))
+        )
+    elif event_idx < 0:
+        raise AmbiScaperError(
+            'event_idx must be positive: ' + str(event_idx)
         )
 
     return substring+str(event_idx)
 
 
 def _get_event_idx_from_id(event_id,role):
+    '''
+    Given an event_id (a string),
+    generate the event index (event_id)
+    by appending the corresponding role label
+
+    Parameters
+    ----------
+    :param event_id: string
+    :param role: 'foreground' or 'background'
+
+    Returns
+    ------
+    The associated event index (event_idx)
+
+    Raises
+    ------
+    AmbiScaperError
+        If the input arguments does not match the required types and formats
+
+    '''
 
     if role is 'foreground':
         substring = event_foreground_id_string
@@ -590,9 +637,26 @@ def _get_event_idx_from_id(event_id,role):
             'event role not known'+role
         )
 
-    # Remove role substring and get the integer number
-    return int(event_id.replace(substring,""))
+    if not isinstance(event_id,str):
+        raise AmbiScaperError(
+            'event_id not a string: ' + str(type(event_id))
+        )
 
+    # Remove role substring and get the integer number
+    idx = event_id.replace(substring,"")
+
+    # If didn't found (incorrect id), then idx will be equal to event_id
+    if idx == event_id:
+        raise AmbiScaperError(
+            'Malformed event_id: ' + event_id
+        )
+
+    try:
+        return int(idx)
+    except ValueError:
+        raise AmbiScaperError(
+            'Malformed event_id: ' + event_id
+        )
 
 
 

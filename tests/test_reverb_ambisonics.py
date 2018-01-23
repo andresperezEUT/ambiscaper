@@ -6,6 +6,50 @@ from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
 from ambiscaper.reverb_ambisonics import _validate_IR_length
 
 
+def test_validate_smir_reverb_spec():
+
+    def __test_bad_smir_reverb_spec(smir_reverb_spec):
+        pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_smir_reverb_spec, *smir_reverb_spec)
+
+    def __test_warn_smir_reverb_spec(smir_reverb_spec):
+        pytest.raises(AmbiScaperWarning, ambiscaper.reverb_ambisonics._validate_smir_reverb_spec, *smir_reverb_spec)
+
+    def __test_good_smir_reverb_spec(smir_reverb_spec):
+        try:
+            ambiscaper.reverb_ambisonics._validate_smir_reverb_spec(*smir_reverb_spec)
+        except AmbiScaperError:
+            raise
+
+    IRlengt = ('const',1024)
+    room_dimensions = ('const',[1,2,3])
+    source_type = ('const','o')
+    microphone_type = ('const','soundfield')
+
+    # Incorrect specs: no t60/reflectivity
+    t60 = None
+    reflectivity = None
+    spec = [IRlengt,room_dimensions,t60,reflectivity,source_type,microphone_type]
+    __test_bad_smir_reverb_spec(spec)
+
+    # Incorrect specs: both t60/reflectivity
+    t60 = ('const',0.5)
+    reflectivity = ('const',[0.1,0.2,0.3,0.4,0.5,0.6])
+    spec = [IRlengt,room_dimensions,t60,reflectivity,source_type,microphone_type]
+    __test_warn_smir_reverb_spec(spec)
+
+    # Correct entries
+    t60 = ('const',0.5)
+    reflectivity = None
+    spec = [IRlengt,room_dimensions,t60,reflectivity,source_type,microphone_type]
+    __test_good_smir_reverb_spec(spec)
+
+    t60 = None
+    reflectivity = ('const',[0.1,0.2,0.3,0.4,0.5,0.6])
+    spec = [IRlengt,room_dimensions,t60,reflectivity,source_type,microphone_type]
+    __test_good_smir_reverb_spec(spec)
+
+
+
 def test_validate_IR_length():
 
     def __test_bad_IR_length_tuple(IR_length_tuple):
