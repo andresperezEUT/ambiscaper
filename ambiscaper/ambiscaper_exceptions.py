@@ -9,3 +9,4 @@ class AmbiScaperError(Exception):
     '''The root AmbiScaper exception class'''
 
     pass
+
