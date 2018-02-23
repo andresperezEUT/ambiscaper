@@ -4,7 +4,7 @@
 
 A library for soundscape synthesis and augmentation
 
-Originally forked from [http://github.com/justinsalamon/scaper][http://github.com/justinsalamon/scaper]
+Originally forked from [http://github.com/justinsalamon/scaper][Scaper]
 (commit e0cc1c9, 17th October 2017)
 
 [![PyPI](https://img.shields.io/pypi/v/scaper.svg)](https://pypi.python.org/pypi/scaper)
