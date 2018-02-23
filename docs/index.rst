@@ -1,20 +1,9 @@
-.. scaper documentation master file, created by
-   sphinx-quickstart on Thu May  4 17:32:22 2017.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-.. |br| raw:: html
 
-   <br />
-
-Welcome to scaper's documentation!
+Welcome to ambiscaper's documentation!
 ==================================
 
-For a detailed description of scaper and its applications check out the scaper-paper:
-
-`Scaper: A library for soundscape synthesis and augmentation <http://www.justinsalamon.com/uploads/4/3/9/4/4394963/salamon_scaper_waspaa_2017.pdf>`_ |br|
-J. Salamon, D. MacConnell, M. Cartwright, P. Li, and J. P. Bello |br|
-In IEEE Workshop on Applications of Signal Processing to Audio and Acoustics (WASPAA), New Paltz, NY, USA, Oct. 2017.
-
+Ambiscaper: a tool for automatic dataset generation and annotation of reverberant Ambisonics audio.
+Originally forked from http://github.com/justinsalamon/scaper
 
 Installation
 ============
@@ -49,8 +38,8 @@ API Reference
 
 Contribute
 ==========
-- `Issue tracker <http://github.com/justinsalamon/scaper/issues>`_
-- `Source code <http://github.com/justinsalamon/scaper>`_
+- `Issue tracker <http://github.com/andresperezlopez/ambiscaper/issues>`_
+- `Source code <http://github.com/andresperezlopez/ambiscaper>`_
 
 
 Changes
@@ -67,6 +56,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-
-
