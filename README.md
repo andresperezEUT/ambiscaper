@@ -2,7 +2,7 @@
 
 <img src="ambiscaper_logo.png" width="450" height="200">
 
-A library for soundscape synthesis and augmentation
+Ambiscaper: a tool for automatic dataset generation and annotation of reverberant Ambisonics audio
 
 Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit e0cc1c9, 17th October 2017)
 
