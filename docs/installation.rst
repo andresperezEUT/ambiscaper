@@ -5,7 +5,7 @@ Installation instructions
 
 Non-python dependencies
 -----------------------
-Scaper has two non-python dependencies:
+AmbiScaper has two non-python dependencies:
 
 - SoX: http://sox.sourceforge.net/
 - FFmpeg: https://ffmpeg.org/
@@ -32,20 +32,20 @@ On windows you can use the provided installation binaries:
 - SoX: https://sourceforge.net/projects/sox/files/sox/
 - FFmpeg: https://ffmpeg.org/download.html#build-windows
 
-Installing Scaper
+Installing AmbiScaper
 -----------------
-The simplest way to install ``scaper`` is by using ``pip``, which will also install the required dependencies if needed.
-To install ``scaper`` using ``pip``, simply run
+The simplest way to install ``ambiscaper`` is by using ``pip``, which will also install the required dependencies if needed.
+To install ``ambiscaper`` using ``pip``, simply run
 
->>> pip install scaper
+>>> pip install ambiscaper
 
-To install the latest version of scaper from source:
+To install the latest version of ambiscaper from source:
 
 1. Clone or pull the lastest version:
 
->>> git clone git@github.com:justinsalamon/scaper.git
+>>> git clone git@github.com:andresperezlopez/ambiscaper.git
 
 2. Install using pip to handle python dependencies:
 
->>> cd scaper
+>>> cd ambiscaper
 >>> pip install -e .
