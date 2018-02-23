@@ -271,3 +271,8 @@ parameter.
 
 That's it! For a more detailed example of automatically synthesizing 1000
 soundscapes using a single ``Scaper`` object, please see the :ref:`examples`.
+
+
+Differences from Scaper
+------------
+TODO 

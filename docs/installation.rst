@@ -32,6 +32,10 @@ On windows you can use the provided installation binaries:
 - SoX: https://sourceforge.net/projects/sox/files/sox/
 - FFmpeg: https://ffmpeg.org/download.html#build-windows
 
+Matlab dependency
+-----------------------
+If you wish to use the simulated reverb feature implemented by SmirGenerator, you will need to have a valid working version of Matlab. 
+
 Installing AmbiScaper
 -----------------
 The simplest way to install ``ambiscaper`` is by using ``pip``, which will also install the required dependencies if needed.
