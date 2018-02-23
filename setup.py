@@ -2,23 +2,23 @@ from setuptools import setup, find_packages
 import imp
 
 
-version = imp.load_source('scaper.version', 'scaper/version.py')
+version = imp.load_source('ambiscaper.version', 'ambiscaper/version.py')
 
 setup(
-    name='scaper',
+    name='ambiscaper',
     version=version.version,
     description='A library for soundscape synthesis and augmentation',
     author='Justin Salamon & Duncan MacConnell',
-    author_email='justin.salamon@gmail.com',
-    url='https://github.com/justinsalamon/scaper',
-    download_url='http://github.com/justinsalamon/scaper/releases',
-    packages=['scaper'],
-    package_data={'scaper': ['namespaces/ambiscaper_sound_event.json']},
-    long_description='A library for soundscape synthesis and augmentation',
-    keywords='audio sound soundscape environmental dsp mixing',
-    license='BSD-3-Clause',
+    author_email='andres.perez@upf.edu',
+    url='https://github.com/andresperezlopez/ambiscaper',
+    download_url='https://github.com/andresperezlopez/ambiscaper/releases',
+    packages=['ambiscaper'],
+    package_data={'ambiscaper': ['namespaces/ambiscaper_sound_event.json', 'namespaces/ambiscaper_recorded_reverb.json','namespaces/ambiscaper_smir_reverb.json']},
+    long_description='Ambiscaper: a tool for automatic dataset generation and annotation of reverberant Ambisonics audio',
+    keywords='ambisonics audio sound soundscape',
+    license='GNU GPLv3.0',
     classifiers=[
-            "License :: OSI Approved :: BSD License",
+            "License :: OSI Approved :: GPL 3",
             "Programming Language :: Python",
             "Development Status :: 3 - Alpha",
             "Intended Audience :: Developers",

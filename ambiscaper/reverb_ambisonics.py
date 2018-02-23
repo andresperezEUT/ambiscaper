@@ -468,9 +468,9 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
             raise AmbiScaperError(
                 'reverb_config: no list for choose')
         # Empty list
-        elif len(reverb_name_tuple[1]) is 0:
-            raise AmbiScaperError(
-                'reverb_config: empty list for choose')
+        # elif len(reverb_name_tuple[1]) is 0:
+            # raise AmbiScaperError(
+            #     'reverb_config: empty list for choose')
         elif not all(__valid_s3a_reverb_name_types(length) for length in reverb_name_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb name must be a positive integer')
