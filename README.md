@@ -6,12 +6,12 @@ Ambiscaper: a tool for automatic dataset generation and annotation of reverberan
 
 Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit e0cc1c9, 17th October 2017)
 
-[![PyPI](https://img.shields.io/pypi/v/scaper.svg)](https://pypi.python.org/pypi/scaper)
+[//]: #[![PyPI](https://img.shields.io/pypi/v/scaper.svg)](https://pypi.python.org/pypi/scaper)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Build Status](https://travis-ci.org/andresperezlopez/ambiscaper.svg?branch=master)](https://travis-ci.org/andresperezlopez/ambiscaper)
-[![Coverage Status](https://coveralls.io/repos/github/justinsalamon/scaper/badge.svg?branch=master)](https://coveralls.io/github/justinsalamon/scaper?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/andresperezlopez/ambiscaper/badge.svg?branch=master)](https://coveralls.io/github/andresperezlopez/ambiscaper?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/scaper/badge/?version=latest)](http://scaper.readthedocs.io/en/latest/?badge=latest)
-[![PyPI](https://img.shields.io/badge/python-2.7%2C%203.4%2C%203.5%2C%203.6-blue.svg)]()
+[//]: #[![PyPI](https://img.shields.io/badge/python-2.7%2C%203.4%2C%203.5%2C%203.6-blue.svg)]()
 
 Please refer to the [documentation](http://scaper.readthedocs.io/) for details.
 
