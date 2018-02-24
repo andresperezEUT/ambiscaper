@@ -26,7 +26,7 @@ As a consequence, Ambisonics recordings might be useful in the auditory scene an
 
 However, there is an important lack of Ambisonics recordings databases, specially in the case of Higher Order Ambisonics. Annotation is also needed to design, train and evaluate the algorithms. The related works presented in last years have used custom databases, which hinder experiment reproducibility. A flexible reverberation configuration is as well needed for the state-of-the-art methods. Manual recording and annotation of sound scenes on that scale would imply an excessive amount of work. 
 
-As a consequence, we present AmbiScaper, a python library for procedural creation and annotation of reverberant Ambisonics databases. The software is based on a related work by Justin Salamon ( [Scaper](http://github.com/justinsalamon/scaper) ) in the context of scene recognition. 
+We present AmbiScaper, a python library for procedural creation and annotation of reverberant Ambisonics databases. The software is based on a related work by Justin Salamon ( [Scaper](http://github.com/justinsalamon/scaper) ) in the context of scene recognition. 
 
 ## Installation
 
