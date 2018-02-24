@@ -10,7 +10,7 @@ Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Build Status](https://travis-ci.org/andresperezlopez/ambiscaper.svg?branch=master)](https://travis-ci.org/andresperezlopez/ambiscaper)
 [![Coverage Status](https://coveralls.io/repos/github/andresperezlopez/ambiscaper/badge.svg?branch=master)](https://coveralls.io/github/andresperezlopez/ambiscaper?branch=master)
-[![Documentation Status](https://readthedocs.org/projects/ambiscaper/badge/?version=latest)](http://scaper.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/ambiscaper/badge/?version=latest)](http://ambiscaper.readthedocs.io/en/latest/?badge=latest)
 
 [//]: #[![PyPI](https://img.shields.io/badge/python-2.7%2C%203.4%2C%203.5%2C%203.6-blue.svg)]()
 
