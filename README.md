@@ -14,13 +14,8 @@ Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit 
 
 [//]: #[![PyPI](https://img.shields.io/badge/python-2.7%2C%203.4%2C%203.5%2C%203.6-blue.svg)]()
 
-Please refer to the [documentation](http://scaper.readthedocs.io/) for details.
+Please refer to the [documentation](http://ambiscaper.readthedocs.io/) for details.
 
-For the motivation behind scaper and its applications check out the scaper-paper:
-
-[Scaper: A library for soundscape synthesis and augmentation](http://www.justinsalamon.com/uploads/4/3/9/4/4394963/salamon_scaper_waspaa_2017.pdf)<br />
-J. Salamon, D. MacConnell, M. Cartwright, P. Li, and J. P. Bello<br />
-In IEEE Workshop on Applications of Signal Processing to Audio and Acoustics (WASPAA), New Paltz, NY, USA, Oct. 2017.
 
 ## Installation
 
