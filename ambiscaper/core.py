@@ -825,19 +825,18 @@ class AmbiScaper(object):
         '''
         Create am AmbiScaper object.
 
-        Parameters
-        ----------
-        duration : float
-            Duration of the soundscape, in seconds.
-        ambisonics_order: int
-            Ambisonics Order
-        ambisonics_spread_slope: float
-            TODO
-        # TODO: num channels, but also all sr, ref_db etc... parameters??
-        fg_path : str
-            Path to foreground folder.
-        bg_path : str
-            Path to background folder.
+        Args:
+            duration : float
+                Duration of the soundscape, in seconds.
+            ambisonics_order: int
+                Ambisonics Order
+            ambisonics_spread_slope: float
+                TODO
+            # TODO: num channels, but also all sr, ref_db etc... parameters??
+            fg_path : str
+                Path to foreground folder.
+            bg_path : str
+                Path to background folder.
 
         '''
         # Validate soundscape duration
@@ -896,45 +895,43 @@ class AmbiScaper(object):
         be concatenated to itself as many times as necessary to produce the
         specified duration when calling ``AmbiScaper.generate``.
 
-        Parameters
-        ----------
-        source_file : tuple
-            Specifies the audio file to use as the source. See Notes below for
-            the expected format of this tuple and the allowed values.
-        source_time : tuple
-            Specifies the desired start time in the source file. See Notes
-            below for the expected format of this tuple and the allowed values.
-            NOTE: the source time specified by this tuple should be equal to or
-            smaller than ``<source file duration> - <soundscape duration>``.
-            Larger values will be automatically changed to fulfill this
-            requirement when calling ``AmbiScaper.generate``.
+        Args:
+            source_file : tuple
+                Specifies the audio file to use as the source. See Notes below for
+                the expected format of this tuple and the allowed values.
+            source_time : tuple
+                Specifies the desired start time in the source file. See Notes
+                below for the expected format of this tuple and the allowed values.
+                NOTE: the source time specified by this tuple should be equal to or
+                smaller than ``<source file duration> - <soundscape duration>``.
+                Larger values will be automatically changed to fulfill this
+                requirement when calling ``AmbiScaper.generate``.
 
-        Notes
-        -----
-        Each parameter of this function is set by passing a distribution
-        tuple, whose first item is always the distribution name and subsequent
-        items are distribution specific. The supported distribution tuples are:
+        Notes:
+            Each parameter of this function is set by passing a distribution
+            tuple, whose first item is always the distribution name and subsequent
+            items are distribution specific. The supported distribution tuples are:
 
-        * ``("const", value)`` : a constant, given by ``value``.
-        * ``("choose", valuelist)`` : choose a value from
-          ``valuelist`` at random (uniformly). The
-          ``source_file`` parameter also support providing an empty
-          ``valuelist`` i.e. ``("choose", [])``, in which case the
-          value will be chosen at random from all available files
-          as determined automatically by AmbiScaper by examining the file
-          structure of ``bg_path`` provided during initialization.
-        * ``("uniform", min_value, max_value)`` : sample a random
-          value from a uniform distribution between ``min_value``
-          and ``max_value``.
-        * ``("normal", mean, stddev)`` : sample a random value from a
-          normal distribution defined by its mean ``mean`` and
-          standard deviation ``stddev``.
+            * ``("const", value)`` : a constant, given by ``value``.
+            * ``("choose", valuelist)`` : choose a value from
+              ``valuelist`` at random (uniformly). The
+              ``source_file`` parameter also support providing an empty
+              ``valuelist`` i.e. ``("choose", [])``, in which case the
+              value will be chosen at random from all available files
+              as determined automatically by AmbiScaper by examining the file
+              structure of ``bg_path`` provided during initialization.
+            * ``("uniform", min_value, max_value)`` : sample a random
+              value from a uniform distribution between ``min_value``
+              and ``max_value``.
+            * ``("normal", mean, stddev)`` : sample a random value from a
+              normal distribution defined by its mean ``mean`` and
+              standard deviation ``stddev``.
 
-        IMPORTANT: not all parameters support all distribution tuples. In
-        particular, ``source_file`` only support ``"const"`` and
-        ``"choose"``, whereas ``source_time`` supports all distribution tuples.
-        As noted above, only ``source_file`` support providing an
-        empty ``valuelist`` with ``"choose"``.
+            IMPORTANT: not all parameters support all distribution tuples. In
+            particular, ``source_file`` only support ``"const"`` and
+            ``"choose"``, whereas ``source_time`` supports all distribution tuples.
+            As noted above, only ``source_file`` support providing an
+            empty ``valuelist`` with ``"choose"``.
         '''
 
         # These values are fixed for the background sound
@@ -978,88 +975,85 @@ class AmbiScaper(object):
         '''
         Add a foreground sound event to the foreground specification.
 
-        Parameters
-        ----------
-        source_file : tuple
-            Specifies the audio file to use as the source. See Notes below for
-            the expected format of this tuple and the allowed values.
-        source_time : tuple
-            Specifies the desired start time in the source file. See Notes
-            below for the expected format of this tuple and the allowed values.
-            NOTE: the source time specified by this tuple should be equal to or
-            smaller than ``<source file duration> - event_duration``. Larger
-            values will be automatically changed to fulfill this requirement
-            when calling ``AmbiScaper.generate``.
-        event_time : tuple
-            Specifies the desired start time of the event in the soundscape.
-            See Notes below for the expected format of this tuple and the
-            allowed values.
-            NOTE: The value specified by this tuple should be equal to or
-            smaller than ``<soundscapes duration> - event_duration``, and
-            larger values will be automatically changed to fulfill this
-            requirement when calling ``AmbiScaper.generate``.
-        event_duration : tuple
-            Specifies the desired duration of the event. See Notes below for
-            the expected format of this tuple and the allowed values.
-            NOTE: The value specified by this tuple should be equal to or
-            smaller than the source file's duration, and larger values will be
-            automatically changed to fulfill this requirement when calling
-            ``AmbiScaper.generate``.
-        event_azimuth : tuple
-            Specifies the horizontal angular position of the event. See Notes below for
-            the expected format of this tuple and the allowed values.
-        event_elevation : tuple
-            Specifies the vertical angular position of the event. See Notes below for
-            the expected format of this tuple and the allowed values.
-        event_spread : tuple
-            Specifies the apparent sound source width. See Notes below for
-            the expected format of this tuple and the allowed values.
-        snr : tuple
-            Specifies the desired signal to noise ratio (SNR) between the event
-            and the background. See Notes below for the expected format of
-            this tuple and the allowed values.
-        pitch_shift : tuple
-            Specifies the number of semitones to shift the event by. None means
-            no pitch shift.
-        time_stretch: tuple
-            Specifies the time stretch factor (value>1 will make it slower and
-            longer, value<1 will makes it faster and shorter).
+        Args:
+            source_file : tuple
+                Specifies the audio file to use as the source. See Notes below for
+                the expected format of this tuple and the allowed values.
+            source_time : tuple
+                Specifies the desired start time in the source file. See Notes
+                below for the expected format of this tuple and the allowed values.
+                NOTE: the source time specified by this tuple should be equal to or
+                smaller than ``<source file duration> - event_duration``. Larger
+                values will be automatically changed to fulfill this requirement
+                when calling ``AmbiScaper.generate``.
+            event_time : tuple
+                Specifies the desired start time of the event in the soundscape.
+                See Notes below for the expected format of this tuple and the
+                allowed values.
+                NOTE: The value specified by this tuple should be equal to or
+                smaller than ``<soundscapes duration> - event_duration``, and
+                larger values will be automatically changed to fulfill this
+                requirement when calling ``AmbiScaper.generate``.
+            event_duration : tuple
+                Specifies the desired duration of the event. See Notes below for
+                the expected format of this tuple and the allowed values.
+                NOTE: The value specified by this tuple should be equal to or
+                smaller than the source file's duration, and larger values will be
+                automatically changed to fulfill this requirement when calling
+                ``AmbiScaper.generate``.
+            event_azimuth : tuple
+                Specifies the horizontal angular position of the event. See Notes below for
+                the expected format of this tuple and the allowed values.
+            event_elevation : tuple
+                Specifies the vertical angular position of the event. See Notes below for
+                the expected format of this tuple and the allowed values.
+            event_spread : tuple
+                Specifies the apparent sound source width. See Notes below for
+                the expected format of this tuple and the allowed values.
+            snr : tuple
+                Specifies the desired signal to noise ratio (SNR) between the event
+                and the background. See Notes below for the expected format of
+                this tuple and the allowed values.
+            pitch_shift : tuple
+                Specifies the number of semitones to shift the event by. None means
+                no pitch shift.
+            time_stretch: tuple
+                Specifies the time stretch factor (value>1 will make it slower and
+                longer, value<1 will makes it faster and shorter).
 
-        Notes
-        -----
-        Each parameter of this function is set by passing a distribution
-        tuple, whose first item is always the distribution name and subsequent
-        items are distribution specific. The supported distribution tuples are:
+        Notes:
+            Each parameter of this function is set by passing a distribution
+            tuple, whose first item is always the distribution name and subsequent
+            items are distribution specific. The supported distribution tuples are:
 
-        * ``("const", value)`` : a constant, given by ``value``.
-        * ``("choose", valuelist)`` : choose a value from
-          ``valuelist`` at random (uniformly). The
-          ``source_file`` parameter also support providing an empty
-          ``valuelist`` i.e. ``("choose", [])``, in which case the
-          value will be chosen at random from all available
-          source files as determined automatically by AmbiScaper by examining
-          the file structure of ``fg_path`` provided during
-          initialization.
-        * ``("uniform", min_value, max_value)`` : sample a random
-          value from a uniform distribution between ``min_value``
-          and ``max_value`` (including ``max_value``).
-        * ``("normal", mean, stddev)`` : sample a random value from a
-          normal distribution defined by its mean ``mean`` and
-          standard deviation ``stddev``.
+            * ``("const", value)`` : a constant, given by ``value``.
+            * ``("choose", valuelist)`` : choose a value from
+              ``valuelist`` at random (uniformly). The
+              ``source_file`` parameter also support providing an empty
+              ``valuelist`` i.e. ``("choose", [])``, in which case the
+              value will be chosen at random from all available
+              source files as determined automatically by AmbiScaper by examining
+              the file structure of ``fg_path`` provided during
+              initialization.
+            * ``("uniform", min_value, max_value)`` : sample a random
+              value from a uniform distribution between ``min_value``
+              and ``max_value`` (including ``max_value``).
+            * ``("normal", mean, stddev)`` : sample a random value from a
+              normal distribution defined by its mean ``mean`` and
+              standard deviation ``stddev``.
 
-        IMPORTANT: not all parameters support all distribution tuples. In
-        particular, ``source_file`` only support ``"const"`` and
-        ``"choose"``, whereas the remaining parameters support all distribution
-        tuples. As noted above, only ``source_file`` support
-        providing an empty ``valuelist`` with ``"choose"``.
+            IMPORTANT: not all parameters support all distribution tuples. In
+            particular, ``source_file`` only support ``"const"`` and
+            ``"choose"``, whereas the remaining parameters support all distribution
+            tuples. As noted above, only ``source_file`` support
+            providing an empty ``valuelist`` with ``"choose"``.
 
-        See Also
-        --------
-        _validate_event : Check that event parameter values are valid.
+        See Also:
+            _validate_event : Check that event parameter values are valid.
 
-        AmbiScaper.generate : Generate a soundscape based on the current
-            specification and save to disk as both an audio file and a JAMS file
-            describing the soundscape.
+            AmbiScaper.generate : Generate a soundscape based on the current
+                specification and save to disk as both an audio file and a JAMS file
+                describing the soundscape.
 
         '''
 
@@ -1084,13 +1078,14 @@ class AmbiScaper(object):
     def add_simulated_reverb(self, IRlength, room_dimensions,
                   t60, source_type, microphone_type, reflectivity=None):
         '''
-        TODO
-        :param IRlength:
-        :param room_dimentions:
-        :param beta:
-        :param source_type:
-        :param microphone_type:
-        :return:
+        Args:
+            :param IRlength: asdf
+            :param room_dimentions:  sdf
+            :param beta: asdf
+            :param source_type: sdf
+            :param microphone_type: asdf
+        Return:
+            return
         '''
 
         # SAFETY_CHECKS
@@ -1121,9 +1116,10 @@ class AmbiScaper(object):
 
     def add_recorded_reverb(self, name):
         '''
-        TODO
-        :param reverb_name:
-        :return:
+        Args:
+            :param reverb_name: asdf
+        Return:
+            returnasdfasdf
         '''
 
         # SAFETY_CHECKS
