@@ -37,10 +37,6 @@ from .reverb_ambisonics import S3aReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
 from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
 
-
-
-
-
 # Define single event spec as namedtuple
 EventSpec = namedtuple(
     'EventSpec',
