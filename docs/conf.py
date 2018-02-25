@@ -67,7 +67,7 @@ class Mock(MagicMock):
             return MagicMock()
 
 MOCK_MODULES = [
-    'sox', 'jams', 'scipy', 'scipy.signal', 'numpy', 'pandas', 'soundfile'
+    'sox', 'jams', 'scipy', 'scipy.signal', 'scipy.special', 'scipy.special.sph_harm', 'numpy', 'pandas', 'soundfile'
 ]
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
