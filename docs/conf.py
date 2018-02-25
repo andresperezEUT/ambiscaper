@@ -54,8 +54,11 @@ copyright = u'2018, Andres Perez-Lopez'
 author = u'Andres Perez-Lopez'
 
 
-import sys
-from unittest.mock import MagicMock
+# Mock the dependencies
+if six.PY3:
+    from unittest.mock import MagicMock
+else:
+    from mock import Mock as MagicMock
 
 class Mock(MagicMock):
     @classmethod
