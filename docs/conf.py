@@ -61,10 +61,27 @@ if six.PY3:
 else:
     from mock import Mock as MagicMock
 
+# class Mock(MagicMock):
+#     @classmethod
+#     def __getattr__(cls, name):
+#             return MagicMock()
 class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-            return MagicMock()
+	@classmethod
+	def __getattr__(cls, name):
+		return Mock()
+	def __mul__(self, other):
+		return Mock()
+	def __rmul__(self, other):
+		return Mock()
+	def __pow__(self, other):
+		return Mock()
+	def __div__(self, other):
+		return Mock()
+	def __add__(self, other):
+		return Mock()
+	def __radd__(self, other):
+		return Mock()
+
 
 MOCK_MODULES = [
     'sox', 'jams', 'scipy', 'scipy.signal', 'scipy.special', 'scipy.special.sph_harm', 'numpy', 'pandas', 'soundfile'
