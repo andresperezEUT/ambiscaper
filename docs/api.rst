@@ -5,6 +5,8 @@
 API Reference
 ------------------
 
+.. automodule:: ambiscaper.core
+    :members:
 
 .. autoclass:: ambiscaper.core.AmbiScaper
     :members:
