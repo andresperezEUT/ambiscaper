@@ -1,11 +1,11 @@
 .. _api:
 
-.. module:: scaper
+.. module:: ambiscaper
 
-Core functionality
+API Reference
 ------------------
-.. automodule:: scaper.core
+.. automodule:: ambiscaper.core
     :members:
 
-.. automodule:: scaper.core.Scaper
+.. automodule:: ambiscaper.core.AmbiScaper
     :members:
