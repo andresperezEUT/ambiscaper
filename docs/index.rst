@@ -61,6 +61,9 @@ API Reference
 
   api
 
+
+API Index
+-------------
 * :ref:`genindex`
 
 
