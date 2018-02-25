@@ -275,4 +275,4 @@ soundscapes using a single ``Scaper`` object, please see the :ref:`examples`.
 
 Differences from Scaper
 ------------
-TODO 
+TODO

@@ -14,19 +14,19 @@ Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit 
 
 [//]: #[![PyPI](https://img.shields.io/badge/python-2.7%2C%203.4%2C%203.5%2C%203.6-blue.svg)]()
 
-Please refer to the [documentation](http://ambiscaper.readthedocs.io/) for implementation detailsdetails.
+Please refer to the [documentation](http://ambiscaper.readthedocs.io/) for implementation details.
 
 ## Motivation
 
-Due to the recent developments on the field of immersive media and virtual reality, there has been a renewed interest into Ambisonics, specially motivated by its potential to capture the spacial qualities of the sound, and the methodologies to dynamically render it to binaural. 
+Due to the recent developments on the field of immersive media and virtual reality, there has been a renewed interest into Ambisonics, specially motivated by its potential to capture the spacial qualities of the sound, and the methodologies to dynamically render it to binaural.
 
 Despite the common approach to Ambisonics recordings as "ambiences", some modern Ambisonics microphones feature dozens of capsules. Therefore, it is possible to use such microphones as beamforming devices, with an accurate spatial resolution.
 
-As a consequence, Ambisonics recordings might be useful in the auditory scene analysis field. More specifically, the intrinsic spatial audio representation can be exploited in the Sound Source Localization and Blind Source Separation fields. 
+As a consequence, Ambisonics recordings might be useful in the auditory scene analysis field. More specifically, the intrinsic spatial audio representation can be exploited in the Sound Source Localization and Blind Source Separation fields.
 
-However, there is an important lack of Ambisonics recordings databases, specially in the case of Higher Order Ambisonics. Annotation is also needed to design, train and evaluate the algorithms. The related works presented in last years have used custom databases, which hinder experiment reproducibility. A flexible reverberation configuration is as well needed for the state-of-the-art methods. Manual recording and annotation of sound scenes on that scale would imply an excessive amount of work. 
+However, there is an important lack of Ambisonics recordings databases, specially in the case of Higher Order Ambisonics. Annotation is also needed to design, train and evaluate the algorithms. The related works presented in last years have used custom databases, which hinder experiment reproducibility. A flexible reverberation configuration is as well needed for the state-of-the-art methods. Manual recording and annotation of sound scenes on that scale would imply an excessive amount of work.
 
-We present AmbiScaper, a python library for procedural creation and annotation of reverberant Ambisonics databases. The software is based on a related work by Justin Salamon ( [Scaper](http://github.com/justinsalamon/scaper) ) in the context of scene recognition. 
+We present AmbiScaper, a python library for procedural creation and annotation of reverberant Ambisonics databases. The software is based on a related work by Justin Salamon ( [Scaper](http://github.com/justinsalamon/scaper) ) in the context of scene recognition.
 
 ## Installation
 
@@ -93,7 +93,7 @@ bg_folder = 'audio/soundbank/background/'
 
 n_soundscapes = 1000
 ref_db = -50
-duration = 10.0 
+duration = 10.0
 
 min_events = 1
 max_events = 9
@@ -122,40 +122,40 @@ pitch_max = 3.0
 time_stretch_dist = 'uniform'
 time_stretch_min = 0.8
 time_stretch_max = 1.2
-    
+
 # Generate 1000 soundscapes using a truncated normal distribution of start times
 
 for n in range(n_soundscapes):
-    
+
     print('Generating soundscape: {:d}/{:d}'.format(n+1, n_soundscapes))
-    
+
     # create a scaper
     sc = scaper.Scaper(duration, fg_folder, bg_folder)
     sc.protected_labels = []
     sc.ref_db = ref_db
-    
+
     # add background
-    sc.add_background(label=('const', 'noise'), 
-                      source_file=('choose', []), 
+    sc.add_background(label=('const', 'noise'),
+                      source_file=('choose', []),
                       source_time=('const', 0))
 
     # add random number of foreground events
     n_events = np.random.randint(min_events, max_events+1)
     for _ in range(n_events):
-        sc.add_event(label=('choose', []), 
-                     source_file=('choose', []), 
-                     source_time=(source_time_dist, source_time), 
-                     event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max), 
-                     event_duration=(event_duration_dist, event_duration_min, event_duration_max), 
+        sc.add_event(label=('choose', []),
+                     source_file=('choose', []),
+                     source_time=(source_time_dist, source_time),
+                     event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max),
+                     event_duration=(event_duration_dist, event_duration_min, event_duration_max),
                      snr=(snr_dist, snr_min, snr_max),
                      pitch_shift=(pitch_dist, pitch_min, pitch_max),
                      time_stretch=(time_stretch_dist, time_stretch_min, time_stretch_max))
-    
+
     # generate
     audiofile = os.path.join(outfolder, "soundscape_unimodal{:d}.wav".format(n))
     jamsfile = os.path.join(outfolder, "soundscape_unimodal{:d}.jams".format(n))
     txtfile = os.path.join(outfolder, "soundscape_unimodal{:d}.txt".format(n))
-    
+
     sc.generate(audiofile, jamsfile,
                 allow_repeated_label=True,
                 allow_repeated_source=False,

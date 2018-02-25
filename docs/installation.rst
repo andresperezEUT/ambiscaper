@@ -34,7 +34,7 @@ On windows you can use the provided installation binaries:
 
 Matlab dependency
 -----------------------
-If you wish to use the simulated reverb feature implemented by SmirGenerator, you will need to have a valid working version of Matlab. 
+If you wish to use the simulated reverb feature implemented by SmirGenerator, you will need to have a valid working version of Matlab.
 
 Installing AmbiScaper
 -----------------
