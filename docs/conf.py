@@ -53,6 +53,18 @@ project = u'ambiscaper'
 copyright = u'2018, Andres Perez-Lopez'
 author = u'Andres Perez-Lopez'
 
+
+import sys
+from unittest.mock import MagicMock
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+            return MagicMock()
+
+MOCK_MODULES = ['sox', 'jams', 'scipy', 'numpy', 'pandas', 'soundfile']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
