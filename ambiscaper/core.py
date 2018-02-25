@@ -13,8 +13,7 @@ import shutil
 import pandas as pd
 from .ambiscaper_exceptions import AmbiScaperError
 from .ambiscaper_warnings import AmbiScaperWarning
-from .util import _close_temp_files, spherical_to_cartesian, \
-    _validate_distribution, SUPPORTED_DIST, _get_event_idx_from_id, _generate_event_id_from_idx
+from .util import _close_temp_files, spherical_to_cartesian, _validate_distribution, SUPPORTED_DIST, _get_event_idx_from_id, _generate_event_id_from_idx
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -23,16 +22,12 @@ from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
-from .ambisonics import get_number_of_ambisonics_channels, change_channel_ordering_fuma_2_acn, \
-    change_normalization_fuma_2_sn3d
+from .ambisonics import get_number_of_ambisonics_channels, change_channel_ordering_fuma_2_acn, change_normalization_fuma_2_sn3d
 from .ambisonics import _validate_ambisonics_order
 from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, \
-    SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, \
-    SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_s3a_reverb_spec, \
-    retrieve_available_recorded_IRs
+from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_s3a_reverb_spec, retrieve_available_recorded_IRs
 from .reverb_ambisonics import retrieve_RIR_positions
 from .reverb_ambisonics import MATLAB_ROOT
 from .reverb_ambisonics import S3A_FILTER_NAME
@@ -211,7 +206,7 @@ def trim(audio_infile, jams_infile, audio_outfile, jams_outfile, start_time,
             If true, operates on the jams only. Audio input and output paths
             don't have to point to valid files.
     '''
-    
+
     # First trim jams (might raise an error)
     jam = jams.load(jams_infile)
     jam_sliced = jam.slice(start_time, end_time, strict=False)
