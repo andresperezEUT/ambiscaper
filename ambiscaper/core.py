@@ -36,7 +36,8 @@ from .reverb_ambisonics import SMIR_FOLDER_PATH
 from .reverb_ambisonics import S3aReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
 from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
-import matlab_wrapper
+
+
 
 
 
@@ -873,6 +874,18 @@ class AmbiScaper(object):
         # Configure reverb to None by default
         self.reverb_spec = None
 
+
+        # check Matlab!!
+        self.matlab_available = True
+        try:
+            import matlab_wrapper
+        except ImportError:
+            self.matlab_available = False
+            warnings.warn(
+                "Matlab not available in tye system",
+                AmbiScaperWarning)
+
+
     def add_background(self, source_file, source_time):
         '''
         Add a background recording to the background specification.
@@ -1382,6 +1395,10 @@ class AmbiScaper(object):
         :param disable_instantiation_warnings:
         :return:
         '''
+
+        if not self.matlab_available:
+            warnings.warn('Matlab not available',AmbiScaperWarning)
+            return
 
         reverb = self.reverb_spec
 
