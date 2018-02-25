@@ -106,7 +106,7 @@ for n in range(n_soundscapes):
     # Nothing: no reverb
 
     # generate
-    destination_path = os.path.join(outfolder,"soundscape{:d}".format(n+3))
+    destination_path = os.path.join(outfolder,"soundscape{:d}".format(n+33))
 
     sc.generate(destination_path=destination_path,
                 allow_repeated_source=True,
