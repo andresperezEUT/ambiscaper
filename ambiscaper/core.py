@@ -1071,17 +1071,32 @@ class AmbiScaper(object):
         self.fg_spec.append(event)
 
 
-    def add_simulated_reverb(self, IRlength, room_dimensions,
-                  t60, source_type, microphone_type, reflectivity=None):
+    def add_simulated_reverb(self,
+                             IRlength,
+                             room_dimensions,
+                             t60,
+                             source_type,
+                             microphone_type,
+                             reflectivity=None):
         '''
-        Args:
-            :param IRlength: asdf
-            :param room_dimentions:  sdf
-            :param beta: asdf
-            :param source_type: sdf
-            :param microphone_type: asdf
-        Return:
-            return
+        Call this method in order to define the specs for a reverb simulated through SMIRGenerator.
+
+        Therefore, a valid working copy of Matlab is a requirement for this method.
+
+        All parameters must be specified by tuples.
+
+        :param IRlength: int, length of the FIR filter in samples
+        :param room_dimensions:  list of three floats [lenX, lenY, lenZ]
+        :param t60: float, reverberation time t60
+        :param source_type: string, one from :data:`~reverb_ambisonics.SMIR_SUPPORTED_SOURCE_TYPES`
+        :param microphone_type: string, one from :data:`~reverb_ambisonics.SMIR_SUPPORTED_VIRTUAL_MICS`
+        :param reflectivity: list of six floats, with the reflectivity index of each wall [+X, -X, +Y, -Y, +Z, -Z]
+        :raises AmbiScaperError: if Matlab not found
+
+        .. note::
+            Due to legacy reasons, the reverberation length might be specified either by the t60 or by the wall reflectivity.
+
+            In case both are defined, t60 will have the priority
         '''
 
         # SAFETY_CHECKS

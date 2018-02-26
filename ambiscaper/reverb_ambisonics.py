@@ -619,8 +619,11 @@ SmirReverbSpec = namedtuple(
      'microphone_type'
      ], verbose=False)
 
-# omnidirectional/subcardioid/cardioid/hypercardioid/bidirectional
+
 SMIR_ALLOWED_SOURCE_TYPES = ['o', 'c', 's', 'h', 'b']
+'''
+omnidirectional/subcardioid/cardioid/hypercardioid/bidirectional
+'''
 
 
 # Location of the smir module

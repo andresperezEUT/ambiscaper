@@ -10,3 +10,6 @@ API Reference
 
 .. autoclass:: ambiscaper.core.AmbiScaper
     :members:
+
+.. automodule:: ambiscaper.reverb_ambisonics
+    :members:
