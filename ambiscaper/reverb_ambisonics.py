@@ -1,4 +1,9 @@
 '''
+Ambisonics reverb related methods
+=================================
+'''
+
+'''
 reverb_ambisonics.py
 Created by Andres Perez Lopez on 09/01/2018
 
@@ -6,8 +11,8 @@ Convenience declarations and methods
 for the ambisonics reverb
 
 Currently supporrting two IR acquisition methods:
-- Recorded: S3A material
-- Modelled: SMIR generator
+- Recorded Ambisonics IRs
+- Synthetic Ambisonic IRs through SMIR generator (matlab)
 '''
 
 import csv
@@ -401,7 +406,7 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
     # Make sure that the audio and position files exist and are valid
     def __valid_s3a_reverb_name_configuration(reverb_name):
         # Folder structure should be something like:
-        # - S3A_top_folder (:s3a_folder_path: defined in ambisonics.py)
+        # - S3A_top_folder (:reverb_folder_path: defined in ambisonics.py)
         #     - reverb_name (:name: in the config struct)
         #         - (maybe a pdf)
         #         - "Soundfield"
@@ -487,26 +492,37 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
 
 def get_max_ambi_order_from_reverb_config(reverb_spec):
     '''
-    Compute the maximum ambisonics order given a microphone configuration
-    :param reverb_spec: a valid reverb spec
+    Compute the maximum ambisonics order given a reverb configuration
+
+    :param reverb_spec:
+
+        a valid instance of ``reverb_spec``
+
+    :raises: AmbiScaperError
+
+        If ``reverb_spec`` is not valid.
+
     :return: The maximum ambisonics order allowed
+
+    .. note::
+        The maximum ambisonics order L is defined by the number of microphone capsules,
+        ``K <= Q``,
+        where ``K`` is the number of ambisonics components ``K = (L+1)^2``,
+        and ``Q`` the number of capsules.
+
+        For more information, please refer to
+        *3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone
+        (Moreau, Daniel and Bertet, 2006)*.
+        http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
     '''
 
-    # The maximum ambisonics order L is defined by the number of microphone capsules:
-    #   K <= Q,
-    # where K is the number of ambisonics components K = (L+1)^2,
-    # and Q the number of capsules.
-    # For more information, please refer to
-    # "3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone"
-    # (Moreau, Daniel and Bertet, 2006).
-    # http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
 
     if isinstance(reverb_spec, SmirReverbSpec):
         Q = len(SMIR_SUPPORTED_VIRTUAL_MICS[reverb_spec.microphone_type]['capsule_position_sph'])
 
     elif isinstance(reverb_spec, S3aReverbSpec):
         # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
-        Q = 4
+        Q = 1
     else:
         raise AmbiScaperError(
             'Not valid reverb_spec'
@@ -518,8 +534,9 @@ def get_max_ambi_order_from_reverb_config(reverb_spec):
 
 def retrieve_available_recorded_IRs():
     '''
-    List all dirs inside S3A folder path
-    :return: List
+    List all available recorded Ambisonics reverbs.
+
+    :return: List containing the names of the IRs
     '''
 
     # TODO: implement it in a more elegant way
@@ -527,10 +544,13 @@ def retrieve_available_recorded_IRs():
 
 def generate_RIR_path(recorded_reverb_name):
     '''
-    Return full path to recorded IR data given a recorded reverb name
-    :param s3a_reverg_config: string pointing to a valid reverb name
-    Raises: AmbiScaper Error with not valid reverb name
+    Return full path to a recorded Ambisonics reverb given a reverb name
+
+    :param recorded_reverb_name: string referencing to a valid recorded reverb name
+
+    :raises: AmbiScaper Error if reverb name is not valid
     '''
+
     if not isinstance(recorded_reverb_name,str):
         raise AmbiScaperError(
             'Not valid recorded reverb name type')
@@ -544,20 +564,21 @@ def generate_RIR_path(recorded_reverb_name):
 
 def retrieve_RIR_positions(recorded_reverb_name):
     '''
-    TODO
+    Retrieve all speaker positions from a given recorded reverb name
 
-    Folder structure should be something like:
-    - S3A_top_folder (:path: in the config struct)
-        - reverb_name (:name: in the config struct)
-            - (maybe a pdf)
-            - "Soundfield"
-                - "lsN.wav" with the N actual impulse responses, starting from 1
-                - "LsPos.txt" with the loudspeaker positions
-                - (maybe a "Metadata_SoundField.txt")
+    :param recorded_reverb_name: string referencing to a valid recorded reverb name
 
-    :param s3a_reverg_config:
-    :return:
+    :return: List with the speaker positions in the format ``[azimuth, elevation, radius]`` (in radians).
     '''
+
+    # Folder structure should be something like:
+    # - S3A_top_folder (:path: in the config struct)
+    #     - reverb_name (:name: in the config struct)
+    #         - (maybe a pdf)
+    #         - "Soundfield"
+    #             - "lsN.wav" with the N actual impulse responses, starting from 1
+    #             - "LsPos.txt" with the loudspeaker positions
+    #             - (maybe a "Metadata_SoundField.txt")
 
     # Go to Soundfield folder
     # todo: maybe better implementation for txt file open?
@@ -621,8 +642,13 @@ SmirReverbSpec = namedtuple(
 
 
 SMIR_ALLOWED_SOURCE_TYPES = ['o', 'c', 's', 'h', 'b']
-'''
-omnidirectional/subcardioid/cardioid/hypercardioid/bidirectional
+''' The source directivity patterns allowed in SMIR Generator
+
+        - 'o': omnidirectional 
+        - 'c': cardioid 
+        - 's': subcardioid 
+        - 'h': hypercardioid 
+        - 'b': bidirectional 
 '''
 
 
@@ -633,17 +659,8 @@ SMIR_FOLDER_PATH = os.path.join(os.getcwd(), SMIR_FOLDER_NAME)
 # Location of the matlab app
 MATLAB_ROOT = "/Applications/MATLAB_R2017b.app"
 
-# Store useful information from each mic:
-# - Sphere type (rigid or open)
-# - Sphere radius
-# - Maximum ambisonics order (it could be computed from the number of capsules,
-#     but we specify it for avoiding computations)
-# - Spherical coordinates of the capsules
-#
-# Info gathered from Farina, http://pcfarina.eng.unipr.it/SPS-conversion.htm
-# More info at https://www.mhacoustics.com/sites/default/files/ReleaseNotes.pdf
-SMIR_SUPPORTED_VIRTUAL_MICS = {
 
+SMIR_SUPPORTED_VIRTUAL_MICS = {
     "soundfield": {
         "sph_type": 'open',
         "sph_radius": 0.02, # todo: get real measurement!
@@ -699,6 +716,17 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
                 [4.729842272904633, -1.2042771838760873]]
     }
 }
+'''Store useful information from each mic
+
+    - Sphere type (rigid or open)
+    - Sphere radius
+    - Maximum ambisonics order (it could be computed from the number of capsules, but we specify it for avoiding computations)
+    - Spherical coordinates of the capsules
+
+Info gathered from Farina, http://pcfarina.eng.unipr.it/SPS-conversion.htm
+
+More info at https://www.mhacoustics.com/sites/default/files/ReleaseNotes.pdf
+'''
 
 def get_receiver_position(room_dimensions):
     '''

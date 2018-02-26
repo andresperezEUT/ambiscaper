@@ -427,28 +427,18 @@ def delta_kronecker(q1,q2):
 
 def cartesian_to_spherical(cartesian_list):
     '''
-    Performs conversion from cartesian to spherical coordinates.
-    Reference system:
-        azimuth 0: +x axis
-        elevation 0: horizontal plane ()
-        +y axis: azimuth pi/2
-        +x axis: elevation pi/2
+    Performs conversion from cartesian to spherical coordinates, with the following reference system:
 
-    Parameters
-    ----------
-    cartesian_list: list of 3 floats
-        Cartesian coordinates in the form [x, y, z]
+        - azimuth 0: +x axis
+        - elevation 0: horizontal plane ()
+        - +y axis: azimuth pi/2
+        - +x axis: elevation pi/2
 
-    Returns
-    ------
-    value : list of 3 floats
-        Cartesian conversion in the form [azimuth, elevation, radius]
+    :param cartesian_list: List of 3 floats, in the form ``[x,y,z]``.
 
-    Raises
-    ------
-    AmbiScaperError
-        If the input argument does not match the required type
+    :returns: List of 3 floats, in the form ``[azimuth, elevation, radius]``.
 
+    :raises: AmbiScaperError. If the input argument does not match the required type
     '''
 
     # Both arguments should be lists of 3 floats
@@ -478,28 +468,18 @@ def cartesian_to_spherical(cartesian_list):
 
 def spherical_to_cartesian(spherical_list):
     '''
-    Performs conversion from spherical to cartesian coordinates.
-    Reference system:
-        azimuth 0: +x axis
-        elevation 0: horizontal plane ()
-        +y axis: azimuth pi/2
-        +x axis: elevation pi/2
+    Performs conversion from spherical to cartesian coordinates, with the following reference system:
 
-    Parameters
-    ----------
-    spherical_list: list of 3 floats
-        Spherical coordinates in the form [azimuth, elevation, radius]
+        - azimuth 0: +x axis
+        - elevation 0: horizontal plane ()
+        - +y axis: azimuth pi/2
+        - +x axis: elevation pi/2
 
-    Returns
-    ------
-    value : list of 3 floats
-        Cartesian conversion in the form [x, y, z]
+    :param spherical_list: List of 3 floats, in the form ``[azimuth, elevation, radius]``.
 
-    Raises
-    ------
-    AmbiScaperError
-        If the input argument does not match the required type
+    :returns: List of 3 floats, in the form ``[x,y,z]``.
 
+    :raises: AmbiScaperError. If the input argument does not match the required type
     '''
 
     # Both arguments should be lists of 3 floats

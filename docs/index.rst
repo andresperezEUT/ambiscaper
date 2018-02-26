@@ -8,7 +8,6 @@ AmbiScaper documentation
 
 .. figure:: ../ambiscaper_logo.png
    :scale: 50 %
-   :alt: sdfasdf
 
 Ambiscaper: a tool for automatic dataset generation and annotation of reverberant Ambisonics audio.
 

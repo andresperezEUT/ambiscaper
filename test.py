@@ -3,11 +3,12 @@ import numpy as np
 import os
 
 # OUTPUT FOLDER
-outfolder = '/Volumes/Dinge/ambiscaper/generated/'
+# outfolder = '/Volumes/Dinge/ambiscaper/generated/'
+outfolder = '/Volumes/Dinge/ambiscaper/testing/'
 
 # SCAPER SETTINGS
-foreground_folder = '/Volumes/Dinge/audio/scaper/foreground/'
-# foreground_folder = '/Users/andres.perez/audio/freesound'
+# foreground_folder = '/Volumes/Dinge/audio/scaper/foreground/'
+foreground_folder = '/Volumes/Dinge/audio/anechoic_openAIRlib/Acoustics_Book'
 background_folder = '/Volumes/Dinge/audio/scaper/background/'
 
 n_soundscapes = 10
@@ -18,12 +19,15 @@ ambisonics_spread_slope = 1.0
 
 num_events = 2
 
+# Event time is the time at which the event will start, with respect to the soundscape time
 event_time_dist = 'const'
 event_time = 0.0
 
+# Source time is the offset between the beginning of the audio event and the actual audio clip beginning
 source_time_dist = 'const'
 source_time = 0.0
 
+# Event duration specifies the duration of the sound event, with respect to source_time
 event_duration_dist = 'const'
 event_duration = 5.0
 
@@ -55,8 +59,8 @@ time_stretch_dist = 'const'
 time_stretch = 1
 
 # reverb = 'simulated'
-reverb = 'recorded'
-# reverb = None
+# reverb = 'recorded'
+reverb = None
 
 # Generate 1000 soundscapes using a truncated normal distribution of start times
 
@@ -106,7 +110,7 @@ for n in range(n_soundscapes):
     # Nothing: no reverb
 
     # generate
-    destination_path = os.path.join(outfolder,"soundscape{:d}".format(n+33))
+    destination_path = os.path.join(outfolder,"soundscape{:d}".format(n+1))
 
     sc.generate(destination_path=destination_path,
                 allow_repeated_source=True,
