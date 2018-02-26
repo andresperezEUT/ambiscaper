@@ -869,12 +869,26 @@ class AmbiScaper(object):
 
     '''
 
+    # Default values
+    DEFAULT_SR = 48000
+    DEFAULT_REF_DB = -12
+    DEFAULT_FADE_IN_LEN = 0.01  # 10 ms
+    DEFAULT_FADE_OUT_LEN = 0.01  # 10 ms
+    DEFAULT_REVERB_SPEC = None
+
+    # Default init values
+    DEFAULT_DURATION = 10.0
+    DEFAULT_AMBISONICS_ORDER = 1
+    DEFAULT_AMBISONICS_SPREAD_SLOPE = 1.0
+    DEFAULT_FG_PATH = '../samples'
+    DEFAULT_BG_PATH = None
+
     def __init__(self,
-                 duration,
-                 ambisonics_order,
-                 ambisonics_spread_slope,
-                 fg_path,
-                 bg_path):
+                 duration = DEFAULT_DURATION,
+                 ambisonics_order = DEFAULT_AMBISONICS_ORDER,
+                 ambisonics_spread_slope = DEFAULT_AMBISONICS_SPREAD_SLOPE,
+                 fg_path = DEFAULT_FG_PATH,
+                 bg_path = DEFAULT_BG_PATH):
 
         # Validate soundscape duration
         _validate_soundscape_duration(duration)
@@ -890,25 +904,30 @@ class AmbiScaper(object):
         self.ambisonics_spread_slope = ambisonics_spread_slope
 
         # Initialize parameters
-        self.sr = 48000
-        self.ref_db = -12
-        self.fade_in_len = 0.01  # 10 ms
-        self.fade_out_len = 0.01  # 10 ms
+        self.sr = self.DEFAULT_SR
+        self.ref_db = self.DEFAULT_REF_DB
+        self.fade_in_len = self.DEFAULT_FADE_IN_LEN  # 10 ms
+        self.fade_out_len = self.DEFAULT_FADE_OUT_LEN  # 10 ms
 
         # Start with empty specifications
         self.fg_spec = []
         self.bg_spec = []
 
-        # Validate paths and set
+        # Validate foreground path (required)
         expanded_fg_path = os.path.expanduser(fg_path)
-        expanded_bg_path = os.path.expanduser(bg_path)
         _validate_folder_path(expanded_fg_path)
-        _validate_folder_path(expanded_bg_path)
         self.fg_path = expanded_fg_path
-        self.bg_path = expanded_bg_path
+
+        # Validate background path (if exists)
+        if bg_path is not None:
+            expanded_bg_path = os.path.expanduser(bg_path)
+            _validate_folder_path(expanded_bg_path)
+            self.bg_path = expanded_bg_path
+        else:
+            self.bg_path = None
 
         # Configure reverb to None by default
-        self.reverb_spec = None
+        self.reverb_spec = self.DEFAULT_REVERB_SPEC
 
 
         # check Matlab!!
