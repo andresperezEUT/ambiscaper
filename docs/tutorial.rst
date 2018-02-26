@@ -1,107 +1,153 @@
 .. _tutorial:
 
-Scaper tutorial
-===============
+AmbiScaper tutorial
+===================
+
+Welcome to the AmbiScaper tutorial!
 
 Introduction
 ------------
-Welcome to the scaper tutorial! In this tutorial, we'll explain how scaper works
-and show how to use scaper to synthesize soundscapes and generate corresponding
-annotation files.
 
-.. _organize_audio:
+AmbiScaper is a fantastic tool to create Ambisonics sound files (and corresponding annotations) in a procedural way.
 
-Organize your audio files (source material)
--------------------------------------------
-Scaper creates new soundscapes by combining and transforming a set of existing
-audio files, which we'll refer to as the `source material`. By
-combining/transforming the source material in different ways, scaper can create
-an infinite number of different soundscapes from the same source material.
-The source material is comprised of two groups of files: `background` files
-and `foreground` files:
+Through this tutorial you will learn the basic features, and you will be ready to create amazing Ambisonics datasets.
 
-* **Background files**: are used to create the background of the soundscape, and
-  should contain audio material that is perceived as a single holistic sound
-  which is more distant, ambiguous, and texture-like (e.g. the "hum" or "drone"
-  of an urban environment, or "wind and rain" sounds in a natural environment).
-  Importantly, background files should not contain salient sound events.
-* **Foreground files**: are used to create sound events. Each foreground audio
-  file should contain a single sound event (short or long) such as a car honk,
-  an animal vocalization, continuous speech, a siren or an idling engine.
-  Foreground files should be as clean as possible with no background noise and
-  no silence before/after the sound event.
+Ambisonics?
+~~~~~~~~~~~
+`Ambisonics <https://en.wikipedia.org/wiki/Ambisonics>`_ is a spatial sound theory developed by Michael Gerzon in the 1970s, based on the acoustics and psychoacoustics fields.
 
-The source material must be organized as follows: at the top level, you need a
-``background`` folder and a ``foreground`` folder. Within each of these, scaper
-expects a folder for each category (label) of sounds. Example categories of
-background sounds include "street", "forest" or "park". Example categories of
-foreground sounds include "speech", "car_honk", "siren", "dog_bark",
-"bird_song", "idling_engine", etc. Within each category folder, scaper expects
-WAV files of that category: background files should contain a single ambient
-recording, and foreground files should contain a single sound event. The
-filename of each audio file is not important as long as it ends with ``.wav``.
+On its most basic form, Ambisonics can be thought as a way to preserve the spatial characteristics of a soundfield.
+This is based on the plane-wave decomposition of the sound by means of the `Spherical Harmonics Transform <https://en.wikipedia.org/wiki/Spherical_harmonics>`_ (aka the *Spatial Fourier Transform*).
+Indeed, there are many parallels between the *spectral* Fourier transform and the *spacial* Fourier transform,
+but for the moment it's enough to imagine the transform as a set of virtual microphones, each one pointing to one spatial direction.
+This transformation, which is usually referred to as *Ambisonics Encoding*, produces a multichannel audio track which implicitly contains
+the information about the source position(s). This kind of multichannel file is usually called *B-Format*.
 
-Here's an example of a valid folder structure for the source material::
+Ambisonics audio cannot be played just as it is, but it neeeds to be *decoded*. The great thing about it is that it does not requiere
+any specific speaker layout: it will adapt to any given speaker layout, provided a corresponding decoder. Furthermore, it is very easy
+to render binaural audio from a *B-Format* recording, and this is one of the reasons why it is becoming so popular.
 
-    - foreground
-        - siren
-            - siren1.wav
-            - siren2.wav
-            - some_siren_sound.wav
-        - car_honk
-            - honk.wav
-            - beep.wav
-        - human_voice
-            - hello_world.wav
-            - shouting.wav
-    - background
-        - park
-            - central_park.wav
-        - street
-            - quiet_street.wav
-            - loud_street.wav
+AmbiScaper produces *B-Format* synthetic recordings from a library of mono/stereo tracks. If you want to listen to them,
+you will need some extra software, as for example the great `ambiX plugins suite <http://www.matthiaskronlachner.com/?p=2015>`_.
 
-**EXAMPLE SOURCE MATERIAL** can be obtained by downloading the
-`scaper repository <https://github.com/justinsalamon/scaper/archive/master.zip>`_
-(approx. 50mb). The audio can be found under ``scaper-master/tests/data/audio``
-(``audio`` contains two subfolders, ``background`` and ``foreground``).
-For the remainder of this tutorial, we'll assume you've downloaded this material
-and copied the ``audio`` folder to your home directory. If you copy it somewhere
-else (or use different source material), be sure to change the paths to the
-``foreground_folder`` and ``background_folder`` in the example code below.
+Ambisonics can be very useful as well in some research areas, such as Blind Source Separation and Sound Source Localization.
+However, it is not easy to create an annotated dataset of Ambisonics audios, and specially with the separated tracks for the BSS evaluation.
+This is the main motivation behind the development of AmbiScaper.
+Of course, usages for other purposes, such as generative soundscape creation, are welcomed too.
 
-Create a Scaper object
-----------------------
-The first step is to create a ``Scaper`` object:
+Source Material
+~~~~~~~~~~~~~~~
+
+As we already mentioned, the raw material for the Ambisonics soundscape creation are individual audio clips, both mono or stereo.
+These clips, ideally (semi)anechoic, must be present in your system.
+You can use any sounds you like but, just in case, AmbiScaper features a selection of clips from the great `openAIRlib <http://www.openairlib.net>`_.
+You can find them in the `AmbiScaper repository <http://andresperezlopez.com/ambiscaper>`_, under the *samples* folder.
+
+
+
+Creating our first Ambisonics soundscape
+----------------------------------------
+
+AmbiScaper Instanciation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``AmbiScaper`` class is the main object from the library.
+Let's start by instanciating it:
 
 .. code-block:: python
 
-    import scaper
+    import ambiscaper
+    import numpy as np
     import os
-    soundscape_duration = 10.0
-    foreground_folder = os.path.expanduser('~/audio/foreground/')
-    background_folder = os.path.expanduser('~/audio/background/')
-    sc = scaper.Scaper(soundscape_duration, foreground_folder, background_folder)
-    sc.ref_db = -20
 
-We need to supply three arguments to create a ``Scaper`` object:
+    # AmbiScaper settings
+    soundscape_duration = 5.0
+    ambisonics_order = 1
+    foreground_folder = os.path.abspath('./samples/Acoustics_Book')
 
-1. The desired duration: all soundscapes generated by this Scaper object will have this duration.
-2. The path to the foreground folder.
-3. The path to the background folder.
+    ### Create an ambiscaper instance
+    ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
+                                       ambisonics_order=ambisonics_order,
+                                       fg_path=foreground_folder)
 
-If you're not sure what the foreground and background folders are, please see
-:ref:`organize_audio`.
+We are specifying three arguments to the AmbiScaper instance creation.
 
-Finally, we set the reference level ``sc.ref_db``, i.e. the loudnes of the
-background, measured in `LUFS <https://en.wikipedia.org/wiki/LKFS>`_. Later
-when we add foreground events, we'll have to specify an ``snr``
-(signal-to-noise ratio) value, i.e. by how many decibels (dB) should the foreground event
-be louder (or softer) with respect to the background level specified by
-``sc.ref_db``.
+1. The desired soundscape duration.
+2. The Ambisonics order to be used.
+3. The path to the sound event folder (in this case, the *Acoustics_Book* samples shipped with the code).
 
-Adding a background and foreground sound events
------------------------------------------------
+
+Adding sound events
+~~~~~~~~~~~~~~~~~~~
+
+Once we have an instance of AmbiScaper, we can add audio clips (events) to be rendered.
+
+One of the main features of AmbiScaper is that event parameters might be specified in terms of statistical distributions,
+and not only as fixed values. For example:
+
+.. code-block:: python
+
+    ### Add an event
+    ambiscaper.add_event(source_file=('choose', ['adult_female_speech.wav','bagpipe_music.wav']),
+                         source_time=('const', 0),
+                         event_time=('const', 0),
+                         event_duration=('const', soundscape_duration),
+                         event_azimuth=('uniform', 0, 2*np.pi),
+                         event_elevation=('uniform', -np.pi/2, np.pi/2),
+                         event_spread=('const', 0),
+                         snr=('const', 0),
+                         pitch_shift=('const', 1),
+                         time_stretch=('const', 1)
+                         )
+
+As you can see, every parameter is defined in terms of a *distribution tuple*, i.e., a definition of the possible values
+that the given parameter might take. The actual values, sampled from the distribution tuples, will be assigned at the
+soundscape rendering stage (the ``generate()`` method).
+
+The distribution tuples currently supported are:
+
+    * ``('const', value)``: a constant, given by ``value``.
+    * ``('choose', list)``: uniformly sample from a finite set of values given by ``list``.
+    * ``('uniform', min, max)``: sample from a uniform distribution between ``min`` and ``max``.
+    * ``('normal', mean, std)``: sample from a normal distribution with mean ``mean`` and standard deviation ``std``.
+    * ``('truncnorm', mean, std, min, max)``: sample from a truncated normal distribution with mean ``mean`` and standard deviation ``std``,
+      limited to values between ``min`` and ``max``.
+
+Therefore, our ``add_event`` method is actually specifying the following:
+
+    * ``source_file`` can take one of the two provided values: ``adult_female_speech.wav`` or ``bagpipe_music.wav``.
+    * ``source_time`` (the time offset between the soundscape start and the event start) and ``event_time`` (the offset of the given source file itself) are set to ``0``. Furthermore, ``event_duration`` is set equal to the soundscape duration.
+    * ``event_azimuth`` and ``event_elevation``, the angles defining the event position, are set to take a random value, uniformly distributed in their value domain.
+        Remember that *azimuth* is the angle in the horizontal plane starting from the X axis in counter-clockwise direction,
+        and *elevation* is the angle perpendicular to the horizontal plane, being ``0`` the horizontal plane, ``pi/2`` above and ``-pi/2`` below.
+    * ``event_spread`` is set to 0. The spread parameter can be thought as the apparent sound source width, with a value between ``0`` (no spread) and ``1`` (fully spread)
+    * ``snr`` ``pitch_shift`` ``time_stretch`` are set with a constant value.
+
+To summarize up, the ``add_event()`` method allows to tell AmbiScaper about an *event specification* with statistical
+distribution values.
+
+Soundscape generation
+~~~~~~~~~~~~~~~~~~~~~
+
+Once the sound events are described, we can proceed to actually generate the Ambisonics soundscape.
+
+This is provided by the ``generate()`` method:
+
+.. code-block:: python
+
+    ### Genereate the audio and the annotation
+    outfolder = '/Volumes/Dinge/ambiscaper/testing/' # watch out! outfolder must exist
+    destination_path = os.path.join(outfolder,"my_first_ambisonics_soundscape")
+
+    ambiscaper.generate(destination_path=destination_path,
+                        generate_txt=True)
+
+This piece of code will actually sample all values from the event specifications, in a process called *instanciation*,
+and as a result will provide the rendered audio and the associated annotations.
+
+If everything went good so far, we will have the following structure under *my_first_ambisonics_soundscape*:
+
+    *
 
 Adding a background
 ~~~~~~~~~~~~~~~~~~~
@@ -109,9 +155,6 @@ Next, we can optionally add a background track to our soundscape:
 
 .. code-block:: python
 
-    sc.add_background(label=('const', 'park'),
-                      source_file=('choose', []),
-                      source_time=('const', 0))
 
 To add a background we have to specify:
 
@@ -272,6 +315,8 @@ parameter.
 That's it! For a more detailed example of automatically synthesizing 1000
 soundscapes using a single ``Scaper`` object, please see the :ref:`examples`.
 
+
+.. _differences:
 
 Differences from Scaper
 -----------------------
