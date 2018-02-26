@@ -871,7 +871,7 @@ class AmbiScaper(object):
 
     # Default values
     DEFAULT_SR = 48000
-    DEFAULT_REF_DB = -12
+    DEFAULT_REF_DB = -60
     DEFAULT_FADE_IN_LEN = 0.01  # 10 ms
     DEFAULT_FADE_OUT_LEN = 0.01  # 10 ms
     DEFAULT_REVERB_SPEC = None
@@ -1360,14 +1360,33 @@ class AmbiScaper(object):
             event_id = _generate_event_id_from_idx(event_idx, 'foreground')
 
 
-        # determine source file
-        if event.source_file[0] == "choose" and not event.source_file[1]:
-            source_files = _get_sorted_files(file_path)
+        # Determine source file and expand paths
+        # Create new tuples by expanding paths and special case (choose,[])
+
+        if event.source_file[0] == "choose":
+            if not event.source_file[1]:
+                # Distribution of type ("choose",[]): select from all files at the given folder
+                source_files = _get_sorted_files(file_path)
+                source_file_tuple = list(event.source_file)
+                source_file_tuple[1] = source_files
+                source_file_tuple = tuple(source_file_tuple)
+            else:
+                # Some files given to choose
+                source_files = event.source_file[1]
+                expanded_source_files = [os.path.join(file_path,f) for f in source_files]
+                source_file_tuple = list(event.source_file)
+                source_file_tuple[1] = expanded_source_files
+                source_file_tuple = tuple(source_file_tuple)
+
+        elif event.source_file[0] == "const":
+            # Constant definition
             source_file_tuple = list(event.source_file)
-            source_file_tuple[1] = source_files
+            source_file_tuple[1] = os.path.join(file_path, event.source_file[1])
             source_file_tuple = tuple(source_file_tuple)
+
         else:
-            source_file_tuple = event.source_file
+            raise AmbiScaperError(
+                "Unknown distribution type for source_file")
 
         source_file = _get_value_from_dist(source_file_tuple)
 
@@ -1388,7 +1407,9 @@ class AmbiScaper(object):
             used_source_files.append(source_file)
 
         # Get the duration of the source audio file
-        source_duration = sox.file_info.duration(source_file)
+        # It must use the expanded source file name
+        source_file_path = os.path.abspath(os.path.join(self.fg_path,source_file))
+        source_duration = sox.file_info.duration(source_file_path)
 
         # Determine event duration
         # For background events the duration is fixed to self.duration
