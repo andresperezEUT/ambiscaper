@@ -936,9 +936,7 @@ class AmbiScaper(object):
             import matlab_wrapper
         except ImportError:
             self.matlab_available = False
-            warnings.warn(
-                "Matlab not available in tye system",
-                AmbiScaperWarning)
+
 
     def _is_matlab_available(self):
         """
@@ -2451,6 +2449,17 @@ class AmbiScaper(object):
                  generate_txt=False,
                  txt_sep='\t',
                  disable_instantiation_warnings=False):
+        '''
+
+        :param destination_path:
+        :param allow_repeated_source:
+        :param disable_sox_warnings:
+        :param no_audio:
+        :param generate_txt:
+        :param txt_sep:
+        :param disable_instantiation_warnings:
+        :return:
+        '''
 
 
         # First, we will check reverb config.

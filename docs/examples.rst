@@ -1,7 +1,10 @@
 .. _examples:
 
-Example: synthesizing 1000 soundscapes in one go
-================================================
+Examples
+========
+
+Example 1: Fifth order, variable spread Ambisonics souncscape
+-------------------------------------------------------------
 
 .. code-block:: python
     :linenos:

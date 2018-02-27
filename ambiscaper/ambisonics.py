@@ -88,7 +88,7 @@ def get_ambisonics_coefs(azimuth,elevation,order):
     coefs = []
     coef_index = 0
     for l in range(order+1):
-        for m in range(-l,l+1):
+        for m in range(-l,l+1): # this is ACN channel ordering
             coefs.append(get_spherical_harmonic(azimuth, elevation, l, m))
 
     return np.array(coefs)

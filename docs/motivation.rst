@@ -13,11 +13,11 @@ However, there is an important lack of Ambisonics recordings databases, speciall
 
 We present AmbiScaper, a python library for procedural creation and annotation of reverberant Ambisonics databases.
 
-Acknowledgemens
----------------
+Acknowledgements
+----------------
 
 AmbiScaper is based on `Scaper <http://github.com/justinsalamon/scaper>`_, a related work by Justin Salamon in the context of scene recognition.
 
 The material in the present documentation is as well highly inspired on the original Scaper documentation.
 
-For a more detailed comparison, please refer to the "Differences from Scaper" section.
+For a more detailed comparison, please refer to the :ref:`differences` section.

@@ -3,13 +3,11 @@ import numpy as np
 import os
 
 # OUTPUT FOLDER
-# outfolder = '/Volumes/Dinge/ambiscaper/generated/'
 outfolder = '/Volumes/Dinge/ambiscaper/testing/'
 
 # SCAPER SETTINGS
-# foreground_folder = '/Volumes/Dinge/audio/scaper/foreground/'
 foreground_folder = '/Volumes/Dinge/audio/anechoic_openAIRlib/Acoustics_Book'
-background_folder = '/Volumes/Dinge/audio/scaper/background/'
+# background_folder = '/Volumes/Dinge/audio/scaper/background/'
 
 n_soundscapes = 10
 ref_db = -50
@@ -69,7 +67,11 @@ for n in range(n_soundscapes):
     print('Generating soundscape: {:d}/{:d}'.format(n, n_soundscapes))
 
     # create a scaper
-    sc = ambiscaper.AmbiScaper(duration, ambisonics_order, ambisonics_spread_slope, foreground_folder, background_folder)
+    sc = ambiscaper.AmbiScaper(duration=duration,
+                               ambisonics_order=ambisonics_order,
+                               ambisonics_spread_slope=ambisonics_spread_slope,
+                               fg_path=foreground_folder,
+                               bg_path=background_folder)
     sc.protected_labels = []
     sc.ref_db = ref_db
 

@@ -15,12 +15,14 @@ Ambiscaper: a tool for automatic dataset generation and annotation of reverberan
 Motivation
 -------------
 .. toctree::
+   :maxdepth: 1
 
    motivation
 
 Getting started
 ---------------
 .. toctree::
+   :maxdepth: 2
 
    installation
 
@@ -31,8 +33,9 @@ Getting started
 API Reference
 -------------
 .. toctree::
+   :maxdepth: 2
 
-	api
+   api
 
 
 .. Changes
