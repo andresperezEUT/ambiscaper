@@ -64,13 +64,13 @@ def _validate_spread_coef(alpha):
             'Ambisonics spread coef must be in the range [0.0, 1.0]')
 
 
-def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
-    # TODO comments
-
-    if not is_real_number(ambisonics_spread_slope):
-        raise AmbiScaperError('Ambisonics Spread Slope must be a real value')
-    elif not 0 <= ambisonics_spread_slope <= 1:
-        raise AmbiScaperError('Ambisonics Order must be 0 located on the range [0,1]')
+# def _validate_ambisonics_spread_slope(ambisonics_spread_slope):
+#     # TODO comments
+#
+#     if not is_real_number(ambisonics_spread_slope):
+#         raise AmbiScaperError('Ambisonics Spread Slope must be a real value')
+#     elif not 0 <= ambisonics_spread_slope <= 1:
+#         raise AmbiScaperError('Ambisonics Order must be 0 located on the range [0,1]')
 
 
 

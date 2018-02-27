@@ -32,7 +32,6 @@ from .util import is_real_number, is_real_array
 from .audio import get_integrated_lufs
 from .ambisonics import get_number_of_ambisonics_channels, change_channel_ordering_fuma_2_acn, change_normalization_fuma_2_sn3d
 from .ambisonics import _validate_ambisonics_order
-from .ambisonics import _validate_ambisonics_spread_slope
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
 from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_s3a_reverb_spec, retrieve_available_recorded_IRs
@@ -851,11 +850,6 @@ class AmbiScaper(object):
 
         Ambisonics Order to be used in the audios.
 
-    :param ambisonics_spread_slope: float
-
-        Slope of the spread curve. Steepness value in the range ``[0,1]``.
-        See *Ambisonic Spatial Blur (T. Carpentier)* for more details.
-
     :param fg_path: str
 
         Path to foreground folder.
@@ -887,7 +881,6 @@ class AmbiScaper(object):
     def __init__(self,
                  duration = DEFAULT_DURATION,
                  ambisonics_order = DEFAULT_AMBISONICS_ORDER,
-                 ambisonics_spread_slope = DEFAULT_AMBISONICS_SPREAD_SLOPE,
                  fg_path = DEFAULT_FG_PATH,
                  bg_path = DEFAULT_BG_PATH):
 
@@ -900,15 +893,12 @@ class AmbiScaper(object):
         self.ambisonics_order = ambisonics_order
         self.num_channels = get_number_of_ambisonics_channels(ambisonics_order)
 
-        # Validate ambisonics spread slope
-        _validate_ambisonics_spread_slope(ambisonics_spread_slope)
-        self.ambisonics_spread_slope = ambisonics_spread_slope
-
         # Initialize parameters
         self.sr = self.DEFAULT_SR
         self.ref_db = self.DEFAULT_REF_DB
         self.fade_in_len = self.DEFAULT_FADE_IN_LEN  # 10 ms
         self.fade_out_len = self.DEFAULT_FADE_OUT_LEN  # 10 ms
+        self.ambisonics_spread_slope = self.DEFAULT_AMBISONICS_SPREAD_SLOPE
 
         # Start with empty specifications
         self.fg_spec = []
