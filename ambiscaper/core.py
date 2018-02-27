@@ -872,7 +872,7 @@ class AmbiScaper(object):
 
     # Default values
     DEFAULT_SR = 48000
-    DEFAULT_REF_DB = -60
+    DEFAULT_REF_DB = -30
     DEFAULT_FADE_IN_LEN = 0.01  # 10 ms
     DEFAULT_FADE_OUT_LEN = 0.01  # 10 ms
     DEFAULT_REVERB_SPEC = None
@@ -1019,10 +1019,10 @@ class AmbiScaper(object):
         time_stretch = None
 
         # Validate parameter format and values
-        _validate_event(source_file,
-                        source_time, event_time, event_duration,
-                        event_azimuth, event_elevation, event_spread,
-                        snr, None, None)
+        # _validate_event(source_file,
+        #                 source_time, event_time, event_duration,
+        #                 event_azimuth, event_elevation, event_spread,
+        #                 snr, None, None)
 
         # Create background sound event
         bg_event = EventSpec(source_file=source_file,
@@ -1366,7 +1366,6 @@ class AmbiScaper(object):
             if not event.source_file[1]:
                 # Distribution of type ("choose",[]): select from all audio files at the given folder
                 source_files = _get_sorted_audio_files_recursive(file_path)
-                print('sorted_files',source_files)
                 source_file_tuple = list(event.source_file)
                 source_file_tuple[1] = source_files
                 source_file_tuple = tuple(source_file_tuple)
@@ -1409,7 +1408,6 @@ class AmbiScaper(object):
         # Get the duration of the source audio file
         # It must use the expanded source file name
         source_file_path = os.path.abspath(os.path.join(self.fg_path,source_file))
-        print(source_file_path)
         source_duration = sox.file_info.duration(source_file_path)
 
         # Determine event duration
@@ -1427,9 +1425,9 @@ class AmbiScaper(object):
             event_duration = source_duration
             if not disable_instantiation_warnings:
                 warnings.warn(
-                    "Event duration ({:.2f}) is greater that source "
+                    "{:s}: Event duration ({:.2f}) is greater that source "
                     "duration ({:.2f}), changing to {:.2f}".format(
-                        old_duration, source_duration, event_duration),
+                        event_id,old_duration, source_duration, event_duration),
                     AmbiScaperWarning)
 
         # Get the event azimuth
@@ -1461,10 +1459,10 @@ class AmbiScaper(object):
                 event_duration = self.duration
                 if not disable_instantiation_warnings:
                     warnings.warn(
-                        "Event duration ({:.2f}) is greater than the "
+                        "{:s}: Event duration ({:.2f}) is greater than the "
                         "soundscape duration ({:.2f}), changing to "
                         "{:.2f}".format(
-                            old_duration, self.duration, self.duration),
+                            event_id, old_duration, self.duration, self.duration),
                         AmbiScaperWarning)
         else:
             if (event_duration_stretched > self.duration):
@@ -1472,11 +1470,11 @@ class AmbiScaper(object):
                 event_duration = self.duration / float(time_stretch)
                 if not disable_instantiation_warnings:
                     warnings.warn(
-                        "Event duration ({:.2f}) with stretch factor "
+                        "{:s}: Event duration ({:.2f}) with stretch factor "
                         "{:.2f} gives {:.2f} which is greater than the "
                         "soundscape duration ({:.2f}), changing to "
                         "{:.2f}".format(
-                            old_duration, time_stretch,
+                            event_id, old_duration, time_stretch,
                             event_duration_stretched, self.duration,
                             event_duration),
                         AmbiScaperWarning)
@@ -1494,10 +1492,10 @@ class AmbiScaper(object):
             source_time = source_duration - event_duration
             if not disable_instantiation_warnings:
                 warnings.warn(
-                    'Source time ({:.2f}) is too great given event '
+                    '{:s}: Source time ({:.2f}) is too great given event '
                     'duration ({:.2f}) and source duration ({:.2f}), changed '
                     'to {:.2f}.'.format(
-                        old_source_time, event_duration,
+                        event_id, old_source_time, event_duration,
                         source_duration, source_time),
                     AmbiScaperWarning)
 
@@ -1516,26 +1514,40 @@ class AmbiScaper(object):
             if event_time + event_duration > self.duration:
                 old_event_time = event_time
                 event_time = self.duration - event_duration
-                if not disable_instantiation_warnings:
-                    warnings.warn(
-                        'Event time ({:.2f}) is too great given event '
-                        'duration ({:.2f}) and soundscape duration ({:.2f}), '
-                        'changed to {:.2f}.'.format(
-                            old_event_time, event_duration,
-                            self.duration, event_time),
-                        AmbiScaperWarning)
+                if event_time < 0.0:
+                    event_time = 0.0
+                    if not disable_instantiation_warnings:
+                        warnings.warn(
+                            '{:s}: Event time set to 0.0 in order to avoid negative times'.format(event_id),
+                            AmbiScaperWarning)
+                else:
+                    if not disable_instantiation_warnings:
+                        warnings.warn(
+                            '{:s}: Event time ({:.2f}) is too great given event '
+                            'duration ({:.2f}) and soundscape duration ({:.2f}), '
+                            'changed to {:.2f}.'.format(
+                                event_id, old_event_time, event_duration,
+                                self.duration, event_time),
+                            AmbiScaperWarning)
         else:
             if event_time + event_duration_stretched > self.duration:
                 old_event_time = event_time
                 event_time = self.duration - event_duration_stretched
-                if not disable_instantiation_warnings:
-                    warnings.warn(
-                        'Event time ({:.2f}) is too great given '
-                        'stretched event duration ({:.2f}) and soundscape '
-                        'duration ({:.2f}), changed to {:.2f}.'.format(
-                            old_event_time, event_duration_stretched,
-                            self.duration, event_time),
-                        AmbiScaperWarning)
+                if event_time < 0.0:
+                    event_time = 0.0
+                    if not disable_instantiation_warnings:
+                        warnings.warn(
+                            '{:s}: Event time set to 0.0 in order to avoid negative times'.format(event_id),
+                            AmbiScaperWarning)
+                else:
+                    if not disable_instantiation_warnings:
+                        warnings.warn(
+                            '{:s}: Event time ({:.2f}) is too great given event '
+                            'duration ({:.2f}) and soundscape duration ({:.2f}), '
+                            'changed to {:.2f}.'.format(
+                                event_id, old_event_time, event_duration_stretched,
+                                self.duration, event_time),
+                            AmbiScaperWarning)
 
         # determine snr
         snr = _get_value_from_dist(event.snr)
@@ -2333,7 +2345,6 @@ class AmbiScaper(object):
 
                         # TODO: implement that in a more elegant way
                         reverb_name = annotation_reverb.data.value[0]['name']
-
 
                         # Construct the filter name given the speaker index:
                         # In each event iteration we selected a different speaker position
