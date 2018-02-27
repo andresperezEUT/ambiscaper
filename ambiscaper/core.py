@@ -20,7 +20,8 @@ import shutil
 import pandas as pd
 from .ambiscaper_exceptions import AmbiScaperError
 from .ambiscaper_warnings import AmbiScaperWarning
-from .util import _close_temp_files, spherical_to_cartesian, _validate_distribution, SUPPORTED_DIST, _get_event_idx_from_id, _generate_event_id_from_idx
+from .util import _close_temp_files, spherical_to_cartesian, _validate_distribution, SUPPORTED_DIST, \
+    _get_event_idx_from_id, _generate_event_id_from_idx, _get_sorted_audio_files_recursive
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -1363,8 +1364,9 @@ class AmbiScaper(object):
 
         if event.source_file[0] == "choose":
             if not event.source_file[1]:
-                # Distribution of type ("choose",[]): select from all files at the given folder
-                source_files = _get_sorted_files(file_path)
+                # Distribution of type ("choose",[]): select from all audio files at the given folder
+                source_files = _get_sorted_audio_files_recursive(file_path)
+                print('sorted_files',source_files)
                 source_file_tuple = list(event.source_file)
                 source_file_tuple[1] = source_files
                 source_file_tuple = tuple(source_file_tuple)
@@ -1407,6 +1409,7 @@ class AmbiScaper(object):
         # Get the duration of the source audio file
         # It must use the expanded source file name
         source_file_path = os.path.abspath(os.path.join(self.fg_path,source_file))
+        print(source_file_path)
         source_duration = sox.file_info.duration(source_file_path)
 
         # Determine event duration

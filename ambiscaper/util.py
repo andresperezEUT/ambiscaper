@@ -14,6 +14,7 @@ import scipy
 import numpy as np
 from numbers import Number
 import random
+import fnmatch
 
 
 event_foreground_id_string = 'fg'
@@ -90,6 +91,28 @@ def _get_sorted_files(folder_path):
     files = sorted(glob.glob(os.path.join(folder_path, "*")))
     files = [f for f in files if os.path.isfile(f)]
 
+    return files
+
+def _get_sorted_audio_files_recursive(folder_path):
+    '''
+    Recursive implementation of _get_sorted_files()
+    Also filters only .wav files
+    :param folder_path:
+    :return:
+    '''
+    # Ensure path points to valid folder
+    _validate_folder_path(folder_path)
+
+    # Get folder contents and filter for valid files
+    # Note, we sort the list to ensure consistent behavior across operating
+    # systems.
+
+    files = []
+    for dirpath, dirnames, dirfiles in os.walk(folder_path):
+        for f in fnmatch.filter(dirfiles, '*.wav'):
+            files.append(os.path.join(dirpath,f))
+
+    files = sorted(files)
     return files
 
 
