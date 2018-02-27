@@ -117,7 +117,7 @@ Therefore, our ``add_event`` method is actually specifying the following:
 
     * ``source_file`` can take one of the two provided values: ``adult_female_speech.wav`` or ``bagpipe_music.wav``.
     * ``source_time`` (the time in the source file from which to start the event) and ``event_time`` (the start time of the event in the synthesized soundscape) are set to ``0``.
-    Furthermore, ``event_duration`` is set equal to the soundscape duration.
+        Furthermore, ``event_duration`` is set equal to the soundscape duration.
     * ``event_azimuth`` and ``event_elevation``, the angles defining the event position, are set to take a random value, uniformly distributed in their value domain.
         Remember that *azimuth* is the angle in the horizontal plane starting from the X axis in counter-clockwise direction,
         and *elevation* is the angle perpendicular to the horizontal plane, being ``0`` the horizontal plane, ``pi/2`` above and ``-pi/2`` below.

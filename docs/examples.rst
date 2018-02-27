@@ -75,10 +75,10 @@ Loudness computation is performed in a psychoacoustic way through the `LKFS scal
                         generate_txt=True)
 
 
-Example 2: Fifth order, variable spread Ambisonics soundscape
+Example 2: 15th order, variable spread Ambisonics soundscape
 -------------------------------------------------------------
 
-We will create a 5th order ambisonics soundscape (36 channels),
+We will create a **15th** (yes, fifteenth!) order ambisonics soundscape (256 channels),
 consisting of 10 sound events, placed at random positions around the sphere,
 with a small amount of spread. Furthermore, the parameter ``ambisonics_spread_slope`` is set to ``0.25``,
 meaning a softer transition in ambisonics order downgrading (please refer to [Carpentier2017]_ for more information).
@@ -88,6 +88,9 @@ Importing *example2.txt* into Audacity might be helpful to understand the cacoph
 Also, it might be of interest to have a look into *example2.jams*, in order to understand how the file is organized,
 and the possibilities for evaluation and experiment replication that it offers.
 
+Finally, notice the ``allow_repeated_source=True`` argument in ``generate()``.
+As its name implies, during event instanciation, it will not take into account that a given source has been already chosen.
+Setting it to ``False`` might be useful in many cases, but then there is the risk of not having enough sources in the used database.
 
 
 .. code-block:: python
@@ -100,7 +103,7 @@ and the possibilities for evaluation and experiment replication that it offers.
 
     # AmbiScaper settings
     soundscape_duration = 10.0
-    ambisonics_order = 5
+    ambisonics_order = 15
     ambisonics_spread_slope = 0.25 # soft curve
 
     # We want to use the full samples folder as potential events
@@ -135,7 +138,52 @@ and the possibilities for evaluation and experiment replication that it offers.
     destination_path = os.path.join(outfolder, "example2")
 
     ambiscaper.generate(destination_path=destination_path,
-                        generate_txt=True)
+                        generate_txt=True,
+                        allow_repeated_source=True)
+
+
+Example 3: Reverberant soundscape from IR measurement
+-----------------------------------------------------
+
+So far we have been considering the anechoic case, which is great, but unfortunately not realistic.
+Reverberation is present in almost all acoustic environments, and most state-of-the-art algorithms
+for Blind Source Separation and Source Localization consider the reverberant case.
+Apart from the more scientifical approach, reverberant soundscapes sound very nice!
+
+In this example we will use the default reverbs shipped with AmbiScaper - they can be found under the */IRs/* folder.
+Currently, there are five sets of measurements available, corresponding to 5 different rooms with diverse reverberation
+characteristics, ranging from studio to church. All these reverbs come from the great research at Surrey,
+Salford and Southampton Universities, and from BBC.
+Please refer to [Coleman2015]_ for more information.
+
+Reverberation is captured through `Impulse Responses (IRs) <https://en.wikipedia.org/wiki/Impulse_response>`_.
+In this particular case, we are using *Ambisonics IRs*, wich are IRs recorded with an Ambisonics microphone,
+thus capturing the spatial cues of the reverberation. It should be noticed that reverberation is variable along a room,
+in the sense that it depends on both the position of the emitter and the receiver.
+Since it would be impossible to record every possible pair of emitter/receiver positions, a spatial sampling strategie must be designed.
+
+Therefore, the given IRs are the recordings at different emitter positions, while the receiver remains fix (usually at the room center).
+The different speaker positions are specified in the ``LsPos.txt`` file.
+
+.. note::
+
+    We are working on a more compact, reliable and scalable way to store Ambisonics IRs,
+    by means of the development of an ad-hoc `SOFA <https://www.sofaconventions.org>`_ convention.
+    That means that the *IRs* folder structure might change in next releases.
+
+The implication for the soundscape generation is that we can only provide IRs from the actual measured emitter points,
+and with a limited spatial resolution (the Ambisonics order of the microphone used).
+
+Therefore, even when we specify
+
+
+
+
+
+
+
+
+
 
 
 
@@ -143,3 +191,7 @@ and the possibilities for evaluation and experiment replication that it offers.
 .. [Carpentier2017] Carpentier, T. (2017, May).
     Ambisonic spatial blur.
     In Audio Engineering Society Convention 142. Audio Engineering Society.
+
+.. [Coleman2015]
+ Coleman, P., Remaggi, L., and Jackson, PJB. (2015)
+  "S3A Room Impulse Responses", http://dx.doi.org/10.15126/surreydata.00808465

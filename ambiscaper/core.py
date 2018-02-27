@@ -34,13 +34,13 @@ from .ambisonics import get_number_of_ambisonics_channels, change_channel_orderi
 from .ambisonics import _validate_ambisonics_order
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_s3a_reverb_spec, retrieve_available_recorded_IRs
+from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_recorded_reverb_spec, retrieve_available_recorded_IRs
 from .reverb_ambisonics import retrieve_RIR_positions
 from .reverb_ambisonics import MATLAB_ROOT
-from .reverb_ambisonics import S3A_FILTER_NAME
-from .reverb_ambisonics import S3A_FILTER_EXTENSION
+from .reverb_ambisonics import RECORDED_REVERB_FILTER_NAME
+from .reverb_ambisonics import RECORDED_REVERB_FILTER_EXTENSION
 from .reverb_ambisonics import SMIR_FOLDER_PATH
-from .reverb_ambisonics import S3aReverbSpec
+from .reverb_ambisonics import RecordedReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
 from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
 
@@ -1283,10 +1283,10 @@ class AmbiScaper(object):
         '''
 
         # SAFETY_CHECKS
-        _validate_s3a_reverb_spec(name)
+        _validate_recorded_reverb_spec(name)
 
         # Create reverb spec
-        self.reverb_spec = S3aReverbSpec(name=name)
+        self.reverb_spec = RecordedReverbSpec(name=name)
 
         return
 
@@ -1572,8 +1572,8 @@ class AmbiScaper(object):
 
         if type (self.reverb_spec) is SmirReverbSpec:
             return self._instantiate_smir_reverb()
-        elif type(self.reverb_spec) is S3aReverbSpec:
-            return self._instantiate_s3a_reverb()
+        elif type(self.reverb_spec) is RecordedReverbSpec:
+            return self._instantiate_recorded_reverb()
         else:
             raise AmbiScaperError(
                 'Unknown reverb type')
@@ -1640,8 +1640,8 @@ class AmbiScaper(object):
         return instantiated_reverb
 
 
-    def _instantiate_s3a_reverb(self,
-                                disable_instantiation_warnings=False):
+    def _instantiate_recorded_reverb(self,
+                                     disable_instantiation_warnings=False):
 
         name = self.reverb_spec.name
 
@@ -1654,7 +1654,7 @@ class AmbiScaper(object):
             name_tuple = name
         name = _get_value_from_dist(name_tuple)
 
-        return S3aReverbSpec(name=name)
+        return RecordedReverbSpec(name=name)
 
     def _instantiate(self,
                      allow_repeated_source=True,
@@ -1757,7 +1757,7 @@ class AmbiScaper(object):
                     # source_positions_sph = [[SMIR_DEFAULT_SOURCE_RADIUS,pos[0],pos[1]] for pos in fg_source_positions],
             )
 
-            elif isinstance(instantiated_reverb_spec, S3aReverbSpec):
+            elif isinstance(instantiated_reverb_spec, RecordedReverbSpec):
 
                 ann_reverb = jams.Annotation(namespace='ambiscaper_recorded_reverb')
 
@@ -2348,7 +2348,7 @@ class AmbiScaper(object):
 
                         # ir_irx holds the index of the ir to be used with the actual source
 
-                        used_filter_name = S3A_FILTER_NAME + str(ir_idx) + S3A_FILTER_EXTENSION
+                        used_filter_name = RECORDED_REVERB_FILTER_NAME + str(ir_idx) + RECORDED_REVERB_FILTER_EXTENSION
                         used_filter_path = os.path.join(generate_RIR_path(reverb_name), used_filter_name)
 
                         # Create a symlink to the used filter on the source folder
@@ -2469,7 +2469,7 @@ class AmbiScaper(object):
         # First, we will check reverb config.
         # Currently we support two types of ambisonics reverb:
         # - smir: matlab-simulated RIR (todo: link)
-        # - s3a: recorded IR (todo: link)
+        # - recorded: recorded IR (todo: link)
         # In the case of recorded IRs, we are limited on the number of different
         # source locations.
         # Therefore, we must impose the source location limitation before the actual

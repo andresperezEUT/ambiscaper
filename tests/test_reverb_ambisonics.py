@@ -3,7 +3,7 @@ import pytest
 import ambiscaper
 from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
-from ambiscaper.reverb_ambisonics import _validate_IR_length, S3aReverbSpec, SmirReverbSpec, \
+from ambiscaper.reverb_ambisonics import _validate_IR_length, RecordedReverbSpec, SmirReverbSpec, \
     get_max_ambi_order_from_reverb_config, retrieve_available_recorded_IRs, generate_RIR_path
 
 
@@ -261,10 +261,10 @@ def test_validate_microphone_type():
 
 #################### RECORDED
 
-def test_validate_s3a_reverb_name():
+def test_validate_recorded_reverb_name():
 
     def __test_bad_tuple(tuple):
-        pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_s3a_reverb_name, tuple)
+        pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_recorded_reverb_name, tuple)
 
     # bad consts
     bad_values = [None, -1, 1j, 'yes', 'CoolReverb']
@@ -287,7 +287,7 @@ def test_validate_s3a_reverb_name():
 
     def __assert_correct_tuple(tuple):
         try:
-            ambiscaper.reverb_ambisonics._validate_s3a_reverb_name(tuple)
+            ambiscaper.reverb_ambisonics._validate_recorded_reverb_name(tuple)
         except AmbiScaperError:
             raise AmbiScaperError
 
@@ -311,7 +311,7 @@ def test_get_max_ambi_order_from_reverb_config():
 
     # [spec, groundtruth]
     incorrect_values = [
-        [S3aReverbSpec(name='OldChurch'),2],
+        [RecordedReverbSpec(name='OldChurch'),2],
         [SmirReverbSpec(IRlength=1024,
                         room_dimensions=[1.0, 1.0, 1.0],
                         t60=0.5,
@@ -328,7 +328,7 @@ def test_get_max_ambi_order_from_reverb_config():
 
     # [spec, groundtruth]
     correct_values = [
-        [S3aReverbSpec(name='OldChurch'),1],
+        [RecordedReverbSpec(name='OldChurch'),1],
         [SmirReverbSpec(IRlength=1024,
                         room_dimensions=[1.0, 1.0, 1.0],
                         t60=0.5,

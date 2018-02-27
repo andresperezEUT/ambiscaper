@@ -383,30 +383,30 @@ def _validate_microphone_type(mic_type_tuple):
             'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
-def _validate_s3a_reverb_spec(reverb_name):
+def _validate_recorded_reverb_spec(reverb_name):
 
     # Just one element for the moment
-    _validate_s3a_reverb_name(reverb_name)
+    _validate_recorded_reverb_name(reverb_name)
 
     return
 
 
-def _validate_s3a_reverb_name(reverb_name_tuple):
+def _validate_recorded_reverb_name(reverb_name_tuple):
 
     # Make sure it's a valid distribution tuple
     _validate_distribution(reverb_name_tuple)
 
     # Make sure that type matches
-    def __valid_s3a_reverb_name_types(reverb_name):
+    def __valid_recorded_reverb_name_types(reverb_name):
         if (not isinstance(reverb_name, str)):
             return False
         else:
             return True
 
     # Make sure that the audio and position files exist and are valid
-    def __valid_s3a_reverb_name_configuration(reverb_name):
+    def __valid_recorded_reverb_name_configuration(reverb_name):
         # Folder structure should be something like:
-        # - S3A_top_folder (:reverb_folder_path: defined in ambisonics.py)
+        # - IR_top_folder (:reverb_folder_path: defined in ambisonics.py)
         #     - reverb_name (:name: in the config struct)
         #         - (maybe a pdf)
         #         - "Soundfield"
@@ -415,8 +415,8 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
         #             - (maybe a "Metadata_SoundField.txt")
 
         try:
-            # The provided name should exist in s3a_
-            reverb_folder_path = os.path.join(S3A_FOLDER_PATH, reverb_name)
+            # The provided name should exist in RECORDED_REVERB_FOLDER_PATH
+            reverb_folder_path = os.path.join(RECORDED_REVERB_FOLDER_PATH, reverb_name)
             if not os.path.exists(os.path.expanduser(reverb_folder_path)):
                 raise AmbiScaperError(
                     'reverb_config: folder does not exist: ' + reverb_name)
@@ -434,7 +434,7 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
             num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
 
             # Count number of lines in speakers file
-            speakers_positions_file = os.path.join(soundfield_path, S3A_LOUDSPEAKER_POSITIONS_TXTFILE)
+            speakers_positions_file = os.path.join(soundfield_path, RECORDED_REVERB_LOUDSPEAKER_POSITIONS_TXTFILE)
             num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
 
             # Check
@@ -458,10 +458,10 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
         if reverb_name_tuple[1] is None:
             raise AmbiScaperError(
                 'reverb_config: reverb name is None')
-        elif not __valid_s3a_reverb_name_types(reverb_name_tuple[1]):
+        elif not __valid_recorded_reverb_name_types(reverb_name_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb name must be a string')
-        elif not __valid_s3a_reverb_name_configuration(reverb_name_tuple[1]):
+        elif not __valid_recorded_reverb_name_configuration(reverb_name_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb name not valid:' + reverb_name_tuple[1])
 
@@ -476,10 +476,10 @@ def _validate_s3a_reverb_name(reverb_name_tuple):
         # elif len(reverb_name_tuple[1]) is 0:
             # raise AmbiScaperError(
             #     'reverb_config: empty list for choose')
-        elif not all(__valid_s3a_reverb_name_types(length) for length in reverb_name_tuple[1]):
+        elif not all(__valid_recorded_reverb_name_types(length) for length in reverb_name_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb name must be a positive integer')
-        elif not all(__valid_s3a_reverb_name_configuration(name) for name in reverb_name_tuple[1]):
+        elif not all(__valid_recorded_reverb_name_configuration(name) for name in reverb_name_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb names not valid: ' + str(reverb_name_tuple[1]))
 
@@ -520,7 +520,7 @@ def get_max_ambi_order_from_reverb_config(reverb_spec):
     if isinstance(reverb_spec, SmirReverbSpec):
         Q = len(SMIR_SUPPORTED_VIRTUAL_MICS[reverb_spec.microphone_type]['capsule_position_sph'])
 
-    elif isinstance(reverb_spec, S3aReverbSpec):
+    elif isinstance(reverb_spec, RecordedReverbSpec):
         # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
         Q = 1
     else:
@@ -540,7 +540,7 @@ def retrieve_available_recorded_IRs():
     '''
 
     # TODO: implement it in a more elegant way
-    return [e for e in os.listdir(S3A_FOLDER_PATH) if not e == 'README.md' and not e == '.DS_Store']
+    return [e for e in os.listdir(RECORDED_REVERB_FOLDER_PATH) if not e == 'README.md' and not e == '.DS_Store']
 
 def generate_RIR_path(recorded_reverb_name):
     '''
@@ -559,7 +559,7 @@ def generate_RIR_path(recorded_reverb_name):
             'Reverb name does not exist: ', recorded_reverb_name)
 
     # TODO: remove hardcoded reference to Soundfield
-    return os.path.expanduser(os.path.join(S3A_FOLDER_PATH, recorded_reverb_name, 'Soundfield'))
+    return os.path.expanduser(os.path.join(RECORDED_REVERB_FOLDER_PATH, recorded_reverb_name, 'Soundfield'))
 
 
 def retrieve_RIR_positions(recorded_reverb_name):
@@ -572,7 +572,7 @@ def retrieve_RIR_positions(recorded_reverb_name):
     '''
 
     # Folder structure should be something like:
-    # - S3A_top_folder (:path: in the config struct)
+    # - IRs top folder (:path: in the config struct)
     #     - reverb_name (:name: in the config struct)
     #         - (maybe a pdf)
     #         - "Soundfield"
@@ -583,7 +583,7 @@ def retrieve_RIR_positions(recorded_reverb_name):
     # Go to Soundfield folder
     # todo: maybe better implementation for txt file open?
 
-    speakers_positions_file = os.path.join(generate_RIR_path(recorded_reverb_name), S3A_LOUDSPEAKER_POSITIONS_TXTFILE)
+    speakers_positions_file = os.path.join(generate_RIR_path(recorded_reverb_name), RECORDED_REVERB_LOUDSPEAKER_POSITIONS_TXTFILE)
 
     # Retrieve the file content into speaker_positions
     speaker_positions_cartesian = []
@@ -596,23 +596,23 @@ def retrieve_RIR_positions(recorded_reverb_name):
 
     return speaker_positions_spherical
 
-######### S3A CONFIG #########
+######### RECORDED REVERB CONFIG #########
 
-# Container for storing specfic S3A reverb configuration values
-S3aReverbSpec = namedtuple(
-    'S3aReverbSpec',
+# Container for storing specfic recorded reverb configuration values
+RecordedReverbSpec = namedtuple(
+    'RecordedReverbSpec',
     ['name'
      # TODO: add source position constrains type (random, magnet, etc)
      ], verbose=False)
 
-S3A_LOUDSPEAKER_POSITIONS_TXTFILE = "LsPos.txt"
+RECORDED_REVERB_LOUDSPEAKER_POSITIONS_TXTFILE = "LsPos.txt"
 
 # Filters are named by 'lsX.wav', with X the speaker number
-S3A_FILTER_NAME = 'ls'
-S3A_FILTER_EXTENSION = '.wav'
+RECORDED_REVERB_FILTER_NAME = 'ls'
+RECORDED_REVERB_FILTER_EXTENSION = '.wav'
 
-S3A_FOLDER_NAME = "IRs"
-S3A_FOLDER_PATH = os.path.join(os.getcwd(), S3A_FOLDER_NAME)
+RECORDED_REVERB_FOLDER_NAME = "IRs"
+RECORDED_REVERB_FOLDER_PATH = os.path.join(os.getcwd(), RECORDED_REVERB_FOLDER_NAME)
 
 
 
