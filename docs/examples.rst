@@ -142,8 +142,8 @@ Setting it to ``False`` might be useful in many cases, but then there is the ris
                         allow_repeated_source=True)
 
 
-Example 3: Reverberant soundscape from IR measurement
------------------------------------------------------
+Example 3: Reverberant soundscape from recorded Ambisonics IRs
+--------------------------------------------------------------
 
 So far we have been considering the anechoic case, which is great, but unfortunately not realistic.
 Reverberation is present in almost all acoustic environments, and most state-of-the-art algorithms
@@ -187,6 +187,10 @@ inside ``add_recorded_reverb()`` method. There are different options:
     *  ``wrap_surface``: source position assigned to the closest speaker position around the spherical surface
     *  ``random``: source position assigned randomly to one of the available speaker positions
 
+Please note that the reverb is as well specified in terms of distribution tuples, reusing the logic for the sound events,
+and allowing for a very flexible dataset creation. Only one reverb type might be specified per soundscape, *i.e.*,
+per each time the ``generate()`` method is called.
+
 
 .. code-block:: python
 
@@ -220,7 +224,7 @@ inside ``add_recorded_reverb()`` method. There are different options:
                              pitch_shift=('const', 1),
                              time_stretch=('const', 1))
 
-    # Add reverb
+    # Add a recorded reverb
     ambiscaper.add_recorded_reverb(name=('const','MainChurch'),
                                    wrap=('const','wrap_azimuth'))
 
@@ -236,6 +240,43 @@ Please notice the warning message:
 
     ``AmbiScaperWarning: User-defined Ambisonics order L=2 is higher than the maximum order allowed by the reverb spec. Downgrading to 1 AmbiScaperWarning)``.
 
+The last remark is about the IRs. In order to be useful to dereverberation/reverb estimation applications,
+the actual IRs used are softlinked into the output */source/* folder, together with the source files.
+The name of the softlink corresponds to the ``event_id`` parameter for each source: for example, source 0,
+which is named ``fg0.wav``, will have a corresponding ``ir_fg0.wav`` softlink file, and so on.
+
+
+Example 3: Reverberant soundscape from simulated Ambisonics IRs
+--------------------------------------------------------------
+
+AmbiScaper provides the option to use simulated IRs to create synthetic reverberant sound scapes.
+This option might be useful in the cases in which it is not possible to record IRs, due to
+limitations on equipment, permissions or whaterver other reason.
+It is as well indicated for parametric analysis (for example, how is the performance of my BSS algorithm
+as a function on t60?).
+
+The simulated reverbs are computed through the wonderful
+`SMIR Generator <https://www.audiolabs-erlangen.de/fau/professor/habets/software/smir-generator>`_,
+a Matlab library intended for simulation of IRs on a spherical surface (as for example an Ambisonics Microphone).
+For a more detailed explanation, please refer to [Jarrett2012]_.
+
+.. note::
+
+    Please, notice that SMIR Generator is implemented in Matlab, and therefore a valid Matlab installation
+    is needed in order to run the program.
+
+When the simulated reverb is specified, AmbiScaper will internally launch a background Matlab sesssion,
+which will execute the required computation. When finished, the resulting data will be transferred back to
+AmbiScaper, and the Matlab session will be automatically closed. All this process remains hidden for the user.
+
+Please, take into account that IR simulation is a computationally expensive process, and the computation time
+will increase exponentially with the Ambisonics order.
+
+As a result of AmbiScaper's ``generate()`` method, the computed IRs will be available at the */source/* folder.
+AmbiScaper provides thus a way to create databases of Ambisonics IRs, defined in statistical terms.
+
+In Example 4, we will create a file consisting of a trumpet recording in a synthetic reverberant environment,
+virtually captured with a EigenMike em32 microphone.
 
 .. [Carpentier2017] Carpentier, T. (2017, May).
     Ambisonic spatial blur.
@@ -244,3 +285,8 @@ Please notice the warning message:
 .. [Coleman2015]
  Coleman, P., Remaggi, L., and Jackson, PJB. (2015)
   "S3A Room Impulse Responses", http://dx.doi.org/10.15126/surreydata.00808465
+
+.. [Jarrett2012]
+D. P. Jarrett, E. A. P. Habets, M. R. P. Thomas and P. A. Naylor,
+"Rigid sphere room impulse response simulation: algorithm and applications,"
+Journal of the Acoustical Society of America, Volume 132, Issue 3, pp. 1462-1472, 2012.

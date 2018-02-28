@@ -47,6 +47,10 @@ from .reverb_ambisonics import RecordedReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
 from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
 import copy
+try:
+    import matlab_wrapper
+except ImportError:
+    pass
 
 # Define single event spec as namedtuple
 EventSpec = namedtuple(
@@ -925,20 +929,17 @@ class AmbiScaper(object):
         self.reverb_spec = self.DEFAULT_REVERB_SPEC
 
 
-        # check Matlab!!
+        # Check Matlab!!
+        # We have tried to import it on the header,
+        # but we can check again to see if an ImportException is thrown
+        # This should not have any performance issues,
+        # since the library should be already cached
         self.matlab_available = True
         try:
             import matlab_wrapper
         except ImportError:
             self.matlab_available = False
 
-
-    def _is_matlab_available(self):
-        """
-        Check if a working copy of matlab is available on the sistem
-        :return: bool
-        """
-        return self.matlab_available
 
     def add_background(self, source_file, source_time):
         '''
@@ -1223,8 +1224,9 @@ class AmbiScaper(object):
         '''
 
         # SAFETY_CHECKS
-        if not self._is_matlab_available():
-           warnings.warn("Matlab not available in the system",AmbiScaperWarning)
+        if not self.matlab_available:
+            warnings.warn("Matlab not available in the system! Creating anechoic soundscape",AmbiScaperWarning)
+            return
 
         _validate_smir_reverb_spec(IRlength, room_dimensions,
                   t60, reflectivity, source_type, microphone_type)
@@ -1594,8 +1596,10 @@ class AmbiScaper(object):
 
         '''
 
-        if not self._is_matlab_available():
-           warnings.warn("Matlab not available in the system",AmbiScaperWarning)
+        # SAFETY_CHECKS
+        if not self.matlab_available:
+            warnings.warn("Matlab not available in the system! Creating anechoic soundscape",AmbiScaperWarning)
+            return
 
         reverb = self.reverb_spec
 
@@ -1825,13 +1829,39 @@ class AmbiScaper(object):
                     reflection_order= SMIR_REFLECTION_ORDER,
                     reflection_coef_ang_dep = SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY,
                     # [radius, azimuth, elevation]
-            )
+                )
+
+                # Spread must be 0, so manually impose it by making a copy of fg_instanciated_specs
+                imposed_fg_specs = []
+                for e in fg_instanciated_event_specs:
+                    # Note that spread is hardcoded to 0 by definition
+                    imposed_fg_specs.append(EventSpec(event_id=e.event_id,
+                                                      source_file=e.source_file,
+                                                      source_time=e.source_time,
+                                                      event_time=e.event_time,
+                                                      event_duration=e.event_duration,
+                                                      event_azimuth=e.event_azimuth,
+                                                      event_elevation=e.event_elevation,
+                                                      event_spread= 0.0,                # changed!
+                                                      snr=e.snr,
+                                                      role=e.role,
+                                                      pitch_shift=e.pitch_shift,
+                                                      time_stretch=e.time_stretch))
+
+                # Actually substitute (*deepcopy*) the old events for the new imposed ones
+                fg_instanciated_event_specs = []
+                for fg_spec in imposed_fg_specs:
+                    fg_instanciated_event_specs.append(copy.deepcopy(fg_spec))
+
 
             elif isinstance(instantiated_reverb_spec, RecordedReverbSpec):
 
                 ann_reverb = jams.Annotation(namespace='ambiscaper_recorded_reverb')
 
-                # TODO: should we add some info to sandbox??
+                # Add reverb spec info to sandbox
+                ann_reverb.sandbox.ambiscaper = jams.Sandbox(
+                    reverb_spec=self.reverb_spec,
+                )
 
                 # Retrieve loudspeaker positions
                 imposed_source_positions_spherical = retrieve_RIR_positions_spherical(instantiated_reverb_spec.name)
@@ -1918,6 +1948,8 @@ class AmbiScaper(object):
                        value=instantiated_reverb_spec._asdict(),
                        confidence=1.0)
             jam.annotations.append(ann_reverb)
+
+            # TODO: add other info to sandbox
 
 
         #####################
@@ -2049,13 +2081,20 @@ class AmbiScaper(object):
         self.matlab.put('L', instantiated_reverb_values['room_dimensions'])
         # Receiver will be at the middle of the room
         # TODO: make it configurable??
-        self.matlab.put('sphLocation', get_receiver_position(instantiated_reverb_values['room_dimensions']))
+        receiver_position_cartesian = get_receiver_position(instantiated_reverb_values['room_dimensions'])
+        self.matlab.put('sphLocation', receiver_position_cartesian)
+
         # Source location will be given by the specific instance
         azi = e.value['event_azimuth'],
         ele = e.value['event_elevation']
-        self.matlab.put('s', (spherical_to_cartesian([float(e.value['event_azimuth']),
-                                                      float(e.value['event_elevation']),
-                                                      float(SMIR_DEFAULT_SOURCE_RADIUS)])))
+        # This is the position with respect to coordinate system origin
+        source_position_cartesian = spherical_to_cartesian([float(e.value['event_azimuth']),
+                                                            float(e.value['event_elevation']),
+                                                            float(SMIR_DEFAULT_SOURCE_RADIUS)])
+        # Change it to receiver's coordinate system
+        for i, d in enumerate(source_position_cartesian):
+            source_position_cartesian[i] = d + receiver_position_cartesian[i]
+        self.matlab.put('s', source_position_cartesian)
 
         # Default no High Pass Filter
         self.matlab.put('HP', float(SMIR_HIGH_PASS_FILTER))
