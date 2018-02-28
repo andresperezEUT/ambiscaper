@@ -21,7 +21,8 @@ import pandas as pd
 from .ambiscaper_exceptions import AmbiScaperError
 from .ambiscaper_warnings import AmbiScaperWarning
 from .util import _close_temp_files, spherical_to_cartesian, _validate_distribution, SUPPORTED_DIST, \
-    _get_event_idx_from_id, _generate_event_id_from_idx, _get_sorted_audio_files_recursive
+    _get_event_idx_from_id, _generate_event_id_from_idx, _get_sorted_audio_files_recursive, cartesian_to_spherical, \
+    find_closest_spherical_point
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -34,8 +35,10 @@ from .ambisonics import get_number_of_ambisonics_channels, change_channel_orderi
 from .ambisonics import _validate_ambisonics_order
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
-from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_recorded_reverb_spec, retrieve_available_recorded_IRs
-from .reverb_ambisonics import retrieve_RIR_positions
+from .reverb_ambisonics import generate_RIR_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, \
+    SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, \
+    SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_recorded_reverb_spec, \
+    retrieve_available_recorded_IRs, retrieve_RIR_positions_spherical, retrieve_available_recorded_wrap_values
 from .reverb_ambisonics import MATLAB_ROOT
 from .reverb_ambisonics import RECORDED_REVERB_FILTER_NAME
 from .reverb_ambisonics import RECORDED_REVERB_FILTER_EXTENSION
@@ -43,6 +46,7 @@ from .reverb_ambisonics import SMIR_FOLDER_PATH
 from .reverb_ambisonics import RecordedReverbSpec
 from .reverb_ambisonics import SmirReverbSpec
 from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
+import copy
 
 # Define single event spec as namedtuple
 EventSpec = namedtuple(
@@ -1247,7 +1251,7 @@ class AmbiScaper(object):
         return
 
 
-    def add_recorded_reverb(self, name):
+    def add_recorded_reverb(self, name, wrap):
         '''
         Specify an ambisonics reverb for the current sound scene based on recorded material.
 
@@ -1283,10 +1287,10 @@ class AmbiScaper(object):
         '''
 
         # SAFETY_CHECKS
-        _validate_recorded_reverb_spec(name)
+        _validate_recorded_reverb_spec(name, wrap)
 
         # Create reverb spec
-        self.reverb_spec = RecordedReverbSpec(name=name)
+        self.reverb_spec = RecordedReverbSpec(name=name,wrap=wrap)
 
         return
 
@@ -1640,11 +1644,11 @@ class AmbiScaper(object):
         return instantiated_reverb
 
 
-    def _instantiate_recorded_reverb(self,
-                                     disable_instantiation_warnings=False):
+    def _instantiate_recorded_reverb(self, disable_instantiation_warnings=False):
+
+        ## name
 
         name = self.reverb_spec.name
-
         # If 'choose' and list is empty, then choose from all available IRs
         if name[0] == "choose" and not name[1]:
             name_tuple = list(name)
@@ -1654,7 +1658,19 @@ class AmbiScaper(object):
             name_tuple = name
         name = _get_value_from_dist(name_tuple)
 
-        return RecordedReverbSpec(name=name)
+        ## wrap
+
+        wrap = self.reverb_spec.wrap
+        # If 'choose' and list is empty, then choose from all available wrapping types
+        if wrap[0] == "choose" and not wrap[1]:
+            wrap_tuple = list(wrap)
+            wrap_tuple[1] = retrieve_available_recorded_wrap_values()
+            wrap_tuple = tuple(wrap_tuple)
+        else:
+            wrap_tuple = wrap
+        wrap = _get_value_from_dist(wrap_tuple)
+
+        return RecordedReverbSpec(name=name,wrap=wrap)
 
     def _instantiate(self,
                      allow_repeated_source=True,
@@ -1665,6 +1681,9 @@ class AmbiScaper(object):
 
         Any non-deterministic event values (i.e. distribution tuples) will be
         sampled randomly from based on the distribution parameters.
+
+        Note: if there is a reverb spec, then the distribution values given for the event
+        might change due to the limitations of the reverb.
 
         Parameters
         ----------
@@ -1691,13 +1710,66 @@ class AmbiScaper(object):
         '''
         jam = jams.JAMS()
 
-        ############### andres
 
-        # Let's instanciate the reverb before the sound events.
-        # Since the recorded reverbs impose a limitation on the source positions,
-        # we will need this information beforehand.
+        # So...
+        # For wrapping the instanciated source positions around the recorded IR positions,
+        # we would obviously need the instanciated source positions.
+        # However, at this point we only have the distribution tuples.
+        # So, let's first instanciate the events, keeping the values for later,
+        # then instanciate the reverb specs and adding to the annotation,
+        # and then annotate the events
 
 
+        ########################
+        #  INSTANCIATE EVENTS  #
+        ########################
+
+        # Add background sounds
+        # TODO: bg_source_files not used!!
+        bg_source_files = []
+        bg_instanciated_event_specs = []
+        for event_idx, event in enumerate(self.bg_spec):
+            value = self._instantiate_event(
+                event,
+                event_idx,
+                isbackground=True,
+                allow_repeated_source=allow_repeated_source,
+                used_source_files=bg_source_files,
+                disable_instantiation_warnings=disable_instantiation_warnings)
+            # Store event spec for later
+            bg_instanciated_event_specs.append(value)
+
+        # Add foreground events
+        # TODO: fg_source_files not used!!
+        fg_source_files = []
+        fg_instanciated_event_specs = []
+        for event_idx, event in enumerate(self.fg_spec):
+            value = self._instantiate_event(
+                event,
+                event_idx,
+                isbackground=False,
+                allow_repeated_source=allow_repeated_source,
+                used_source_files=fg_source_files,
+                disable_instantiation_warnings=disable_instantiation_warnings)
+
+            # Tune the event duration
+            if value.time_stretch is not None:
+                event_duration_stretched = (
+                    value.event_duration * value.time_stretch)
+            else:
+                event_duration_stretched = value.event_duration
+
+            # Store event spec for later
+            fg_instanciated_event_specs.append(value)
+
+
+        #####################################
+        #  INSTANCIATE AND ANNOTATE REVERB  #
+        #####################################
+
+        # TODO: annotate recorded reverb distribution tuples
+
+        # Check if we have reverb...
         if self.reverb_spec:
 
             # INSTANTIATE REVERB VALUES
@@ -1753,8 +1825,6 @@ class AmbiScaper(object):
                     reflection_order= SMIR_REFLECTION_ORDER,
                     reflection_coef_ang_dep = SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY,
                     # [radius, azimuth, elevation]
-                    # todo: is it needed?
-                    # source_positions_sph = [[SMIR_DEFAULT_SOURCE_RADIUS,pos[0],pos[1]] for pos in fg_source_positions],
             )
 
             elif isinstance(instantiated_reverb_spec, RecordedReverbSpec):
@@ -1764,112 +1834,114 @@ class AmbiScaper(object):
                 # TODO: should we add some info to sandbox??
 
                 # Retrieve loudspeaker positions
-                imposed_source_positions = retrieve_RIR_positions(instantiated_reverb_spec.name)
+                imposed_source_positions_spherical = retrieve_RIR_positions_spherical(instantiated_reverb_spec.name)
 
-                # Since we cannot modify directly an EventSpec (todo: why?)
+                # Since we cannot modify directly an EventSpec
                 # we will copy all valid args from each event, and create a new set of events
-                # which will be attached to the fg_spec list
-                imposed_fg_spec = []
+                # which will be substituted in the fg_instanciated_event_specs list
+                imposed_fg_specs = []
                 self.chosen_IR_indices = []
 
-                for e in self.fg_spec:
-                    # For the moment, just choose random on the imposed positions for each event
-                    # TODO: do we want
-                    random_index = random.randint(0, len(imposed_source_positions) - 1)
-                    random_position = imposed_source_positions[random_index]
-                    imposed_azimuth = ('const', random_position[0])
-                    imposed_elevation = ('const', random_position[1])
-                    imposed_spread = ('const', 0.0)
+                for e in fg_instanciated_event_specs:
 
-                    # Store the random indinces, so later in the generate_audio method we can
-                    # easily retrieve the associated IRs
-                    # Achtung! indices start at 0, but audio files start at 1...
-                    self.chosen_IR_indices.append(random_index)
+                    # Random
+                    if instantiated_reverb_spec.wrap == 'random':
+                        # just pick a random value
+                        random_index = random.randint(0, len(imposed_source_positions_spherical) - 1)
+                        random_position = imposed_source_positions_spherical[random_index]
 
-                    # Create a new event copying the other relevant informationo
-                    imposed_fg_spec.append(EventSpec(event_id=e.event_id,
-                                                     source_file=e.source_file,
-                                                     source_time=e.source_time,
-                                                     event_time=e.event_time,
-                                                     event_duration=e.event_duration,
-                                                     event_azimuth=imposed_azimuth,  # changed!
-                                                     event_elevation=imposed_elevation,  # changed!
-                                                     event_spread=imposed_spread,  # changed!
-                                                     snr=e.snr,
-                                                     role=e.role,
-                                                     pitch_shift=e.pitch_shift,
-                                                     time_stretch=e.time_stretch))
+                        # Store the random indinces, so later in the generate_audio method we can
+                        # easily retrieve the associated IRs
+                        # Achtung! indices start at 0, but audio files start at 1...
+                        self.chosen_IR_indices.append(random_index)
 
-                # Actually substitute the old events for the new imposed ones
-                self.fg_spec = []
-                [self.fg_spec.append(e) for e in imposed_fg_spec]
+                        # Assign actual values
+                        # (no distribution tuples because we just instanciated
+                        # the events in order to know the exact positions)
+                        imposed_azimuth = random_position[0]
+                        imposed_elevation =  random_position[1]
+
+                    # Wrap
+                    else:
+                        if instantiated_reverb_spec.wrap == 'wrap_azimuth':
+
+                            index_of_closest = find_closest_spherical_point([e.event_azimuth,e.event_elevation],
+                                                                            imposed_source_positions_spherical,
+                                                                            criterium='azimuth')
+
+                        elif instantiated_reverb_spec.wrap == 'wrap_elevation':
+
+                            index_of_closest = find_closest_spherical_point([e.event_azimuth, e.event_elevation],
+                                                                            imposed_source_positions_spherical,
+                                                                            criterium='elevation')
+
+                        elif instantiated_reverb_spec.wrap == 'wrap_surface':
+
+                            index_of_closest = find_closest_spherical_point([e.event_azimuth, e.event_elevation],
+                                                                            imposed_source_positions_spherical,
+                                                                            criterium='surface')
+
+                        # Store the random indinces, so later in the generate_audio method we can
+                        # easily retrieve the associated IRs
+                        # Achtung! indices start at 0, but audio files start at 1...
+                        self.chosen_IR_indices.append(index_of_closest)
+
+                        # Once we have :index_of_closest:, let's assign the values
+                        imposed_azimuth = imposed_source_positions_spherical[index_of_closest][0]
+                        imposed_elevation = imposed_source_positions_spherical[index_of_closest][1]
+
+                    # Now we have the imposed values, so let's create the imposed spec for the current event
+                    # Note that spread is hardcoded to 0 by definition
+                    imposed_fg_specs.append(EventSpec(event_id=e.event_id,
+                                                      source_file=e.source_file,
+                                                      source_time=e.source_time,
+                                                      event_time=e.event_time,
+                                                      event_duration=e.event_duration,
+                                                      event_azimuth=imposed_azimuth,     # changed!
+                                                      event_elevation=imposed_elevation, # changed!
+                                                      event_spread= 0.0,                 # changed!
+                                                      snr=e.snr,
+                                                      role=e.role,
+                                                      pitch_shift=e.pitch_shift,
+                                                      time_stretch=e.time_stretch))
+
+                # Actually substitute (*deepcopy*) the old events for the new imposed ones
+                fg_instanciated_event_specs = []
+                for fg_spec in imposed_fg_specs:
+                    fg_instanciated_event_specs.append(copy.deepcopy(fg_spec))
 
 
+
+            # Create the reverb annotation
             ann_reverb.append(time=0.0,   # TODO: does it have any meaning for a reverb?
                        duration=0.0,      # TODO: does it have any meaning for a reverb?
                        value=instantiated_reverb_spec._asdict(),
                        confidence=1.0)
-
             jam.annotations.append(ann_reverb)
 
 
-        #############################################
-
-        # INSTANTIATE BACKGROUND AND FOREGROUND EVENTS AND ADD TO ANNOTATION
-        # NOTE: logic for instantiating bg and fg events is NOT the same.
+        #####################
+        #  ANNOTATE EVENTS  #
+        #####################
 
         ann = jams.Annotation(namespace='ambiscaper_sound_event')
 
         # Set annotation duration (might be changed later due to cropping)
         ann.duration = self.duration
 
-        # Add background sounds
-        bg_source_files = []
-        for event_idx, event in enumerate(self.bg_spec):
-            value = self._instantiate_event(
-                event,
-                event_idx,
-                isbackground=True,
-                allow_repeated_source=allow_repeated_source,
-                used_source_files=bg_source_files,
-                disable_instantiation_warnings=disable_instantiation_warnings)
+        # Annotate background
+        for bg_event_spec in bg_instanciated_event_specs:
+            ann.append(time=value.event_time,
+                           duration=value.event_duration,
+                           value=bg_event_spec._asdict(),
+                           confidence=1.0)
 
-            # Note: add_background doesn't allow to set a time_stretch, i.e.
-            # it's hardcoded to time_stretch=None, so we don't need to check
-            # if value.time_stretch is not None, since it always will be.
+        # Annotate foreground
+        for fg_event_spec in fg_instanciated_event_specs:
             ann.append(time=value.event_time,
                        duration=value.event_duration,
-                       value=value._asdict(),
+                       value=fg_event_spec._asdict(),
                        confidence=1.0)
-
-        # Keep them for the reverb spec...
-        fg_source_positions = []
-
-        # Add foreground events
-        fg_source_files = []
-        for event_idx, event in enumerate(self.fg_spec):
-            value = self._instantiate_event(
-                event,
-                event_idx,
-                isbackground=False,
-                allow_repeated_source=allow_repeated_source,
-                used_source_files=fg_source_files,
-                disable_instantiation_warnings=disable_instantiation_warnings)
-
-            # Retrieve source position
-            fg_source_positions.append([value.event_azimuth,value.event_elevation])
-
-            if value.time_stretch is not None:
-                event_duration_stretched = (
-                    value.event_duration * value.time_stretch)
-            else:
-                event_duration_stretched = value.event_duration
-
-            ann.append(time=value.event_time,
-                       duration=event_duration_stretched,
-                       value=value._asdict(),
-                       confidence=1.0)
-
 
         # Compute max polyphony
         poly = max_polyphony(ann)
@@ -1902,6 +1974,7 @@ class AmbiScaper(object):
         # Set jam metadata
         jam.file_metadata.duration = ann.duration
 
+        ##########################################
 
         # Return
         return jam

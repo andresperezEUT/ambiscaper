@@ -47,7 +47,7 @@ To install the latest version of ambiscaper from source:
 
 1. Clone or pull the lastest version:
 
->>> git clone git@github.com:andresperezlopez/ambiscaper.git
+>>> git clone https://github.com/andresperezlopez/ambiscaper.git
 
 2. Install using pip to handle python dependencies:
 

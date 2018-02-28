@@ -566,6 +566,44 @@ def find_element_in_list(element, list_arg):
         return None
 
 
+def find_closest_spherical_point(point,list_of_points,criterium='azimuth'):
+    '''
+
+    :param point:
+    :param list_of_points:
+    :return:
+    '''
+
+    # Let's define the geometry with azi between 0 and 2pi
+
+    azi = float(wrap_number(point[0],0,2*np.pi))
+    ele = float(wrap_number(point[1],0,2*np.pi))
+
+    list_of_distances = []
+    for p in list_of_points:
+        target_azi = float(wrap_number(p[0],0,2*np.pi))
+        target_ele = float(wrap_number(p[1],0,2*np.pi))
+
+        # Closer in azimuth
+        if criterium is 'azimuth':
+            dist = np.abs(azi - target_azi)
+            dist = min(dist, (2 * np.pi) - dist) # Because azimuth is periodic every 2pi
+
+        elif criterium is 'elevation':
+            dist = np.abs(ele - target_ele)
+
+        elif criterium is 'surface': # both angles
+            dist_azi = np.abs(azi - target_azi)
+            dist_azi = min(dist_azi, (2 * np.pi) - dist_azi)  # Because azimuth is periodic every 2pi
+            dist_ele = np.abs(ele - target_ele)
+            # kinda euclidean distance from angles
+            dist = np.sqrt(pow(dist_azi,2)+pow(dist_ele,2))
+
+        list_of_distances.append(dist)
+
+    index_of_min_distance = list_of_distances.index(min(list_of_distances))
+    return (index_of_min_distance)
+
 def _generate_event_id_from_idx(event_idx,role):
     '''
     Given an event_idx (an integer),

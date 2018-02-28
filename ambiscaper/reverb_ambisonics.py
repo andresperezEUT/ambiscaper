@@ -383,10 +383,10 @@ def _validate_microphone_type(mic_type_tuple):
             'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
-def _validate_recorded_reverb_spec(reverb_name):
+def _validate_recorded_reverb_spec(reverb_name, reverb_wrap):
 
-    # Just one element for the moment
     _validate_recorded_reverb_name(reverb_name)
+    _validate_recorded_reverb_wrap(reverb_wrap)
 
     return
 
@@ -489,6 +489,65 @@ def _validate_recorded_reverb_name(reverb_name_tuple):
             'Reverb name must be specified using a "const" or "choose" tuple.')
 
 
+def _validate_recorded_reverb_wrap(reverb_wrap_tuple):
+    '''
+
+    :param reverb_wrap:
+    :return:
+    '''
+
+    # Make sure it's a valid distribution tuple
+    _validate_distribution(reverb_wrap_tuple)
+
+    # Make sure that type matches
+    def __valid_recorded_reverb_wrap_types(reverb_wrap):
+        if (not isinstance(reverb_wrap, str)):
+            return False
+        else:
+            return True
+
+    def __valid_recorded_reverb_wrap_values(reverb_wrap):
+        if reverb_wrap not in RECORDED_REVERB_VALID_WRAP_VALUES:
+            return False
+        else:
+            return True
+
+    # If reverb wrap is specified explicitly
+    if reverb_wrap_tuple[0] == "const":
+
+        # reverb wrap: allowed string
+        if reverb_wrap_tuple[1] is None:
+            raise AmbiScaperError(
+                'reverb_config: reverb wrap is None')
+        elif not __valid_recorded_reverb_wrap_types(reverb_wrap_tuple[1]):
+            raise AmbiScaperError(
+                'reverb_config: reverb wrap must be a string')
+        elif not __valid_recorded_reverb_wrap_values(reverb_wrap_tuple[1]):
+            raise AmbiScaperError(
+                'reverb_config: reverb wrap not valid:' + reverb_wrap_tuple[1])
+
+    # Otherwise it must be specified using "choose"
+    # Empty list is allowed, meaning all avaiable IRS
+    elif reverb_wrap_tuple[0] == "choose":
+        # Not a list
+        if not isinstance(reverb_wrap_tuple[1], list):
+            raise AmbiScaperError(
+                'reverb_config: no list for choose')
+            # Empty list
+            # elif len(reverb_name_tuple[1]) is 0:
+            # raise AmbiScaperError(
+            #     'reverb_config: empty list for choose')
+        elif not all(__valid_recorded_reverb_wrap_types(length) for length in reverb_wrap_tuple[1]):
+            raise AmbiScaperError(
+                'reverb_config: reverb name must be a positive integer')
+        elif not all(__valid_recorded_reverb_wrap_values(name) for name in reverb_wrap_tuple[1]):
+            raise AmbiScaperError(
+                'reverb_config: reverb names not valid: ' + str(reverb_wrap_tuple[1]))
+
+    # No other labels allowed"
+    else:
+        raise AmbiScaperError(
+            'Reverb wrap must be specified using a "const" or "choose" tuple.')
 
 def get_max_ambi_order_from_reverb_config(reverb_spec):
     '''
@@ -522,7 +581,7 @@ def get_max_ambi_order_from_reverb_config(reverb_spec):
 
     elif isinstance(reverb_spec, RecordedReverbSpec):
         # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
-        Q = 1
+        Q = 4
     else:
         raise AmbiScaperError(
             'Not valid reverb_spec'
@@ -541,6 +600,14 @@ def retrieve_available_recorded_IRs():
 
     # TODO: implement it in a more elegant way
     return [e for e in os.listdir(RECORDED_REVERB_FOLDER_PATH) if not e == 'README.md' and not e == '.DS_Store']
+
+
+def retrieve_available_recorded_wrap_values():
+    '''
+
+    :return:
+    '''
+    return RECORDED_REVERB_VALID_WRAP_VALUES
 
 def generate_RIR_path(recorded_reverb_name):
     '''
@@ -562,13 +629,13 @@ def generate_RIR_path(recorded_reverb_name):
     return os.path.expanduser(os.path.join(RECORDED_REVERB_FOLDER_PATH, recorded_reverb_name, 'Soundfield'))
 
 
-def retrieve_RIR_positions(recorded_reverb_name):
+def retrieve_RIR_positions_spherical(recorded_reverb_name):
     '''
     Retrieve all speaker positions from a given recorded reverb name
 
     :param recorded_reverb_name: string referencing to a valid recorded reverb name
 
-    :return: List with the speaker positions in the format ``[azimuth, elevation, radius]`` (in radians).
+    :return: List with the speaker positions in the format ``[azimuth, elevation]`` (in radians).
     '''
 
     # Folder structure should be something like:
@@ -592,7 +659,7 @@ def retrieve_RIR_positions(recorded_reverb_name):
             speaker_positions_cartesian.append([float(element) for element in line])
 
     # Convert speaker_positions to spherical coordinates
-    speaker_positions_spherical = [cartesian_to_spherical(pos) for pos in speaker_positions_cartesian]
+    speaker_positions_spherical = [cartesian_to_spherical(pos)[:-1] for pos in speaker_positions_cartesian]
 
     return speaker_positions_spherical
 
@@ -601,8 +668,8 @@ def retrieve_RIR_positions(recorded_reverb_name):
 # Container for storing specfic recorded reverb configuration values
 RecordedReverbSpec = namedtuple(
     'RecordedReverbSpec',
-    ['name'
-     # TODO: add source position constrains type (random, magnet, etc)
+    ['name',
+     'wrap'
      ], verbose=False)
 
 RECORDED_REVERB_LOUDSPEAKER_POSITIONS_TXTFILE = "LsPos.txt"
@@ -613,6 +680,8 @@ RECORDED_REVERB_FILTER_EXTENSION = '.wav'
 
 RECORDED_REVERB_FOLDER_NAME = "IRs"
 RECORDED_REVERB_FOLDER_PATH = os.path.join(os.getcwd(), RECORDED_REVERB_FOLDER_NAME)
+
+RECORDED_REVERB_VALID_WRAP_VALUES = ['random', 'wrap_azimuth', 'wrap_elevation', 'wrap_surface']
 
 
 
