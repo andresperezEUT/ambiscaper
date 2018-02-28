@@ -174,18 +174,67 @@ The different speaker positions are specified in the ``LsPos.txt`` file.
 The implication for the soundscape generation is that we can only provide IRs from the actual measured emitter points,
 and with a limited spatial resolution (the Ambisonics order of the microphone used).
 
-Therefore, even when we specify
+In the following example, we define ``ambisonics_order = 2``.
+However, since we are defining a recorded reverb spec of order 1, ``'MainChurch'``, the system will automatically
+downgrade the Ambisonics order to match the minimum.
+
+Furthermore, the source positions will be limited to the ones provided by the ``'MainChurch'`` measurements.
+How AmbiScaper select the final source positions due to this constrain is selected through the ``wrap`` argument
+inside ``add_recorded_reverb()`` method. There are different options:
+
+    *  ``wrap_azimuth``: source position assigned to the closest speaker position in azimuth
+    *  ``wrap_elevation``: source position assigned to the closest speaker position in azimuth
+    *  ``wrap_surface``: source position assigned to the closest speaker position around the spherical surface
+    *  ``random``: source position assigned randomly to one of the available speaker positions
 
 
+.. code-block:: python
 
+    ### EXAMPLE 3
 
+    import ambiscaper
+    import numpy as np
+    import os
 
+    # AmbiScaper settings
+    soundscape_duration = 5.0
+    ambisonics_order = 2
+    samples_folder = os.path.abspath('./samples/Bicycle_Horn')
 
+    ### Create an ambiscaper instance
+    ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
+                                       ambisonics_order=ambisonics_order,
+                                       fg_path=samples_folder)
 
+    num_events = 2
+    for event_idx in range(num_events):
+        ### Add an event
+        ambiscaper.add_event(source_file=('choose',[]),
+                             source_time=('uniform', 0, soundscape_duration),
+                             event_time=('uniform', 0, soundscape_duration),
+                             event_duration=('const', soundscape_duration),
+                             event_azimuth=('uniform', 0, 2 * np.pi),
+                             event_elevation=('uniform', -np.pi / 2, np.pi / 2),
+                             event_spread=('uniform',0 ,1),
+                             snr=('uniform', 0, 10),
+                             pitch_shift=('const', 1),
+                             time_stretch=('const', 1))
 
+    # Add reverb
+    ambiscaper.add_recorded_reverb(name=('const','MainChurch'),
+                                   wrap=('const','wrap_azimuth'))
 
+    ### Genereate the audio and the annotation
+    outfolder = '/Volumes/Dinge/ambiscaper/testing/'  # watch out! outfolder must exist
+    destination_path = os.path.join(outfolder, "example3")
 
+    ambiscaper.generate(destination_path=destination_path,
+                        generate_txt=True,
+                        allow_repeated_source=True)
 
+Please notice the warning message:
+
+    ``AmbiScaperWarning: User-defined Ambisonics order L=2 is higher than the maximum order allowed by the reverb spec. Downgrading to 1 AmbiScaperWarning)``.
 
 
 .. [Carpentier2017] Carpentier, T. (2017, May).
