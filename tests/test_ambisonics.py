@@ -9,8 +9,7 @@
 import numpy as np
 from numpy import pi, sqrt
 import pytest
-from ambiscaper.ambisonics import get_spherical_harmonic_normalization_coef, _validate_ambisonics_spread_slope, \
-    change_channel_ordering_fuma_2_acn, change_normalization_fuma_2_sn3d
+from ambiscaper.ambisonics import get_spherical_harmonic_normalization_coef, change_channel_ordering_fuma_2_acn, change_normalization_fuma_2_sn3d
 from ambiscaper.ambisonics import get_ambisonics_spread_coefs
 from ambiscaper.ambisonics import get_number_of_ambisonics_channels
 from ambiscaper.ambisonics import get_ambisonics_coefs
@@ -356,14 +355,6 @@ def test_validate_ambisonics_spread_coefs():
     for bsv in bad_spread_coef_values:
         __test_bad_ambisonics_spread_coefs(bsv)
 
-
-def test_validate_ambisonics_spread_slope():
-    def __test_bad_ambisonics_spread_slope(slope):
-        pytest.raises(AmbiScaperError,_validate_ambisonics_spread_slope,slope)
-
-    bad_spread_slope_values = [-0.5,3,'1', None]
-    for bsv in bad_spread_slope_values:
-        __test_bad_ambisonics_spread_slope(bsv)
 
 def test_get_spread_gain():
 

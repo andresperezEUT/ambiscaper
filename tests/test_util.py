@@ -6,11 +6,10 @@ Tests for functions in util.py
 
 from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, \
     spherical_to_cartesian, find_element_in_list, event_background_id_string, event_foreground_id_string, \
-    _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution
+    _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution, find_closest_spherical_point
 from ambiscaper.util import _set_temp_logging_level
 from ambiscaper.util import _validate_folder_path
 from ambiscaper.util import _get_sorted_files
-from ambiscaper.util import _populate_label_list
 from ambiscaper.util import _trunc_norm
 from ambiscaper.util import max_polyphony
 from ambiscaper.util import polyphony_gini
@@ -29,17 +28,20 @@ from ambiscaper import AmbiScaper
 
 
 # FIXTURES
-BG_PATH = 'tests/data/audio/background/'
-FG_PATH = 'tests/data/audio/foreground/'
-FG_PATH_HUMANVOICE = 'tests/data/audio/foreground/human_voice'
+BG_PATH = 'samples/Acoustics_Book'
+FG_PATH = 'samples/Acoustics_Book'
 
-FG_LABEL_LIST = ['car_horn', 'human_voice', 'siren']
-HUMANVOICE_FILES = (
-    [os.path.join(FG_PATH_HUMANVOICE,
-                  '42-Human-Vocal-Voice-all-aboard_edit.wav'),
-     os.path.join(FG_PATH_HUMANVOICE, '42-Human-Vocal-Voice-taxi-1_edit.wav'),
-     os.path.join(FG_PATH_HUMANVOICE, '42-Human-Vocal-Voice-taxi-2_edit.wav')])
-SIREN_FILE = os.path.join(FG_PATH, 'siren', '69-Siren-1.wav')
+FG_PATH_FILES = ([
+    os.path.join(FG_PATH, 'adult_female_speech.wav'),
+    os.path.join(FG_PATH, 'bagpipe_music.wav'),
+    os.path.join(FG_PATH, 'bagpipe_steady_chord.wav'),
+    os.path.join(FG_PATH, 'flute_arpeggio.wav'),
+    os.path.join(FG_PATH, 'flute_music.wav'),
+    os.path.join(FG_PATH, 'tuba_arpeggio.wav'),
+    os.path.join(FG_PATH, 'tuba_music.wav'),
+])
+# FLUTE_FILE = os.path.join(FG_PATH, 'flute_arpeggio.wav')
+FLUTE_FILE = 'flute_arpeggio.wav'
 
 
 def test_close_temp_files():
@@ -88,7 +90,7 @@ def test_get_sorted_files():
     Ensure files are returned in expected order.
 
     '''
-    assert _get_sorted_files(FG_PATH_HUMANVOICE) == HUMANVOICE_FILES
+    assert _get_sorted_files(FG_PATH) == FG_PATH_FILES
 
 
 def test_validate_folder_path():
@@ -108,15 +110,6 @@ def test_validate_folder_path():
     # remove it
     shutil.rmtree(tmpdir)
 
-
-def test_populate_label_list():
-    '''
-    Should add folder names contained within provided folder to provided list.
-
-    '''
-    labellist = []
-    _populate_label_list(FG_PATH, labellist)
-    assert sorted(labellist) == sorted(FG_LABEL_LIST)
 
 
 def test_trunc_norm():
@@ -147,12 +140,12 @@ def test_max_polyphony():
     '''
     def __create_annotation_with_overlapping_events(n_events):
 
-        ann = jams.Annotation(namespace='sound_event')
+        ann = jams.Annotation(namespace='ambiscaper_sound_event')
         ann.duration = n_events / 2. + 10
 
         for ind in range(n_events):
-            instantiated_event = EventSpec(label='siren',
-                                           source_file='/the/source/file.wav',
+            instantiated_event = EventSpec(source_file='/the/source/file.wav',
+                                           event_id='fg0',
                                            source_time=0,
                                            event_time=ind / 2.,
                                            event_duration=10,
@@ -173,12 +166,12 @@ def test_max_polyphony():
 
     def __create_annotation_without_overlapping_events(n_events):
 
-        ann = jams.Annotation(namespace='sound_event')
+        ann = jams.Annotation(namespace='ambiscaper_sound_event')
         ann.duration = n_events * 10
 
         for ind in range(n_events):
-            instantiated_event = EventSpec(label='siren',
-                                           source_file='/the/source/file.wav',
+            instantiated_event = EventSpec(source_file='/the/source/file.wav',
+                                           event_id='fg0',
                                            source_time=0,
                                            event_time=ind * 10,
                                            event_duration=5,
@@ -220,17 +213,19 @@ def test_polyphony_gini():
     gini = pytest.raises(AmbiScaperError, polyphony_gini, ann)
 
     # Annotation without duration set should raise error
-    ann = jams.Annotation('sound_event', duration=None)
+    ann = jams.Annotation('ambiscaper_sound_event', duration=None)
     gini = pytest.raises(AmbiScaperError, polyphony_gini, ann)
 
     # Annotation with no foreground events returns a gini of 0
-    sc = AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
+    ambiscaper = AmbiScaper(duration=10.0,
+                            ambisonics_order=3,
+                            fg_path=FG_PATH,
+                            bg_path=BG_PATH)
 
     # add background
-    sc.add_background(label=('choose', []),
-                      source_file=('choose', []),
-                      source_time=('const', 0))
-    jam = sc._instantiate()
+    ambiscaper.add_background(source_file=('const', 'flute_arpeggio.wav'),
+                              source_time=('const', 0))
+    jam = ambiscaper._instantiate()
     ann = jam.annotations[0]
     gini = polyphony_gini(ann)
     assert gini == 0
@@ -241,31 +236,31 @@ def test_polyphony_gini():
         print(event_time_list)
 
         # create ambiscaper
-        sc = AmbiScaper(10.0, 3, 1, FG_PATH, BG_PATH)
+        ambiscaper = AmbiScaper(duration=10.0,
+                                ambisonics_order=3,
+                                fg_path=FG_PATH,
+                                bg_path=BG_PATH)
 
         # add background
-        sc.add_background(label=('choose', []),
-                          source_file=('choose', []),
-                          source_time=('const', 0))
-
+        ambiscaper.add_background(source_file=('choose', []),
+                                  source_time=('const', 0))
         # add foreground events based on the event time list
         # always use siren file since it is 26 s long, so we can choose the
         # event duration flexibly
         for onset, offset in event_time_list:
 
-            sc.add_event(label=('const', 'siren'),
-                         source_file=('const', SIREN_FILE),
-                         source_time=('const', 0),
-                         event_time=('const', onset),
-                         event_duration=('const', offset - onset),
-                         event_azimuth=('const', 0),
-                         event_elevation=('const', 0),
-                         event_spread=('const', 0),
-                         snr=('uniform', 6, 30),
-                         pitch_shift=('uniform', -3, 3),
-                         time_stretch=None)
+            ambiscaper.add_event(source_file=('const', FLUTE_FILE),
+                                 source_time=('const', 0),
+                                 event_time=('const', onset),
+                                 event_duration=('const', offset - onset),
+                                 event_azimuth=('const', 0),
+                                 event_elevation=('const', 0),
+                                 event_spread=('const', 0),
+                                 snr=('uniform', 6, 30),
+                                 pitch_shift=('uniform', -3, 3),
+                                 time_stretch=None)
 
-        jam = sc._instantiate()
+        jam = ambiscaper._instantiate()
         ann = jam.annotations[0]
         gini = polyphony_gini(ann, hop_size=hop_size)
         print(gini, expected_gini)
@@ -278,7 +273,7 @@ def test_polyphony_gini():
         [(0, 10), (3, 7), (4, 6)]
     ])
 
-    expected_ginis = [0, 0.1, 1, 0.75]
+    expected_ginis = [0, 0.1, 0.5, 0.2]
 
     for etl, g in zip(event_time_lists, expected_ginis):
         __test_gini_from_event_times(etl, g, hop_size=0.01)
@@ -563,3 +558,45 @@ def test_validate_distribution():
                ('truncnorm', 1, 2, 'three', 5), ('truncnorm', 1, 2, 3, 'four'),
                ('truncnorm', 0, 2, 2, 0)]
     __test_bad_tuple_list(badargs)
+
+
+def test_find_closest_spherical_point():
+
+    # bad arguments
+    badargs = [
+        # first argument not list of len 2
+        (0, [0, 0]),
+        ([1, 2, 3], [0, 0]),
+        # second argument not list of lists of len 2
+        ([0, 0], 0),
+        ([0, 0], [0, 0]),
+        ([0, 0], [[0, 0], [1, 2, 3]]),
+        # bad criterium string
+        ([0,0],[[0,0],[1,1]],'fake_criterium')
+
+    ]
+    for ba in badargs:
+        pytest.raises(AmbiScaperError, find_closest_spherical_point, *ba)
+
+    # correct arguments
+
+    point = [0,0]
+    list_of_points = [ [0,0], [1,1], [2,2] ]
+    assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='azimuth'))
+
+    point = [0.9,0]
+    list_of_points = [ [0,0], [1,1], [2,2] ]
+    assert( 1 == find_closest_spherical_point(point,list_of_points,criterium='azimuth'))
+
+    point = [0,0]   # wrapping azimuth around 2pi
+    list_of_points = [ [6,0], [1,1], [2,2] ]
+    assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='azimuth'))
+
+    point = [0,1]   # wrapping azimuth around 2pi
+    list_of_points = [ [0,0], [1,1], [2,2] ]
+    assert( 1 == find_closest_spherical_point(point,list_of_points,criterium='elevation'))
+
+    point = [1,1]   # wrapping azimuth around 2pi
+    list_of_points = [ [0,0], [4,1] ]
+    assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='surface'))
+

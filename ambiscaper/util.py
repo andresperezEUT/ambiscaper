@@ -138,38 +138,6 @@ def _validate_folder_path(folder_path):
                 str(folder_path)))
 
 
-def _populate_label_list(folder_path, label_list):
-    '''
-    Given a path to a folder and a list, add the names of all subfolders
-    contained in this folder (excluding folders whose name starts with '.') to
-    the provided list. This is used in ambiscaper to populate the lists of valid
-    foreground and background labels, which are determined by the names of the
-    folders contained in ```fg_path`` and ```bg_path``` provided during
-    initialization.
-
-    Parameters
-    ----------
-    folder_path : str
-        Path to a folder
-    label_list : list
-        List to which label (subfolder) names will be added.
-
-    See Also
-    --------
-    _validate_folder_path : Validate that a provided path points to a valid
-    folder.
-
-    '''
-
-    # Make sure folder path is valid
-    _validate_folder_path(folder_path)
-
-    folder_names = os.listdir(folder_path)
-    for fname in folder_names:
-        if (os.path.isdir(os.path.join(folder_path, fname)) and
-                fname[0] != '.'):
-            label_list.append(fname)
-
 
 def _trunc_norm(mu, sigma, trunc_min, trunc_max):
     '''
@@ -574,6 +542,26 @@ def find_closest_spherical_point(point,list_of_points,criterium='azimuth'):
     :return:
     '''
 
+    if not isinstance(point,list):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): fist argument not a list, given' + str(point))
+    elif len(point) != 2:
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): fist argument size != 2, given' + str(point))
+
+    if not isinstance(list_of_points,list):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): second argument not a list, given' + str(list_of_points))
+    elif not all(isinstance(v,list) for v in list_of_points):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): second argument not a list of lists, given' + str(list_of_points))
+    elif not all(len(v) == 2 for v in list_of_points):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): second argument not a list of lists of len 2, given' + str(list_of_points))
+
+    if criterium not in ['azimuth','elevation','surface']:
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): criterium not known, given' + criterium)
     # Let's define the geometry with azi between 0 and 2pi
 
     azi = float(wrap_number(point[0],0,2*np.pi))

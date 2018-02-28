@@ -26,7 +26,6 @@ from .util import _close_temp_files, spherical_to_cartesian, _validate_distribut
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
-from .util import _populate_label_list
 from .util import max_polyphony
 from .util import polyphony_gini
 from .util import is_real_number, is_real_array
@@ -1403,7 +1402,7 @@ class AmbiScaper(object):
 
         # Get the duration of the source audio file
         # It must use the expanded source file name
-        source_file_path = os.path.abspath(os.path.join(self.fg_path,source_file))
+        source_file_path = os.path.abspath(source_file)
         source_duration = sox.file_info.duration(source_file_path)
 
         # Determine event duration
