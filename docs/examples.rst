@@ -246,8 +246,12 @@ The name of the softlink corresponds to the ``event_id`` parameter for each sour
 which is named ``fg0.wav``, will have a corresponding ``ir_fg0.wav`` softlink file, and so on.
 
 
-Example 3: Reverberant soundscape from simulated Ambisonics IRs
---------------------------------------------------------------
+Example 4: Reverberant soundscape from simulated Ambisonics IRs
+---------------------------------------------------------------
+
+.. note::
+
+    SIMULATED REVERBS ARE STILL IN DEVELOPMENT!!
 
 AmbiScaper provides the option to use simulated IRs to create synthetic reverberant sound scapes.
 This option might be useful in the cases in which it is not possible to record IRs, due to
@@ -257,7 +261,8 @@ as a function on t60?).
 
 The simulated reverbs are computed through the wonderful
 `SMIR Generator <https://www.audiolabs-erlangen.de/fau/professor/habets/software/smir-generator>`_,
-a Matlab library intended for simulation of IRs on a spherical surface (as for example an Ambisonics Microphone).
+a Matlab library intended for simulation of IRs on a spherical surface (as for example an Ambisonics Microphone),
+inside a *shoebox* room model.
 For a more detailed explanation, please refer to [Jarrett2012]_.
 
 .. note::
@@ -275,18 +280,93 @@ will increase exponentially with the Ambisonics order.
 As a result of AmbiScaper's ``generate()`` method, the computed IRs will be available at the */source/* folder.
 AmbiScaper provides thus a way to create databases of Ambisonics IRs, defined in statistical terms.
 
+SMIR Generator is a very flexible tool and, consequently, many parameters might be tuned for the IR computation.
+AmbiScaper exposes a subset of the most relevant ones, described as distribution tuples,
+in the ``add_simulated_reverb()`` method:
+
+    * ``IRlength``: length in samples of the desired IRs
+    * ``room_dimensions``: specified in meters, in the format *[x,y,z]*
+    * ``t60``: reverberation time at 1 kHz, in seconds
+    * ``source_type``: source directionality, can be choosen between:
+        * 'o': omnidirectional
+        * 'c': cardioid
+        * 's': subcardioid
+        * 'h': hypercardioid
+        * 'b': bidirectional
+    * ``microphone_type``: AmbiScaper features some predefined virtual microphone geometries:
+        * 'Soundfield'
+        * 'Tetramic'
+        * 'em32'
+
+.. note::
+
+    It is possible, as well, to define the wall ``reflectivity``, specified for each one of the walls.
+    However, it is not possible to define both ``t60`` and ``reflectivity`` at the same time, for obvious reasons.
+    In that case, ``t60`` will be preferent.
+
+By default, the virtual microphone will be placed at the center of the room, and thus the source
+position is defined with respect to that center.
+
+
 In Example 4, we will create a file consisting of a trumpet recording in a synthetic reverberant environment,
-virtually captured with a EigenMike em32 microphone.
+virtually captured with a Soundfield microphone.
+
+.. code-block:: python
+
+    ### EXAMPLE 4
+
+    import ambiscaper
+    import numpy as np
+    import os
+
+    # AmbiScaper settings
+    soundscape_duration = 5.0
+    ambisonics_order = 1
+    samples_folder = os.path.abspath('./samples/Handel_Trumpet')
+
+    ### Create an ambiscaper instance
+    ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
+                                       ambisonics_order=ambisonics_order,
+                                       fg_path=samples_folder)
+
+
+    ### Add an event
+    ambiscaper.add_event(source_file=('choose',[]),
+                         source_time=('uniform', 0, soundscape_duration),
+                         event_time=('uniform', 0, soundscape_duration),
+                         event_duration=('const', soundscape_duration),
+                         event_azimuth=('const',0),
+                         event_elevation=('const',0),
+                         event_spread=('const',0.5),
+                         snr=('uniform', 0, 10),
+                         pitch_shift=('const', 1),
+                         time_stretch=('const', 1))
+
+    # Add Simulated Reverb
+    ambiscaper.add_simulated_reverb(IRlength=('const', 2048),                  # in samples
+                                    room_dimensions=('const', [3,3,2]),         # [x,y,z]
+                                    t60=('const', 0.2),                         # in seconds
+                                    source_type=('const', 'o'),                 # omnidirectional
+                                    microphone_type=('const', 'soundfield'))    # order 1
+
+
+    ### Genereate the audio and the annotation
+    outfolder = '/Volumes/Dinge/ambiscaper/testing/'  # watch out! outfolder must exist
+    destination_path = os.path.join(outfolder, "example4")
+
+    ambiscaper.generate(destination_path=destination_path,
+                        generate_txt=True,
+                        allow_repeated_source=True)
 
 .. [Carpentier2017] Carpentier, T. (2017, May).
     Ambisonic spatial blur.
     In Audio Engineering Society Convention 142. Audio Engineering Society.
 
 .. [Coleman2015]
- Coleman, P., Remaggi, L., and Jackson, PJB. (2015)
-  "S3A Room Impulse Responses", http://dx.doi.org/10.15126/surreydata.00808465
+    Coleman, P., Remaggi, L., and Jackson, PJB. (2015)
+    "S3A Room Impulse Responses", http://dx.doi.org/10.15126/surreydata.00808465
 
 .. [Jarrett2012]
-D. P. Jarrett, E. A. P. Habets, M. R. P. Thomas and P. A. Naylor,
-"Rigid sphere room impulse response simulation: algorithm and applications,"
-Journal of the Acoustical Society of America, Volume 132, Issue 3, pp. 1462-1472, 2012.
+    D. P. Jarrett, E. A. P. Habets, M. R. P. Thomas and P. A. Naylor,
+    "Rigid sphere room impulse response simulation: algorithm and applications,"
+    Journal of the Acoustical Society of America, Volume 132, Issue 3, pp. 1462-1472, 2012.

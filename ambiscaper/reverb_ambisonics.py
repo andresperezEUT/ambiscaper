@@ -691,11 +691,11 @@ RECORDED_REVERB_VALID_WRAP_VALUES = ['random', 'wrap_azimuth', 'wrap_elevation',
 # Smir default (non-configurable) values
 
 SMIR_SOUND_SPEED = 343.0
-SMIR_NUM_HARMONICS = 36.0
+SMIR_NUM_HARMONICS = 30.0
 SMIR_OVERSAMPLING_FACTOR = 1.0
 SMIR_DEFAULT_SOURCE_RADIUS = 1.0
-SMIR_HIGH_PASS_FILTER = 0.0
-SMIR_REFLECTION_ORDER = 10.0
+SMIR_HIGH_PASS_FILTER = 1.0
+SMIR_REFLECTION_ORDER = -1.0
 SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY = 0.0
 
 # Container for storing specfic SMIR reverb configuration values
@@ -732,11 +732,11 @@ MATLAB_ROOT = "/Applications/MATLAB_R2017b.app"
 SMIR_SUPPORTED_VIRTUAL_MICS = {
     "soundfield": {
         "sph_type": 'open',
-        "sph_radius": 0.02, # todo: get real measurement!
-        "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
-                [np.pi/2, -0.61547970867038726],  # FRD
-                [np.pi, -0.61547970867038726],  # BLD
-                [3*np.pi/2, 0.61547970867038726]]   # BRU
+        "sph_radius": 0.042, # todo: get real measurement!
+        "capsule_position_sph":  [[0.0, np.pi/4],       # FLU
+                [np.pi/2, -1*np.pi/4],  # FRD
+                [np.pi, np.pi/4],  # BLD
+                [3*np.pi/2, -1*np.pi/4]]   # BRU
     },
 
     "tetramic": {
@@ -744,8 +744,8 @@ SMIR_SUPPORTED_VIRTUAL_MICS = {
         "sph_radius": 0.02, # todo: get real measurement!
         "capsule_position_sph":  [[0.0, 0.61547970867038726],       # FLU
                 [np.pi/2, -0.61547970867038726],  # FRD
-                [np.pi, -0.61547970867038726],  # BLD
-                [3*np.pi/2, 0.61547970867038726]]   # BRU
+                [np.pi, 0.61547970867038726],  # BLD
+                [3*np.pi/2, -0.61547970867038726]]   # BRU
     },
 
     "em32":  {

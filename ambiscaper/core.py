@@ -2159,19 +2159,23 @@ class AmbiScaper(object):
             # ambi_coefs is a matrix of shape (num_capsules, num_ambisonics_channels)
             ambi_coefs.append(get_ambisonics_coefs(azi,ele,self.ambisonics_order))
 
-
-        # Just for testing purposes
-        # sf.write("/Volumes/Dinge/ambiscaper/generated/soundscape0/source/mic_IR.wav",
+        # # TODO: expose it as an argument to the generate() method
+        # # Just for testing purposes
+        # sf.write("/Volumes/Dinge/ambiscaper/testing/mic_IR.wav",
         #          np.transpose(mic_IRs),
         #          self.sr,
         #          subtype='PCM_16')
 
         # Then, we need as a result a matrix of shape (num_ambisonics_channels, num_samples)
         # which is in fact the deinterleaved form of the ambisonics IRs
-        ambi_IRs = np.dot(np.transpose(np.array(ambi_coefs)),mic_IRs)
+        Q = len(SMIR_SUPPORTED_VIRTUAL_MICS[mic]["capsule_position_sph"]) # number of capsules
+        ambi_IRs = np.dot(np.transpose(np.array(ambi_coefs)),mic_IRs)/Q
+
+        # TODO: apply here the radial filters!!!
 
         # Write the resulting IRs into the given destination path
-        sf.write(destination_path, np.transpose(ambi_IRs), self.sr, subtype='PCM_16')
+        # sf.write(destination_path, np.transpose(ambi_IRs), self.sr, subtype='PCM_16')
+        sf.write(destination_path, np.transpose(ambi_IRs), self.sr, subtype='FLOAT')
         return
 
 
@@ -2525,7 +2529,7 @@ class AmbiScaper(object):
                             suffix='.wav', delete=False))
 
                     # Change here the subtype for other format types
-                    sf.write(processed_tmpfiles[-1].name, output_signal, self.sr, subtype='PCM_16')
+                    sf.write(processed_tmpfiles[-1].name, output_signal, self.sr, subtype='FLOAT')
 
             # Finally combine all the files and optionally apply reverb
             # If we have more than one tempfile (i.e.g background + at
