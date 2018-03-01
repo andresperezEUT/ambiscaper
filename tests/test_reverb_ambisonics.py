@@ -420,8 +420,8 @@ def test_generate_RIR_path():
     pytest.raises(AmbiScaperError,generate_RIR_path,123)
 
     # test valid
-    # Hardcoded path
-    path = "/Users/andres.perez/source/ambiscaper/IRs/AudioBooth/Soundfield"
+    rootpath = os.path.split(os.path.join(os.path.dirname(os.path.abspath(__file__))))[0]
+    path = os.path.join(rootpath,'IRs','AudioBooth','Soundfield')
     assert path == generate_RIR_path('AudioBooth')
 
 
