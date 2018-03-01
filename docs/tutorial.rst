@@ -201,6 +201,7 @@ This file is very useful if you want to perform Source Separation evaluation tas
 
 If you want to explore a litte bit more the capabilities of AmbiScaper, please refer to the :ref:`examples` section.
 
+A reference database produced with AmbiScaper can be found `in Zenodo <https://zenodo.org/record/1186907>`_.
 
 .. _differences:
 
