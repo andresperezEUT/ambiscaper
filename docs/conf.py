@@ -65,21 +65,21 @@ else:
 #     def __getattr__(cls, name):
 #             return MagicMock()
 class Mock(MagicMock):
-	@classmethod
-	def __getattr__(cls, name):
-		return Mock()
-	def __mul__(self, other):
-		return Mock()
-	def __rmul__(self, other):
-		return Mock()
-	def __pow__(self, other):
-		return Mock()
-	def __div__(self, other):
-		return Mock()
-	def __add__(self, other):
-		return Mock()
-	def __radd__(self, other):
-		return Mock()
+    @classmethod
+    def __getattr__(cls, name):
+        return Mock()
+    def __mul__(self, other):
+        return Mock()
+    def __rmul__(self, other):
+        return Mock()
+    def __pow__(self, other):
+        return Mock()
+    def __div__(self, other):
+        return Mock()
+    def __add__(self, other):
+        return Mock()
+    def __radd__(self, other):
+        return Mock()
 
 
 MOCK_MODULES = [
@@ -129,10 +129,6 @@ html_theme = "alabaster"
 #
 
 html_theme_options = {
-	'github_user': 'andresperezlopez',
-	'github_repo': 'ambiscaper',
-	'github_button': True,
-	'travis_button': True,
     'fixed_sidebar': True
 }
 
