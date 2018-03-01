@@ -112,11 +112,11 @@ Setting it to ``False`` might be useful in many cases, but then there is the ris
     ### Create an ambiscaper instance
     ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
                                        ambisonics_order=ambisonics_order,
-                                       fg_path=samples_folder,
-                                       ambisonics_spread_slope=ambisonics_spread_slope)
+                                       fg_path=samples_folder)
 
     # Make everything a little bit softer to avoid clipping
     ambiscaper.ref_db = -40
+    ambiscaper.ambisonics_spread_slope = ambisonics_spread_slope
 
     # add 10 events!
     num_events = 10
