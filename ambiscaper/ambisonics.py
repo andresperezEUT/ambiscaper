@@ -24,12 +24,12 @@ from ambiscaper.util import delta_kronecker, is_real_number
 
 def _validate_ambisonics_order(order):
 
-    if (order<0):
-        raise AmbiScaperError(
-            'Ambisonics order must be bigger than 0')
     if (not isinstance(order,int)):
         raise AmbiScaperError(
             'Ambisonics order must be an integer')
+    if (order<0):
+        raise AmbiScaperError(
+            'Ambisonics order must be bigger than 0')
 
 def _validate_ambisonics_degree(degree, order):
 
