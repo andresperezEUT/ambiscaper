@@ -57,16 +57,10 @@ On windows you can use the provided installation binaries:
 
 ### Installing Scaper
 
-The simplest way to install scaper is by using `pip`, which will also install the required python dependencies if needed. To install scaper using pip, simply run:
-
-```
-pip install scaper
-```
-
 To install the latest version of scaper from source, clone or pull the lastest version:
 
 ```
-git clone git@github.com:justinsalamon/scaper.git
+git clone https://github.com/andresperezlopez/ambiscaper.git
 ```
 
 Then enter the source folder and install using pip to handle python dependencies:
@@ -75,6 +69,9 @@ Then enter the source folder and install using pip to handle python dependencies
 cd scaper
 pip install -e .
 ```
+
+Pip installer comming soon!
+
 ## Tutorial
 
 To help you get started with scaper, please see this [step-by-step tutorial](http://ambiscaper.readthedocs.io/en/latest/tutorial.html).
