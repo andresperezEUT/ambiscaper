@@ -80,6 +80,7 @@ pip install -e .
 To help you get started with scaper, please see this [step-by-step tutorial](http://ambiscaper.readthedocs.io/en/latest/tutorial.html).
 
 Furthermore, we have prepared a bunch of [reference examples](http://ambiscaper.readthedocs.io/en/latest/examples.html).
+
 ## Example
 
 ```python
@@ -116,3 +117,6 @@ destination_path = os.path.join(outfolder,"my_first_ambisonics_soundscape")
 ambiscaper.generate(destination_path=destination_path,
                     generate_txt=True)
 ```
+# Example Dataset
+
+An example dataset consisting of 100 first order reverberant Ambisonics soundscapes can be accessed [here](https://zenodo.org/record/1186907) 
