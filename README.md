@@ -4,8 +4,6 @@
 
 Ambiscaper: a tool for automatic dataset generation and annotation of reverberant Ambisonics audio
 
-Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit e0cc1c9, 17th October 2017)
-
 [//]: #[![PyPI](https://img.shields.io/pypi/v/scaper.svg)](https://pypi.python.org/pypi/scaper)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Build Status](https://travis-ci.org/andresperezlopez/ambiscaper.svg?branch=master)](https://travis-ci.org/andresperezlopez/ambiscaper)
@@ -15,6 +13,9 @@ Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit 
 [//]: #[![PyPI](https://img.shields.io/badge/python-2.7%2C%203.4%2C%203.5%2C%203.6-blue.svg)]()
 
 Please refer to the [documentation](http://ambiscaper.readthedocs.io/) for implementation details.
+
+Originally forked from [Scaper](http://github.com/justinsalamon/scaper) (commit e0cc1c9, 17th October 2017)
+
 
 ## Motivation
 
@@ -76,91 +77,42 @@ pip install -e .
 ```
 ## Tutorial
 
-To help you get started with scaper, please see this [step-by-step tutorial](http://scaper.readthedocs.io/en/latest/tutorial.html).
+To help you get started with scaper, please see this [step-by-step tutorial](http://ambiscaper.readthedocs.io/en/latest/tutorial.html).
 
+Furthermore, we have prepared a bunch of [reference examples](http://ambiscaper.readthedocs.io/en/latest/examples.html).
 ## Example
 
 ```python
-import scaper
+import ambiscaper
 import numpy as np
+import os
 
-# OUTPUT FOLDER
-outfolder = 'audio/soundscapes/'
+# AmbiScaper settings
+soundscape_duration = 5.0
+ambisonics_order = 1
+foreground_folder = os.path.abspath('./samples/Acoustics_Book')
 
-# SCAPER SETTINGS
-fg_folder = 'audio/soundbank/foreground/'
-bg_folder = 'audio/soundbank/background/'
+### Create an ambiscaper instance
+ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
+                                   ambisonics_order=ambisonics_order,
+                                   fg_path=foreground_folder)
+                                   
+### Add an event
+ambiscaper.add_event(source_file=('choose', ['adult_female_speech.wav','bagpipe_music.wav']),
+                     source_time=('const', 0),
+                     event_time=('const', 0),
+                     event_duration=('const', soundscape_duration),
+                     event_azimuth=('uniform', 0, 2*np.pi),
+                     event_elevation=('uniform', -np.pi/2, np.pi/2),
+                     event_spread=('const', 0),
+                     snr=('const', 0),
+                     pitch_shift=('const', 1),
+                     time_stretch=('const', 1))
+                     
+### Genereate the audio and the annotation
+outfolder = '/Volumes/Dinge/ambiscaper/testing/' # watch out! outfolder must exist
+destination_path = os.path.join(outfolder,"my_first_ambisonics_soundscape")
 
-n_soundscapes = 1000
-ref_db = -50
-duration = 10.0
-
-min_events = 1
-max_events = 9
-
-event_time_dist = 'truncnorm'
-event_time_mean = 5.0
-event_time_std = 2.0
-event_time_min = 0.0
-event_time_max = 10.0
-
-source_time_dist = 'const'
-source_time = 0.0
-
-event_duration_dist = 'uniform'
-event_duration_min = 0.5
-event_duration_max = 4.0
-
-snr_dist = 'uniform'
-snr_min = 6
-snr_max = 30
-
-pitch_dist = 'uniform'
-pitch_min = -3.0
-pitch_max = 3.0
-
-time_stretch_dist = 'uniform'
-time_stretch_min = 0.8
-time_stretch_max = 1.2
-
-# Generate 1000 soundscapes using a truncated normal distribution of start times
-
-for n in range(n_soundscapes):
-
-    print('Generating soundscape: {:d}/{:d}'.format(n+1, n_soundscapes))
-
-    # create a scaper
-    sc = scaper.Scaper(duration, fg_folder, bg_folder)
-    sc.protected_labels = []
-    sc.ref_db = ref_db
-
-    # add background
-    sc.add_background(label=('const', 'noise'),
-                      source_file=('choose', []),
-                      source_time=('const', 0))
-
-    # add random number of foreground events
-    n_events = np.random.randint(min_events, max_events+1)
-    for _ in range(n_events):
-        sc.add_event(label=('choose', []),
-                     source_file=('choose', []),
-                     source_time=(source_time_dist, source_time),
-                     event_time=(event_time_dist, event_time_mean, event_time_std, event_time_min, event_time_max),
-                     event_duration=(event_duration_dist, event_duration_min, event_duration_max),
-                     snr=(snr_dist, snr_min, snr_max),
-                     pitch_shift=(pitch_dist, pitch_min, pitch_max),
-                     time_stretch=(time_stretch_dist, time_stretch_min, time_stretch_max))
-
-    # generate
-    audiofile = os.path.join(outfolder, "soundscape_unimodal{:d}.wav".format(n))
-    jamsfile = os.path.join(outfolder, "soundscape_unimodal{:d}.jams".format(n))
-    txtfile = os.path.join(outfolder, "soundscape_unimodal{:d}.txt".format(n))
-
-    sc.generate(audiofile, jamsfile,
-                allow_repeated_label=True,
-                allow_repeated_source=False,
-                reverb=0.1,
-                disable_sox_warnings=True,
-                no_audio=False,
-                txt_path=txtfile)
+ambiscaper.generate(destination_path=destination_path,
+                    generate_txt=True)
 ```
