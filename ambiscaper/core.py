@@ -1948,8 +1948,8 @@ class AmbiScaper(object):
                         # Find the onset and offset for each channel (in samples)
                         # TODO: this is kinda rustic method, but it seems to work.
                         # Maybe extend to a more sofisticated algorithm
-                        onsets.append(find_onset(filter_data[:, n], th=1e-1))
-                        offsets.append(find_offset(filter_data[:, n], th=1e-2))
+                        onsets.append(find_onset(filter_data[:, n], th=0.01))
+                        offsets.append(find_offset(filter_data[:, n], th=0.01))
                     min_onset = min(onsets)
                     max_offset = max(offsets)
 
