@@ -219,7 +219,7 @@ are preserver. However, obviously, some changes must be performed in order to ad
 
 In that sense, Scaper and AmbiScaper are not mutually compatible. That means that, in general, copying pieces of code from
 one to the another won't work. The number of arguments to the methods, the default values, the namespaces, the lack of labels,
- and many other aspects have been changed and adapted to the new situation.
+and many other aspects have been changed and adapted to the new situation.
 
 However, don't panic! The code structure is very similar and, if you already know how Scaper works, it will be very fast
 to catch up with AmbiScaper.
