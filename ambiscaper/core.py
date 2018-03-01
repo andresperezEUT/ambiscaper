@@ -22,7 +22,7 @@ from .ambiscaper_exceptions import AmbiScaperError
 from .ambiscaper_warnings import AmbiScaperWarning
 from .util import _close_temp_files, spherical_to_cartesian, _validate_distribution, SUPPORTED_DIST, \
     _get_event_idx_from_id, _generate_event_id_from_idx, _get_sorted_audio_files_recursive, cartesian_to_spherical, \
-    find_closest_spherical_point
+    find_closest_spherical_point, find_onset, find_offset
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -898,7 +898,7 @@ class AmbiScaper(object):
         # Validate ambisonics order
         _validate_ambisonics_order(ambisonics_order)
         self.ambisonics_order = ambisonics_order
-        self.num_channels = get_number_of_ambisonics_channels(ambisonics_order)
+        # self.num_channels = get_number_of_ambisonics_channels(ambisonics_order)
 
         # Initialize parameters
         self.sr = self.DEFAULT_SR
@@ -1397,9 +1397,6 @@ class AmbiScaper(object):
                     source_file = _get_value_from_dist(source_file_tuple)
 
         # Update the used source files list
-        print('used_source_files', used_source_files)
-        print('source_file', source_file)
-        print('file in source fules', source_file in used_source_files)
         if source_file not in used_source_files:
             used_source_files.append(source_file)
 
@@ -1929,16 +1926,53 @@ class AmbiScaper(object):
                         imposed_azimuth = imposed_source_positions_spherical[index_of_closest][0]
                         imposed_elevation = imposed_source_positions_spherical[index_of_closest][1]
 
+
+
+                    # TODO: compute onset/offset as well in the Smir case!!
+                    # Retrieve onset and offset information about the IRs,
+                    # since the convolution will affect event_time and event_duration
+
+                    # FILTER NUMERATION STARTS WITH 1!!
+                    ir_idx =  self.chosen_IR_indices[-1] + 1
+
+                    filter_name = RECORDED_REVERB_FILTER_NAME + str(ir_idx) + RECORDED_REVERB_FILTER_EXTENSION
+                    filter_path = os.path.join(generate_RIR_path(instantiated_reverb_spec.name), filter_name)
+                    filter_data, filter_sample_rate = sf.read(filter_path)
+
+                    # Compute delays in filter data
+                    # We will use it later for modifying the duration and time information
+                    onsets = []
+                    offsets = []
+                    num_channels = np.shape(filter_data)[1]
+                    for n in range(num_channels):
+                        # Find the onset and offset for each channel (in samples)
+                        # TODO: this is kinda rustic method, but it seems to work.
+                        # Maybe extend to a more sofisticated algorithm
+                        onsets.append(find_onset(filter_data[:, n], th=1e-1))
+                        offsets.append(find_offset(filter_data[:, n], th=1e-2))
+                    min_onset = min(onsets)
+                    max_offset = max(offsets)
+
+                    # For each source, after convolution, the timing is modified in this manner:
+                    # .) event_time += min_onset (because of IR delay)
+                    # .) event_duration += max_offset (because of convolution)
+                    min_onset_seconds = float(min_onset) / self.sr
+                    max_offset_seconds = float(max_offset) / self.sr
+
+                    imposed_event_time = e.event_time + min_onset_seconds
+                    imposed_event_duration = e.event_duration + max_offset_seconds
+
                     # Now we have the imposed values, so let's create the imposed spec for the current event
                     # Note that spread is hardcoded to 0 by definition
+                    # TODO: change implementation to the _replace() method
                     imposed_fg_specs.append(EventSpec(event_id=e.event_id,
                                                       source_file=e.source_file,
                                                       source_time=e.source_time,
-                                                      event_time=e.event_time,
-                                                      event_duration=e.event_duration,
-                                                      event_azimuth=imposed_azimuth,     # changed!
-                                                      event_elevation=imposed_elevation, # changed!
-                                                      event_spread= 0.0,                 # changed!
+                                                      event_time=imposed_event_time,        # changed!
+                                                      event_duration=imposed_event_duration,# changed!
+                                                      event_azimuth=imposed_azimuth,        # changed!
+                                                      event_elevation=imposed_elevation,    # changed!
+                                                      event_spread= 0.0,                    # changed!
                                                       snr=e.snr,
                                                       role=e.role,
                                                       pitch_shift=e.pitch_shift,
@@ -1972,15 +2006,15 @@ class AmbiScaper(object):
 
         # Annotate background
         for bg_event_spec in bg_instanciated_event_specs:
-            ann.append(time=value.event_time,
-                           duration=value.event_duration,
-                           value=bg_event_spec._asdict(),
-                           confidence=1.0)
+            ann.append(time=bg_event_spec.event_time,
+                       duration=bg_event_spec.event_duration,
+                       value=bg_event_spec._asdict(),
+                       confidence=1.0)
 
         # Annotate foreground
         for fg_event_spec in fg_instanciated_event_specs:
-            ann.append(time=value.event_time,
-                       duration=value.event_duration,
+            ann.append(time=fg_event_spec.event_time,
+                       duration=fg_event_spec.event_duration,
                        value=fg_event_spec._asdict(),
                        confidence=1.0)
 
@@ -2372,7 +2406,7 @@ class AmbiScaper(object):
                 # on the remix method
                 fx_combiner = sox.Combiner()
                 fx_combiner.convert(samplerate=self.sr,
-                                    n_channels=self.num_channels,  # num_ambisonics_channels
+                                    n_channels=get_number_of_ambisonics_channels(self.ambisonics_order),  # num_ambisonics_channels
                                     bitdepth=None)
 
                 # Pad with silence before/after event to match the
@@ -2426,7 +2460,7 @@ class AmbiScaper(object):
 
                     # Build by passing a list of duplicated downmixed files
                     # and 'merging' it with targed ambisonics gains and spreads (one for each channel)
-                    fx_combiner.build(input_filepath_list=[preprocessed_files[-1] for _ in range(self.num_channels)],
+                    fx_combiner.build(input_filepath_list=[preprocessed_files[-1] for _ in range(get_number_of_ambisonics_channels(self.ambisonics_order))],
                                       output_filepath=processed_tmpfiles[-1].name,
                                       combine_type='merge',
                                       input_volumes=input_volumes.tolist())
@@ -2506,7 +2540,7 @@ class AmbiScaper(object):
                     filter_data, filter_sample_rate = sf.read(used_filter_path)
 
                     # Ensure that num channels is what it should be according to ambisonics order..
-                    # TODO!
+                    assert np.shape(filter_data)[1] == get_number_of_ambisonics_channels(self.ambisonics_order)
                     num_channels = np.shape(filter_data)[1]
 
                     # The S3A filters are in fuma, so perform rescaling and channel reordering...
@@ -2515,18 +2549,28 @@ class AmbiScaper(object):
                         normalized_filter_data = change_normalization_fuma_2_sn3d(ordered_filter_data)
                         filter_data = normalized_filter_data
 
+
+                    #########
+                    # padded_file contains a multichannel, zero_padded copy of the audio event
+                    padded_file = tempfile.NamedTemporaryFile(
+                        suffix='.wav', delete=False)
+
+                    # Build padded_file in that ugly way with the volumes trick
+                    fx_combiner.build(input_filepath_list=[preprocessed_files[-1],preprocessed_files[-1]],
+                                      output_filepath=padded_file.name,
+                                      combine_type='mix',
+                                      input_volumes=[1.0,0.0])
+                    #########
+
                     # Open the preprocessed file
                     # TODO: check sr of file and filter...
-                    file_data, file_sample_rate = sf.read(preprocessed_files[-1])
+                    # file_data, file_sample_rate = sf.read(preprocessed_files[-1])
+                    file_data, file_sample_rate = sf.read(padded_file)
 
-                    # fftconvolve will try to convolve the signals in every dimension
-                    # i.e., if we have two files with 4 channels, the result will have 7 channel
-                    # Obviously that's not what we want, so the provisional workaround
-                    # is to convolve each filter channel individually,
-                    # and then put all them together when wav rendering
+                    # Convolve each padded_file signal with the corresponding ambisonics channel IR
                     output_signal_list = []
                     for i in range(num_channels):
-                        output_signal_list.append(scipy.signal.fftconvolve(file_data, filter_data[:, i]))
+                        output_signal_list.append(scipy.signal.fftconvolve(file_data[:, i], filter_data[:, i]))
 
                     output_signal = np.transpose(np.array(output_signal_list))
 
@@ -2542,6 +2586,10 @@ class AmbiScaper(object):
 
                     # Change here the subtype for other format types
                     sf.write(processed_tmpfiles[-1].name, output_signal, self.sr, subtype='FLOAT')
+
+                    # Don't forget to close paddedfile
+                    padded_file.close()
+
 
             # Finally combine all the files and optionally apply reverb
             # If we have more than one tempfile (i.e.g background + at
@@ -2642,6 +2690,9 @@ class AmbiScaper(object):
                                  filename + '.wav',
                                  annotation_array,
                                  disable_sox_warnings=disable_sox_warnings)
+
+
+
 
         # Finally save JAMS to disk too
         # NOTE: using strict=False for allowing None values of not-implemented

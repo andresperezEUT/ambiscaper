@@ -6,7 +6,8 @@ Tests for functions in util.py
 
 from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, \
     spherical_to_cartesian, find_element_in_list, event_background_id_string, event_foreground_id_string, \
-    _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution, find_closest_spherical_point
+    _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution, find_closest_spherical_point, \
+    find_onset, find_offset
 from ambiscaper.util import _set_temp_logging_level
 from ambiscaper.util import _validate_folder_path
 from ambiscaper.util import _get_sorted_files
@@ -273,7 +274,7 @@ def test_polyphony_gini():
         [(0, 10), (3, 7), (4, 6)]
     ])
 
-    expected_ginis = [0, 0.1, 0.5, 0.2]
+    expected_ginis = [0, 0.1, 1.0, 0.75]
 
     for etl, g in zip(event_time_lists, expected_ginis):
         __test_gini_from_event_times(etl, g, hop_size=0.01)
@@ -599,4 +600,47 @@ def test_find_closest_spherical_point():
     point = [1,1]   # wrapping azimuth around 2pi
     list_of_points = [ [0,0], [4,1] ]
     assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='surface'))
+
+
+def test_find_onset():
+
+    # bad arguments
+    badargs = [
+        # not ndarray
+        ([1,2,3],1e-4),
+        # not 1d ndarray
+        (np.asarray([[1,2],[3,4]]),1e-4),
+        # th not a float
+        (np.asarray([1,2]),123)
+    ]
+
+    for ba in badargs:
+        pytest.raises(AmbiScaperError, find_onset, *ba)
+
+    # correct arguments
+    array = np.asarray([0,1,2,3,4,5])
+    assert 1 == find_onset(array,th=1.)
+    assert 3 == find_onset(array,th=3.)
+    assert None == find_onset(array,th=10.)
+
+def test_find_offset():
+
+    # bad arguments
+    badargs = [
+        # not ndarray
+        ([1,2,3],1e-4),
+        # not 1d ndarray
+        (np.asarray([[1,2],[3,4]]),1e-4),
+        # th not a float
+        (np.asarray([1,2]),123)
+    ]
+
+    for ba in badargs:
+        pytest.raises(AmbiScaperError, find_offset, *ba)
+
+    # correct arguments
+    array = np.asarray([5,4,3,2,1,0])
+    assert 4 == find_offset(array,th=1.)
+    assert 2 == find_offset(array,th=3.)
+    assert None == find_offset(array,th=10.)
 

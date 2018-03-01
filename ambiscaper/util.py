@@ -780,3 +780,51 @@ def _validate_distribution(dist_tuple):
 
 
 
+def find_onset(ndarray,th=1e-4):
+    '''
+    Find the onset in samples of a given signal
+
+    :param ndarray: 1d array
+    :param th: level threshold
+    :return: the onset's sample index, or None if no onset found
+    :raises: AmbiScaper error if args not correct
+    '''
+    if not isinstance(ndarray,np.ndarray):
+        raise AmbiScaperError('find_onset: arg not a ndarray')
+    elif ndarray.ndim != 1:
+        raise AmbiScaperError('find_onset: arg not a 1d-ndarray')
+    elif not isinstance(th,float):
+        raise AmbiScaperError('find_onset: th not a float')
+
+    onset = None
+    for i in range(ndarray.size):
+        if ndarray[i] >= th:
+            onset = i
+            break
+
+    return onset
+
+def find_offset(ndarray,th=1e-4):
+    '''
+    Find the offset in samples of a given signal
+
+    :param th: level threshold
+    :return: the offset's sample index, or None if no onset found
+    :raises: AmbiScaper error if args not correct
+    '''
+
+    if not isinstance(ndarray,np.ndarray):
+        raise AmbiScaperError('find_onset: arg not a ndarray')
+    elif ndarray.ndim != 1:
+        raise AmbiScaperError('find_onset: arg not a 1d-ndarray')
+    elif not isinstance(th,float):
+        raise AmbiScaperError('find_onset: th not a float')
+
+    offset = None
+    # Decreasing range
+    for i in range(ndarray.size-1,-1,-1):
+        if ndarray[i] >= th:
+            offset = i
+            break
+
+    return offset
