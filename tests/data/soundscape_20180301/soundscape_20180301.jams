@@ -1,0 +1,287 @@
+{
+  "sandbox": {}, 
+  "annotations": [
+    {
+      "namespace": "ambiscaper_sound_event", 
+      "sandbox": {
+        "ambiscaper": {
+          "allow_repeated_source": true, 
+          "ref_db": -50, 
+          "fade_out_len": 0.01, 
+          "n_events": 3, 
+          "polyphony_max": 3, 
+          "ambisonics_spread_slope": 1.0, 
+          "polyphony_gini": 0.20000133333111125, 
+          "bg_path": "samples", 
+          "ambisonics_order": 1, 
+          "duration": 10.0, 
+          "bg_spec": [
+            [
+              [
+                "const", 
+                "Handel_Trumpet/tr-1888d-piece3-st.wav"
+              ], 
+              null, 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                10.0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              "background", 
+              null, 
+              null
+            ]
+          ], 
+          "fg_path": "samples", 
+          "fg_spec": [
+            [
+              [
+                "const", 
+                "Acoustics_Book/tuba_arpeggio.wav"
+              ], 
+              null, 
+              [
+                "const", 
+                5
+              ], 
+              [
+                "const", 
+                2
+              ], 
+              [
+                "const", 
+                5
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                5
+              ], 
+              "foreground", 
+              null, 
+              null
+            ], 
+            [
+              [
+                "const", 
+                "Acoustics_Book/flute_music.wav"
+              ], 
+              null, 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                5
+              ], 
+              [
+                "const", 
+                2
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                20
+              ], 
+              "foreground", 
+              [
+                "const", 
+                1
+              ], 
+              null
+            ], 
+            [
+              [
+                "const", 
+                "Acoustics_Book/adult_female_speech.wav"
+              ], 
+              null, 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                7
+              ], 
+              [
+                "const", 
+                2
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                0
+              ], 
+              [
+                "const", 
+                10
+              ], 
+              "foreground", 
+              null, 
+              [
+                "const", 
+                1.2
+              ]
+            ]
+          ], 
+          "fade_in_len": 0.01
+        }
+      }, 
+      "time": 0, 
+      "duration": 10.0, 
+      "annotation_metadata": {
+        "annotation_tools": "", 
+        "curator": {
+          "name": "", 
+          "email": ""
+        }, 
+        "annotator": {}, 
+        "version": "", 
+        "corpus": "", 
+        "annotation_rules": "", 
+        "validation": "", 
+        "data_source": ""
+      }, 
+      "data": [
+        {
+          "duration": 2.0, 
+          "confidence": 1.0, 
+          "value": {
+            "source_time": 0, 
+            "event_time": 0, 
+            "event_id": "bg0", 
+            "event_elevation": 0, 
+            "event_azimuth": 0, 
+            "event_duration": 10.0, 
+            "source_file": "samples/Handel_Trumpet/tr-1888d-piece3-st.wav", 
+            "snr": 0, 
+            "time_stretch": null, 
+            "pitch_shift": null, 
+            "role": "background", 
+            "event_spread": 0
+          }, 
+          "time": 7.0
+        }, 
+        {
+          "duration": 2.0, 
+          "confidence": 1.0, 
+          "value": {
+            "source_time": 5, 
+            "event_time": 2, 
+            "event_id": "fg0", 
+            "event_elevation": 0, 
+            "event_azimuth": 0, 
+            "event_duration": 5, 
+            "source_file": "samples/Acoustics_Book/tuba_arpeggio.wav", 
+            "snr": 5, 
+            "time_stretch": null, 
+            "pitch_shift": null, 
+            "role": "foreground", 
+            "event_spread": 0
+          }, 
+          "time": 7.0
+        }, 
+        {
+          "duration": 2.0, 
+          "confidence": 1.0, 
+          "value": {
+            "source_time": 0, 
+            "event_time": 5, 
+            "event_id": "fg1", 
+            "event_elevation": 0, 
+            "event_azimuth": 0, 
+            "event_duration": 2, 
+            "source_file": "samples/Acoustics_Book/flute_music.wav", 
+            "snr": 20, 
+            "time_stretch": null, 
+            "pitch_shift": 1, 
+            "role": "foreground", 
+            "event_spread": 0
+          }, 
+          "time": 7.0
+        }, 
+        {
+          "duration": 2.0, 
+          "confidence": 1.0, 
+          "value": {
+            "source_time": 0, 
+            "event_time": 7, 
+            "event_id": "fg2", 
+            "event_elevation": 0, 
+            "event_azimuth": 0, 
+            "event_duration": 2, 
+            "source_file": "samples/Acoustics_Book/adult_female_speech.wav", 
+            "snr": 10, 
+            "time_stretch": 1.2, 
+            "pitch_shift": null, 
+            "role": "foreground", 
+            "event_spread": 0
+          }, 
+          "time": 7.0
+        }
+      ]
+    }
+  ], 
+  "file_metadata": {
+    "jams_version": "0.2.2", 
+    "title": "", 
+    "identifiers": {}, 
+    "release": "", 
+    "duration": 10.0, 
+    "artist": ""
+  }
+}

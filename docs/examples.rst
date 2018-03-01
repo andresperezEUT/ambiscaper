@@ -294,8 +294,8 @@ in the ``add_simulated_reverb()`` method:
         * 'h': hypercardioid
         * 'b': bidirectional
     * ``microphone_type``: AmbiScaper features some predefined virtual microphone geometries:
-        * 'Soundfield'
-        * 'Tetramic'
+        * 'soundfield'
+        * 'tetramic'
         * 'em32'
 
 .. note::

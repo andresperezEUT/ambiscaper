@@ -4,8 +4,9 @@ import ambiscaper
 from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
 from ambiscaper.reverb_ambisonics import _validate_IR_length, RecordedReverbSpec, SmirReverbSpec, \
-    get_max_ambi_order_from_reverb_config, retrieve_available_recorded_IRs, generate_RIR_path
-
+    get_max_ambi_order_from_reverb_config, retrieve_available_recorded_IRs, generate_RIR_path, \
+    RECORDED_REVERB_VALID_WRAP_VALUES, retrieve_available_recorded_wrap_values, get_receiver_position
+import os
 
 #################### SMIR
 
@@ -261,20 +262,70 @@ def test_validate_microphone_type():
 
 #################### RECORDED
 
+def test_validate_recorded_reverb_spec():
+
+    # bad name
+    pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_recorded_reverb_spec,*[('const','fakeReverb'),('const','wrap_azimuth')])
+    # bad wrap
+    pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_recorded_reverb_spec,*[('const','OldChurch'),('const','fakeWrap')])
+    # correct values
+    try:
+        ambiscaper.reverb_ambisonics._validate_recorded_reverb_spec(('const','OldChurch'),('const','wrap_azimuth'))
+    except AmbiScaperError:
+        raise AmbiScaperError
+
+
+def test_validate_recorded_reverb_wrap():
+
+    def __test_bad_tuple(tuple):
+        pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_recorded_reverb_wrap, tuple)
+
+        # bad types
+        bad_values = [None, -1, 1j]
+        for bv in bad_values:
+            __test_bad_tuple(('const', bv))
+
+        # Incorrect name
+        __test_bad_tuple(('const', 'wrap_fake'))
+        # Not a choose list
+        __test_bad_tuple(('choose', 'wrap_azimuth'))
+        # Bad choose list
+        __test_bad_tuple(('choose', ['wrap_azimuth',123]))
+        __test_bad_tuple(('choose', ['wrap_azimuth','wrap_fake']))
+
+        # no other labels allowed
+        __test_bad_tuple(('uniform', -1, 1))
+        __test_bad_tuple(('normal', -1, 1))
+        __test_bad_tuple(('truncnorm', -1, 1, 0,))
+
+
+        def __assert_correct_tuple(tuple):
+            try:
+                ambiscaper.reverb_ambisonics._validate_recorded_reverb_wrap(tuple)
+            except AmbiScaperError:
+                raise AmbiScaperError
+
+        __assert_correct_tuple(('const', 'wrap_elevation'))
+        __assert_correct_tuple(('choose', ['wrap_azimuth', 'random']))
+        __assert_correct_tuple(('choose', []))
+
+
 def test_validate_recorded_reverb_name():
 
     def __test_bad_tuple(tuple):
         pytest.raises(AmbiScaperError, ambiscaper.reverb_ambisonics._validate_recorded_reverb_name, tuple)
 
-    # bad consts
-    bad_values = [None, -1, 1j, 'yes', 'CoolReverb']
-
+    # bad types
+    bad_values = [None, -1, 1j]
     for bv in bad_values:
         __test_bad_tuple(('const', bv))
 
-    # empty list for choose
-    __test_bad_tuple(('choose', []))
-    __test_bad_tuple(('choose', 'CoolReverb'))
+    # Incorrect name
+    __test_bad_tuple(('const', 'CoolReverb'))
+    # Not a choose list
+    __test_bad_tuple(('choose', 'OldChurch'))
+    # Bad choose list
+    __test_bad_tuple(('choose', ['OldChurch', 123]))
 
     # bad consts in list for choose
     for bv in bad_values:
@@ -285,6 +336,12 @@ def test_validate_recorded_reverb_name():
     __test_bad_tuple(('normal', -1, 1))
     __test_bad_tuple(('truncnorm', -1, 1, 0 ,))
 
+    # Correct name, but not correct folder structure
+    # Create empty IR folder
+    os.mkdir(os.path.join(os.getcwd(),'IRs','fakeChurch1'))
+    __test_bad_tuple(('choose', 'fakeChurch1'))
+    os.rmdir(os.path.join(os.getcwd(),'IRs','fakeChurch1'))
+
     def __assert_correct_tuple(tuple):
         try:
             ambiscaper.reverb_ambisonics._validate_recorded_reverb_name(tuple)
@@ -293,6 +350,7 @@ def test_validate_recorded_reverb_name():
 
     __assert_correct_tuple(('const','MainChurch'))
     __assert_correct_tuple(('choose',['Vislab','OldChurch']))
+    __assert_correct_tuple(('choose',[]))
 
 def test_get_max_ambi_order_from_reverb_config():
 
@@ -311,7 +369,7 @@ def test_get_max_ambi_order_from_reverb_config():
 
     # [spec, groundtruth]
     incorrect_values = [
-        [RecordedReverbSpec(name='OldChurch'),2],
+        [RecordedReverbSpec(name='OldChurch',wrap='azimuth'),2],
         [SmirReverbSpec(IRlength=1024,
                         room_dimensions=[1.0, 1.0, 1.0],
                         t60=0.5,
@@ -328,7 +386,7 @@ def test_get_max_ambi_order_from_reverb_config():
 
     # [spec, groundtruth]
     correct_values = [
-        [RecordedReverbSpec(name='OldChurch'),1],
+        [RecordedReverbSpec(name='OldChurch',wrap='azimuth'),1],
         [SmirReverbSpec(IRlength=1024,
                         room_dimensions=[1.0, 1.0, 1.0],
                         t60=0.5,
@@ -348,6 +406,13 @@ def test_retrieve_available_recorded_IRs():
     # Check with unordered lists
     assert set(retrieve_available_recorded_IRs()) == set(groundtruth)
 
+def test_retrieve_available_recorded_wrap_values():
+
+    groundtruth = RECORDED_REVERB_VALID_WRAP_VALUES
+
+    # Check with unordered lists
+    assert set(retrieve_available_recorded_wrap_values()) == set(groundtruth)
+
 def test_generate_RIR_path():
 
     # Not valid arg
@@ -358,3 +423,13 @@ def test_generate_RIR_path():
     # Hardcoded path
     path = "/Users/andres.perez/source/ambiscaper/IRs/AudioBooth/Soundfield"
     assert path == generate_RIR_path('AudioBooth')
+
+
+def test_get_receiver_position():
+
+    # Incorrect args
+    pytest.raises(AmbiScaperError, get_receiver_position, 3)
+    pytest.raises(AmbiScaperError, get_receiver_position, [4,5,6,7])
+
+    # Correct args
+    assert(get_receiver_position([2,4,6]) == [1,2,3])

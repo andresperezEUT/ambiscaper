@@ -397,14 +397,13 @@ def _validate_recorded_reverb_name(reverb_name_tuple):
     _validate_distribution(reverb_name_tuple)
 
     # Make sure that type matches
-    def __valid_recorded_reverb_name_types(reverb_name):
+    def __validate_recorded_reverb_name_types(reverb_name):
         if (not isinstance(reverb_name, str)):
-            return False
-        else:
-            return True
+            raise AmbiScaperError(
+                'reverb_config: reverb name must be a string')
 
     # Make sure that the audio and position files exist and are valid
-    def __valid_recorded_reverb_name_configuration(reverb_name):
+    def __validate_recorded_reverb_name_configuration(reverb_name):
         # Folder structure should be something like:
         # - IR_top_folder (:reverb_folder_path: defined in ambisonics.py)
         #     - reverb_name (:name: in the config struct)
@@ -414,41 +413,32 @@ def _validate_recorded_reverb_name(reverb_name_tuple):
         #             - "LsPos.txt" with the loudspeaker positions
         #             - (maybe a "Metadata_SoundField.txt")
 
-        try:
-            # The provided name should exist in RECORDED_REVERB_FOLDER_PATH
-            reverb_folder_path = os.path.join(RECORDED_REVERB_FOLDER_PATH, reverb_name)
-            if not os.path.exists(os.path.expanduser(reverb_folder_path)):
-                raise AmbiScaperError(
-                    'reverb_config: folder does not exist: ' + reverb_name)
+        # The provided name should exist in RECORDED_REVERB_FOLDER_PATH
+        reverb_folder_path = os.path.join(RECORDED_REVERB_FOLDER_PATH, reverb_name)
+        if not os.path.exists(os.path.expanduser(reverb_folder_path)):
+            raise AmbiScaperError(
+                'reverb_config: folder does not exist: ' + reverb_name)
 
-            # Inside the reverb folder should be a "Soundfield" folder
-            soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
-            if not os.path.exists(os.path.expanduser(soundfield_path)):
-                raise AmbiScaperError(
-                    'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(
-                        reverb_folder_path))
+        # Inside the reverb folder should be a "Soundfield" folder
+        soundfield_path = os.path.join(reverb_folder_path, 'Soundfield')
+        if not os.path.exists(os.path.expanduser(soundfield_path)):
+            raise AmbiScaperError(
+                'reverb_config: Soundfield folder does not exist inside : ' + os.path.expanduser(
+                    reverb_folder_path))
 
-            # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
+        # Check that the "LsPos.txt" file contains as many xyz positions as wav files in the folder
 
-            # Count number of audio files (the actual IRs)
-            num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
+        # Count number of audio files (the actual IRs)
+        num_wav_files = len(glob.glob(os.path.expanduser(soundfield_path) + "/*.wav"))
 
-            # Count number of lines in speakers file
-            speakers_positions_file = os.path.join(soundfield_path, RECORDED_REVERB_LOUDSPEAKER_POSITIONS_TXTFILE)
-            num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
+        # Count number of lines in speakers file
+        speakers_positions_file = os.path.join(soundfield_path, RECORDED_REVERB_LOUDSPEAKER_POSITIONS_TXTFILE)
+        num_lines = sum(1 for line in open(os.path.expanduser(speakers_positions_file)))
 
-            # Check
-            if num_wav_files is not num_lines:
-                raise AmbiScaperError(
-                    'reverb_config: the number of audio files does not match with the speaker description')
-
-            result = True
-
-        except AmbiScaperError:
-            pass
-            result = False
-
-        return result
+        # Check
+        if num_wav_files is not num_lines:
+            raise AmbiScaperError(
+                'reverb_config: the number of audio files does not match with the speaker description')
 
 
     # If reverb name is specified explicitly
@@ -457,13 +447,10 @@ def _validate_recorded_reverb_name(reverb_name_tuple):
         # reverb name: allowed string
         if reverb_name_tuple[1] is None:
             raise AmbiScaperError(
-                'reverb_config: reverb name is None')
-        elif not __valid_recorded_reverb_name_types(reverb_name_tuple[1]):
-            raise AmbiScaperError(
-                'reverb_config: reverb name must be a string')
-        elif not __valid_recorded_reverb_name_configuration(reverb_name_tuple[1]):
-            raise AmbiScaperError(
-                'reverb_config: reverb name not valid:' + reverb_name_tuple[1])
+                'reverb_config: reverb name is None'
+            )
+        __validate_recorded_reverb_name_types(reverb_name_tuple[1])
+        __validate_recorded_reverb_name_configuration(reverb_name_tuple[1])
 
     # Otherwise it must be specified using "choose"
     # Empty list is allowed, meaning all avaiable IRS
@@ -473,15 +460,9 @@ def _validate_recorded_reverb_name(reverb_name_tuple):
             raise AmbiScaperError(
                 'reverb_config: no list for choose')
         # Empty list
-        # elif len(reverb_name_tuple[1]) is 0:
-            # raise AmbiScaperError(
-            #     'reverb_config: empty list for choose')
-        elif not all(__valid_recorded_reverb_name_types(length) for length in reverb_name_tuple[1]):
-            raise AmbiScaperError(
-                'reverb_config: reverb name must be a positive integer')
-        elif not all(__valid_recorded_reverb_name_configuration(name) for name in reverb_name_tuple[1]):
-            raise AmbiScaperError(
-                'reverb_config: reverb names not valid: ' + str(reverb_name_tuple[1]))
+
+        [__validate_recorded_reverb_name_types(name) for name in reverb_name_tuple[1]]
+        [__validate_recorded_reverb_name_configuration(name) for name in reverb_name_tuple[1]]
 
     # No other labels allowed"
     else:
@@ -539,7 +520,7 @@ def _validate_recorded_reverb_wrap(reverb_wrap_tuple):
             #     'reverb_config: empty list for choose')
         elif not all(__valid_recorded_reverb_wrap_types(length) for length in reverb_wrap_tuple[1]):
             raise AmbiScaperError(
-                'reverb_config: reverb name must be a positive integer')
+                'reverb_config: reverb wrap must be a string')
         elif not all(__valid_recorded_reverb_wrap_values(name) for name in reverb_wrap_tuple[1]):
             raise AmbiScaperError(
                 'reverb_config: reverb names not valid: ' + str(reverb_wrap_tuple[1]))
@@ -662,6 +643,8 @@ def retrieve_RIR_positions_spherical(recorded_reverb_name):
     speaker_positions_spherical = [cartesian_to_spherical(pos)[:-1] for pos in speaker_positions_cartesian]
 
     return speaker_positions_spherical
+
+
 
 ######### RECORDED REVERB CONFIG #########
 
@@ -803,4 +786,10 @@ def get_receiver_position(room_dimensions):
     :param room_dimensions:
     :return:
     '''
+
+    if not isinstance(room_dimensions,list) or len(room_dimensions) != 3:
+        raise AmbiScaperError(
+            'Incorrect room dimensions'
+        )
+
     return [float(l) / 2.0 for l in room_dimensions]

@@ -1397,8 +1397,13 @@ class AmbiScaper(object):
                     source_file = _get_value_from_dist(source_file_tuple)
 
         # Update the used source files list
+        print('used_source_files', used_source_files)
+        print('source_file', source_file)
+        print('file in source fules', source_file in used_source_files)
         if source_file not in used_source_files:
             used_source_files.append(source_file)
+
+        # print('used_source_files',used_source_files)
 
         # Get the duration of the source audio file
         # It must use the expanded source file name
@@ -1741,6 +1746,8 @@ class AmbiScaper(object):
                 disable_instantiation_warnings=disable_instantiation_warnings)
             # Store event spec for later
             bg_instanciated_event_specs.append(value)
+            # # Keep track of used source files
+            # bg_source_files.append(event.source_file)
 
         # Add foreground events
         # TODO: fg_source_files not used!!
@@ -1764,6 +1771,9 @@ class AmbiScaper(object):
 
             # Store event spec for later
             fg_instanciated_event_specs.append(value)
+            # # Keep track of used source files
+            # fg_source_files.append(event.source_file)
+            # print('fg_source_files',fg_source_files)
 
 
         #####################################
@@ -2178,7 +2188,10 @@ class AmbiScaper(object):
         return
 
 
-    def _generate_audio(self, destination_path, audio_filename, annotation_array,
+    def _generate_audio(self,
+                        destination_path,
+                        audio_filename,
+                        annotation_array,
                         disable_sox_warnings=True):
         '''
         Generate audio based on a sound_event annotation and save to disk.
@@ -2561,7 +2574,8 @@ class AmbiScaper(object):
             [os.remove(t.name) for t in processed_tmpfiles]
 
 
-    def generate(self, destination_path,
+    def generate(self,
+                 destination_path,
                  allow_repeated_source=True,
                  disable_sox_warnings=True,
                  no_audio=False,
