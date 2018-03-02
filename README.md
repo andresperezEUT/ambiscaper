@@ -31,8 +31,27 @@ We present AmbiScaper, a python library for procedural creation and annotation o
 
 ## Installation
 
-### Non-python dependencies
-Scaper has two non-python dependencies:
+### Installing Scaper
+
+To install the latest version of AmbiScaper from source, clone or pull the lastest version:
+
+```
+git clone https://github.com/andresperezlopez/ambiscaper.git
+```
+
+Then enter the source folder and install using pip to handle python dependencies:
+
+```
+cd ambiscaper
+sudo pip install -e .
+```
+This procedure will automatically install the required python and non-python dependencies.
+
+Pip online installer comming soon!
+
+### Non-python dependencies (manual installation)
+
+AmbiScaper has two non-python dependencies:
 - SoX: http://sox.sourceforge.net/
 - FFmpeg: https://ffmpeg.org/
 
@@ -55,22 +74,7 @@ On windows you can use the provided installation binaries:
 - SoX: https://sourceforge.net/projects/sox/files/sox/
 - FFmpeg: https://ffmpeg.org/download.html#build-windows
 
-### Installing Scaper
 
-To install the latest version of scaper from source, clone or pull the lastest version:
-
-```
-git clone https://github.com/andresperezlopez/ambiscaper.git
-```
-
-Then enter the source folder and install using pip to handle python dependencies:
-
-```
-cd scaper
-pip install -e .
-```
-
-Pip installer comming soon!
 
 ## Tutorial
 
