@@ -636,11 +636,27 @@ def retrieve_RIR_positions_spherical(recorded_reverb_name):
     # Retrieve the file content into speaker_positions
     speaker_positions_cartesian = []
     with open(os.path.expanduser(speakers_positions_file)) as tsv:
-        for line in csv.reader(tsv, delimiter='\t'):  # You can also use delimiter="\t" rather than giving a dialect.
+        for line in csv.reader(tsv, delimiter='\t'):
             speaker_positions_cartesian.append([float(element) for element in line])
+            # ACHTUNG! in Studio1 the soundfield is not located at the center, but at [0, -1.51, 0.1]
+            if recorded_reverb_name == 'Studio1':
+                pos_nparray = np.array(speaker_positions_cartesian[-1])
+                res_nparray = pos_nparray + np.asarray([0, 1.51, -0.1 ])
+                speaker_positions_cartesian[-1] = res_nparray.tolist()
 
     # Convert speaker_positions to spherical coordinates
     speaker_positions_spherical = [cartesian_to_spherical(pos)[:-1] for pos in speaker_positions_cartesian]
+
+    # Ugly fix to compensate the different reference systems used in S3a:
+    # - AudioBooth, MainChurch, OldChurch and Studio1 have the sounfield facing the Y axis:
+    #   -> substract pi/2 from the azimuth value
+    #  - Vislab is fine, no transformation needed (soundfield facing X axis)
+    if recorded_reverb_name in ['AudioBooth','MainChurch','OldChurch','Studio1']:
+        for idx,pos in enumerate(speaker_positions_spherical):
+            pos_nparray = np.array(pos)
+            res_nparray = pos + np.asarray([-np.pi / 2, 0])
+            speaker_positions_spherical[idx] = res_nparray.tolist()
+
 
     return speaker_positions_spherical
 
