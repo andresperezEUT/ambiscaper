@@ -648,13 +648,19 @@ def retrieve_RIR_positions_spherical(recorded_reverb_name):
     speaker_positions_spherical = [cartesian_to_spherical(pos)[:-1] for pos in speaker_positions_cartesian]
 
     # Ugly fix to compensate the different reference systems used in S3a:
-    # - AudioBooth, MainChurch, OldChurch and Studio1 have the sounfield facing the Y axis:
+    #  in AudioBooth, the soundfield seems to be a little bit rotated (around +0.3 rad)
+    #  MainChurch, OldChurch and Studio1 have the sounfield facing the Y axis:
     #   -> substract pi/2 from the azimuth value
     #  - Vislab is fine, no transformation needed (soundfield facing X axis)
     if recorded_reverb_name in ['MainChurch','OldChurch','Studio1']:
         for idx,pos in enumerate(speaker_positions_spherical):
             pos_nparray = np.array(pos)
             res_nparray = pos + np.asarray([-np.pi / 2, 0])
+            speaker_positions_spherical[idx] = res_nparray.tolist()
+    elif recorded_reverb_name in ['AudioBooth']:
+        for idx,pos in enumerate(speaker_positions_spherical):
+            pos_nparray = np.array(pos)
+            res_nparray = pos + np.asarray([-np.pi/8, 0])
             speaker_positions_spherical[idx] = res_nparray.tolist()
 
 
