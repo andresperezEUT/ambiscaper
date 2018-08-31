@@ -35,6 +35,7 @@ before_install:
     - pip install python-coveralls
     - pip install pytest-faulthandler
     - pip install pytest-cov
+    - pip install pysofaconventions
 #    - pip install numpydoc
 
 install:

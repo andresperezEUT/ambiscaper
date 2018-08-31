@@ -5,6 +5,7 @@ import numpy as np
 import os
 import random
 
+
 # AmbiScaper settings
 soundscape_duration = 5.0
 ambisonics_order = 1
@@ -38,8 +39,14 @@ for i in range(num_soundscapes):
                              time_stretch=('uniform', 0.8,1.2))
 
     # Add a recorded reverb
-    asc.add_recorded_reverb(name=('choose',[]),
+
+    # TODO
+    asc.set_sofa_reverb_folder_path('/Volumes/Dinge/SOFA/standrews/')
+
+    asc.add_recorded_reverb(name=('const','balcony.sofa'),
                             wrap=('const','wrap_azimuth'))
+    # asc.add_recorded_reverb(name=('choose',[]),
+    #                         wrap=('const','wrap_azimuth'))
 
     ### Genereate the audio and the annotation
     outfolder = '/Volumes/Dinge/ambiscaper/database/'  # watch out! outfolder must exist

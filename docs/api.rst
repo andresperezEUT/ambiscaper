@@ -12,7 +12,7 @@ API Reference
     :members:
 
 .. automodule:: ambiscaper.reverb_ambisonics
-    :members: get_max_ambi_order_from_reverb_config, retrieve_available_recorded_IRs, generate_RIR_path, retrieve_RIR_positions_spherical
+    :members: get_max_ambi_order_from_reverb_config, retrieve_available_recorded_IRs, generate_sofa_file_full_path, retrieve_RIR_positions_spherical
 
 .. autodata:: ambiscaper.reverb_ambisonics.SMIR_SUPPORTED_VIRTUAL_MICS
     :annotation:
