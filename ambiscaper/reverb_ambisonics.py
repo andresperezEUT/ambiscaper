@@ -2,7 +2,7 @@
 Ambisonics reverb related methods
 =================================
 '''
-
+from pysofaconventions import SOFAError
 
 '''
 reverb_ambisonics.py
@@ -25,12 +25,61 @@ import glob
 import warnings
 
 from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
-from ambiscaper.util import _validate_distribution
+from ambiscaper.util import _validate_distribution, degree_to_radian
 from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from ambiscaper.util import find_element_in_list, cartesian_to_spherical
 
 import pysofaconventions
 
+
+
+
+# class AmbiScaperReverb():
+#
+    # @classmethod
+    # def get_maximum_ambisonics_order_from_spec(self, reverb_spec):
+    #     '''
+    #     Compute the maximum ambisonics order given a reverb configuration
+    #
+    #     :param reverb_spec:
+    #
+    #         a valid instance of ``reverb_spec``
+    #
+    #     :raises: AmbiScaperError
+    #
+    #         If ``reverb_spec`` is not valid.
+    #
+    #     :return: The maximum ambisonics order allowed
+    #
+    #     .. note::
+    #         The maximum ambisonics order L is defined by the number of microphone capsules,
+    #         ``K <= Q``,
+    #         where ``K`` is the number of ambisonics components ``K = (L+1)^2``,
+    #         and ``Q`` the number of capsules.
+    #
+    #         For more information, please refer to
+    #         *3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone
+    #         (Moreau, Daniel and Bertet, 2006)*.
+    #         http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
+    #     '''
+    #
+    #     # TODO TODO TODO TODO TODO probably move to core
+    #
+    #     if isinstance(reverb_spec, SmirReverbSpec):
+    #         Q = len(SmirReverb.supported_virtual_mics[reverb_spec.microphone_type]['capsule_position_sph'])
+    #         return int(np.floor(np.sqrt(Q) - 1))
+    #
+    #     elif isinstance(reverb_spec, SOFAReverbSpec):
+    #         # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
+    #         sofafile = pysofaconventions.SOFAAmbisonicsDRIR(reverb_spec.name, 'r')
+    #         order = sofafile.getGlobalAttributeValue('AmbisonicsOrder')
+    #         sofafile.close()
+    #         return int(order)
+    #
+    #     else:
+    #         raise AmbiScaperError(
+    #             'Not valid reverb_spec'
+    #         )
 
 ### SIMULATED REVERBS ------------------------
 
@@ -46,6 +95,8 @@ SmirReverbSpec = namedtuple(
      'microphone_type'
      ], verbose=False)
 
+
+# class SmirReverb(AmbiScaperReverb):
 class SmirReverb():
     ######### SMIR CONFIG #########
 
@@ -80,6 +131,18 @@ class SmirReverb():
     matlab_root = "/Applications/MATLAB_R2017b.app"
 
     supported_virtual_mics = {
+        '''Store useful information from each mic
+    
+            - Sphere type (rigid or open)
+            - Sphere radius
+            - Maximum ambisonics order (it could be computed from the number of capsules, but we specify it for avoiding computations)
+            - Spherical coordinates of the capsules
+    
+        Info gathered from Farina, http://pcfarina.eng.unipr.it/SPS-conversion.htm
+    
+        More info at https://www.mhacoustics.com/sites/default/files/ReleaseNotes.pdf
+        '''
+        
         "soundfield": {
             "sph_type": 'open',
             "sph_radius": 0.042,  # todo: get real measurement!
@@ -135,6 +198,7 @@ class SmirReverb():
                                      [4.729842272904633, -1.2042771838760873]]
         }
     }
+
 
 
     def _validate_smir_reverb_spec(self,IRlength, room_dimensions,
@@ -475,24 +539,68 @@ class SmirReverb():
         # Make sure it's one of the allowed distributions for a mic_type and that the
         # mic_type value is one of the allowed labels.
         if mic_type_tuple[0] == "const":
-            if not mic_type_tuple[1] in SMIR_SUPPORTED_VIRTUAL_MICS.keys():
+            if not mic_type_tuple[1] in self.supported_virtual_mics.keys():
                 raise AmbiScaperError(
                     'Microphone type value must match one of the available labels: '
-                    '{:s}'.format(str(SMIR_SUPPORTED_VIRTUAL_MICS.keys())))
+                    '{:s}'.format(str(self.supported_virtual_mics.keys())))
         elif mic_type_tuple[0] == "choose":
             if mic_type_tuple[1]:  # list is not empty
-                if not set(mic_type_tuple[1]).issubset(set(SMIR_SUPPORTED_VIRTUAL_MICS.keys())):
+                if not set(mic_type_tuple[1]).issubset(set(self.supported_virtual_mics.keys())):
                     raise AmbiScaperError(
                         'Microphone type provided must be a subset of the available '
-                        'labels: {:s}'.format(str(SMIR_SUPPORTED_VIRTUAL_MICS.keys())))
+                        'labels: {:s}'.format(str(self.supported_virtual_mics.keys())))
         else:
             raise AmbiScaperError(
                 'Microphone type must be specified using a "const" or "choose" tuple.')
 
 
 
+    def get_max_ambi_order_from_reverb_config(self, reverb_spec):
+        '''
+        Compute the maximum ambisonics order given a reverb configuration
+
+        :param reverb_spec:
+
+            a valid instance of ``reverb_spec``
+
+        :raises: AmbiScaperError
+
+            If ``reverb_spec`` is not valid.
+
+        :return: The maximum ambisonics order allowed
+
+        .. note::
+            The maximum ambisonics order L is defined by the number of microphone capsules,
+            ``K <= Q``,
+            where ``K`` is the number of ambisonics components ``K = (L+1)^2``,
+            and ``Q`` the number of capsules.
+
+            For more information, please refer to
+            *3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone
+            (Moreau, Daniel and Bertet, 2006)*.
+            http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
+        '''
+
+        # TODO TODO TODO TODO TODO probably move to core
+
+        Q = len(self.supported_virtual_mics[reverb_spec.microphone_type]['capsule_position_sph'])
+        return int(np.floor(np.sqrt(Q) - 1))
 
 
+
+    def get_receiver_position(room_dimensions):
+        '''
+        TODO: for the moment just the center
+        :param room_dimensions:
+        :return:
+        '''
+
+        if not isinstance(room_dimensions,list) or len(room_dimensions) != 3:
+            raise AmbiScaperError(
+                'Incorrect room dimensions'
+            )
+
+        return [float(l) / 2.0 for l in room_dimensions]
 
 
 ### RECORDED REVERBS ------------------------
@@ -518,6 +626,7 @@ SOFAReverbSpec = namedtuple(
 
 ######## CLASS
 
+# class SOFAReverb(AmbiScaperReverb):
 class SOFAReverb():
 
     valid_wrap_values = ['random', 'wrap_azimuth', 'wrap_elevation', 'wrap_surface']
@@ -525,6 +634,14 @@ class SOFAReverb():
     def __init__(self):
         self.sofa_reverb_folder_path = None
 
+
+    def get_sofa_reverb_folder_path(self):
+        """
+        Retrieve the base path where to find the AmbisonicsDRIR SOFA files
+
+        :return: The path to the folder, or None if not set
+        """
+        return self.sofa_reverb_folder_path
 
 
     def set_sofa_reverb_folder_path(self, path):
@@ -577,12 +694,15 @@ class SOFAReverb():
 
         :param sofa_reverb_name: string referencing to a valid recorded reverb name
 
-        :raises: AmbiScaper Error if reverb name is not valid
+        :raises: AmbiScaper Error if reverb name is not valid, or if sofa path is not specified
         '''
 
         if not isinstance(sofa_reverb_name,str):
             raise AmbiScaperError(
-                'Not valid recorded reverb name type')
+                'Not valid reverb name type')
+        elif not self.sofa_reverb_folder_path:
+            raise AmbiScaperError(
+                "SOFA reverb folder path is not specified!")
         elif find_element_in_list(sofa_reverb_name, self.retrieve_available_sofa_reverb_files()) is None:
             raise AmbiScaperError(
                 'Reverb name does not exist: ', sofa_reverb_name)
@@ -593,24 +713,24 @@ class SOFAReverb():
 
 
 
-    def _validate_recorded_reverb_spec(self,reverb_name_tuple, reverb_wrap_tuple):
+    def _validate_reverb_spec(self, reverb_name_tuple, reverb_wrap_tuple):
 
-        self._validate_recorded_reverb_name(reverb_name_tuple)
-        self._validate_recorded_reverb_wrap(reverb_wrap_tuple)
+        self._validate_reverb_name(reverb_name_tuple)
+        self._validate_reverb_wrap(reverb_wrap_tuple)
         return
 
 
 
-    def _validate_recorded_reverb_name(self,reverb_name_tuple):
+    def _validate_reverb_name(self, reverb_name_tuple):
 
         # Make sure that type matches
-        def __validate_recorded_reverb_name_types(reverb_name):
+        def __validate_reverb_name_types(reverb_name):
             if not isinstance(reverb_name, str):
                 raise AmbiScaperError(
                     'reverb_config: reverb name must be a string')
 
         # Make sure that the sofa file exists and is valid
-        def __validate_recorded_reverb_name_configuration(reverb_name):
+        def __validate_reverb_name_configuration(reverb_name):
 
             reverb_full_path = self.sofa_reverb_folder_path +'/' +reverb_name
 
@@ -619,6 +739,7 @@ class SOFAReverb():
                 raise AmbiScaperError(
                     'reverb_config: file does not exist: ' + reverb_full_path)
 
+            # TODO
             # The file should be a valid AmbisonicsDRIR file
             sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(reverb_full_path,'r')
             if not sofa_file.isValid():
@@ -639,20 +760,15 @@ class SOFAReverb():
                 raise AmbiScaperError(
                     'reverb_config: reverb name is None'
                 )
-            __validate_recorded_reverb_name_types(reverb_name_tuple[1])
-            __validate_recorded_reverb_name_configuration(reverb_name_tuple[1])
+            __validate_reverb_name_types(reverb_name_tuple[1])
+            __validate_reverb_name_configuration(reverb_name_tuple[1])
 
         # Otherwise it must be specified using "choose"
         # Empty list is allowed, meaning all avaiable IRS
         elif reverb_name_tuple[0] == "choose":
-            # Not a list
-            if not isinstance(reverb_name_tuple[1],list):
-                raise AmbiScaperError(
-                    'reverb_config: no list for choose')
             # Empty list
-
-            [__validate_recorded_reverb_name_types(name) for name in reverb_name_tuple[1]]
-            [__validate_recorded_reverb_name_configuration(name) for name in reverb_name_tuple[1]]
+            [__validate_reverb_name_types(name) for name in reverb_name_tuple[1]]
+            [__validate_reverb_name_configuration(name) for name in reverb_name_tuple[1]]
 
         # No other labels allowed"
         else:
@@ -660,7 +776,7 @@ class SOFAReverb():
                 'Reverb name must be specified using a "const" or "choose" tuple.')
 
 
-    def _validate_recorded_reverb_wrap(self,reverb_wrap_tuple):
+    def _validate_reverb_wrap(self, reverb_wrap_tuple):
         '''
 
         :param reverb_wrap:
@@ -671,13 +787,13 @@ class SOFAReverb():
         _validate_distribution(reverb_wrap_tuple)
 
         # Make sure that type matches
-        def __valid_recorded_reverb_wrap_types(reverb_wrap):
+        def __valid_reverb_wrap_types(reverb_wrap):
             if (not isinstance(reverb_wrap, str)):
                 return False
             else:
                 return True
 
-        def __valid_recorded_reverb_wrap_values(reverb_wrap):
+        def __valid_reverb_wrap_values(reverb_wrap):
             if reverb_wrap not in self.valid_wrap_values:
                 return False
             else:
@@ -690,28 +806,21 @@ class SOFAReverb():
             if reverb_wrap_tuple[1] is None:
                 raise AmbiScaperError(
                     'reverb_config: reverb wrap is None')
-            elif not __valid_recorded_reverb_wrap_types(reverb_wrap_tuple[1]):
+            elif not __valid_reverb_wrap_types(reverb_wrap_tuple[1]):
                 raise AmbiScaperError(
                     'reverb_config: reverb wrap must be a string')
-            elif not __valid_recorded_reverb_wrap_values(reverb_wrap_tuple[1]):
+            elif not __valid_reverb_wrap_values(reverb_wrap_tuple[1]):
                 raise AmbiScaperError(
                     'reverb_config: reverb wrap not valid:' + reverb_wrap_tuple[1])
 
         # Otherwise it must be specified using "choose"
         # Empty list is allowed, meaning all avaiable IRS
         elif reverb_wrap_tuple[0] == "choose":
-            # Not a list
-            if not isinstance(reverb_wrap_tuple[1], list):
-                raise AmbiScaperError(
-                    'reverb_config: no list for choose')
-                # Empty list
-                # elif len(reverb_name_tuple[1]) is 0:
-                # raise AmbiScaperError(
-                #     'reverb_config: empty list for choose')
-            elif not all(__valid_recorded_reverb_wrap_types(length) for length in reverb_wrap_tuple[1]):
+
+            if not all(__valid_reverb_wrap_types(length) for length in reverb_wrap_tuple[1]):
                 raise AmbiScaperError(
                     'reverb_config: reverb wrap must be a string')
-            elif not all(__valid_recorded_reverb_wrap_values(name) for name in reverb_wrap_tuple[1]):
+            elif not all(__valid_reverb_wrap_values(name) for name in reverb_wrap_tuple[1]):
                 raise AmbiScaperError(
                     'reverb_config: reverb names not valid: ' + str(reverb_wrap_tuple[1]))
 
@@ -722,104 +831,89 @@ class SOFAReverb():
 
 
 
-
-#############################################################
-####################################################################
-##########################################################################################
-#############################################################
-#####################################################################
-#############################################################
-####################################################################
-
-
-
-
-
-
-
-
-    def get_max_ambi_order_from_reverb_config(self,reverb_spec):
-        '''
-        Compute the maximum ambisonics order given a reverb configuration
-
-        :param reverb_spec:
-
-            a valid instance of ``reverb_spec``
-
-        :raises: AmbiScaperError
-
-            If ``reverb_spec`` is not valid.
-
-        :return: The maximum ambisonics order allowed
-
-        .. note::
-            The maximum ambisonics order L is defined by the number of microphone capsules,
-            ``K <= Q``,
-            where ``K`` is the number of ambisonics components ``K = (L+1)^2``,
-            and ``Q`` the number of capsules.
-
-            For more information, please refer to
-            *3D Sound Field Recording With Higher Order Ambisonics - Objective Measurements and Validation of a 4th Order Spherical Microphone
-            (Moreau, Daniel and Bertet, 2006)*.
-            http://160.78.24.2/Public/phd-thesis/aes120_hoamicvalidation.pdf (accessed January 2018)
-        '''
-
-        # TODO TODO TODO TODO TODO probably move to core
-
-        if isinstance(reverb_spec, SmirReverbSpec):
-            Q = len(SMIR_SUPPORTED_VIRTUAL_MICS[reverb_spec.microphone_type]['capsule_position_sph'])
-
-        elif isinstance(reverb_spec, SOFAReverbSpec):
-            # TODO: for the moment we only have order 1 recordings, so let's just do a dirty hardcode
-            Q = 4
-        else:
-            raise AmbiScaperError(
-                'Not valid reverb_spec'
-            )
-
-        return int(np.floor(np.sqrt(Q)-1))
-
-
-
-
-
-
-    def retrieve_RIR_positions_spherical(self,sofa_reverb_name):
+    def retrieve_emitter_positions_spherical(self, sofa_reverb_name):
         '''
         Retrieve all speaker positions from a given SOFA reverb name
 
         :param sofa_reverb_name: string referencing to a valid SOFA reverb name
 
-        :return: List with the speaker positions in the format ``[azimuth, elevation, distance]`` (in radians).
+        :return: list of lists with the speaker positions in the format ``[azimuth, elevation, distance]`` (in radians).
 
-        :raises:    AmbiScaper error
+        :raises: AmbiScaperError
 
-            If the file is not a valid SOFAAmbisonicsDRIR file
+            If ``sofa_reverb_name`` is not valid
+
+        :raises: SOFAError
+
+            If there is a problem associated with the SOFA file
+
         '''
-
-        # Open the file
-        sofa_reverb_file_path = self.generate_sofa_file_full_path(sofa_reverb_name)
-        sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(sofa_reverb_file_path, 'r')
-        if not sofa_file.isValid():
-            sofa_file.close()
-            raise AmbiScaperError(
-                'reverb_config: file is not a valid AmbisonicsDRIR SOFA file: ' + sofa_reverb_file_path)
-
-        # Get EmitterPositions
-        # Emitter Positions has dimensions [E,C,I] or [E,C,M]
-        emitter_positions = sofa_file.getEmitterPositionValues()
-        sofa_file.close()
-
-        # TODO: sofa coordinates are in spherical, degrees. should we do something about it?
         # TODO: compensate tilt with ListenerPosition, ListenerView, ListenerUp
         # todo: WHAT ABOUT DIFFERENT LISTENER POSITIONS, DIFFERENT DISTANCES, ETC?
-        return emitter_positions
+
+        # Open the file
+        try:
+            sofa_reverb_file_path = self.generate_sofa_file_full_path(sofa_reverb_name)
+            sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(sofa_reverb_file_path, 'r')
+
+            # Get EmitterPositions
+            # Emitter Positions has dimensions [E,C,I] or [E,C,M]
+            emitter_positions_cartesian_nparray = sofa_file.getEmitterPositionValues() # cartesian
+            emitter_positions_cartesian_list = []
+
+
+            E, C, M = sofa_file.getVariableShape('EmitterPosition')
+            for e in range(E):
+                for m in range(M):
+                    position_list =  emitter_positions_cartesian_nparray[e,:,m].tolist()
+                    emitter_positions_cartesian_list.append(position_list)
+
+            emitter_positions_spherical_radians = [cartesian_to_spherical(d) for d in emitter_positions_cartesian_list]
+
+        except (AmbiScaperError,SOFAError) as e:
+            raise e
+
+        # Close the file
+        sofa_file.close()
+
+        return emitter_positions_spherical_radians
 
 
 
 ######### RECORDED REVERB CONFIG #########
 
+    def get_maximum_ambisonics_order_from_spec(self, reverb_spec):
+        '''
+        Compute the maximum ambisonics order given a reverb configuration
 
+        :param reverb_spec:
+
+            a valid instance of ``SOFAReverbSpec``
+
+        :raises: AmbiScaperError
+
+            If ``reverb_spec`` is not valid
+
+        :raises: SOFAError
+
+            If attribute 'AmbisonicsOrder' is not found
+
+        :return: The maximum ambisonics order allowed, as int
+
+        '''
+        try:
+            full_path = self.generate_sofa_file_full_path(reverb_spec.name)
+        except AmbiScaperError as e:
+            raise e
+        sofafile = pysofaconventions.SOFAAmbisonicsDRIR(full_path, 'r')
+        try:
+            # TODO
+            order = sofafile.getGlobalAttributeValue('AmbisonicsOrder')
+        except pysofaconventions.SOFAError as e:
+            sofafile.close()
+            raise e
+        sofafile.close()
+        return int(order)
 
 
 
@@ -834,32 +928,3 @@ class SOFAReverb():
 
 
 
-
-
-
-
-'''Store useful information from each mic
-
-    - Sphere type (rigid or open)
-    - Sphere radius
-    - Maximum ambisonics order (it could be computed from the number of capsules, but we specify it for avoiding computations)
-    - Spherical coordinates of the capsules
-
-Info gathered from Farina, http://pcfarina.eng.unipr.it/SPS-conversion.htm
-
-More info at https://www.mhacoustics.com/sites/default/files/ReleaseNotes.pdf
-'''
-
-def get_receiver_position(room_dimensions):
-    '''
-    TODO: for the moment just the center
-    :param room_dimensions:
-    :return:
-    '''
-
-    if not isinstance(room_dimensions,list) or len(room_dimensions) != 3:
-        raise AmbiScaperError(
-            'Incorrect room dimensions'
-        )
-
-    return [float(l) / 2.0 for l in room_dimensions]

@@ -180,7 +180,7 @@ downgrade the Ambisonics order to match the minimum.
 
 Furthermore, the source positions will be limited to the ones provided by the ``'MainChurch'`` measurements.
 How AmbiScaper select the final source positions due to this constrain is selected through the ``wrap`` argument
-inside ``add_recorded_reverb()`` method. There are different options:
+inside ``add_sofa_reverb()`` method. There are different options:
 
     *  ``wrap_azimuth``: source position assigned to the closest speaker position in azimuth
     *  ``wrap_elevation``: source position assigned to the closest speaker position in azimuth
@@ -225,7 +225,7 @@ per each time the ``generate()`` method is called.
                              time_stretch=('const', 1))
 
     # Add a recorded reverb
-    ambiscaper.add_recorded_reverb(name=('const','MainChurch'),
+    ambiscaper.add_sofa_reverb(name=('const','MainChurch'),
                                    wrap=('const','wrap_azimuth'))
 
     ### Genereate the audio and the annotation

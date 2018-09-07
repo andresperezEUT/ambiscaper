@@ -22,7 +22,7 @@ from .ambiscaper_exceptions import AmbiScaperError
 from .ambiscaper_warnings import AmbiScaperWarning
 from .util import _close_temp_files, spherical_to_cartesian, _validate_distribution, SUPPORTED_DIST, \
     _get_event_idx_from_id, _generate_event_id_from_idx, _get_sorted_audio_files_recursive, cartesian_to_spherical, \
-    find_closest_spherical_point, find_onset, find_offset
+    find_closest_spherical_point, find_onset, find_offset, normalize_ir
 from .util import _set_temp_logging_level
 from .util import _get_sorted_files
 from .util import _validate_folder_path
@@ -35,21 +35,24 @@ from .ambisonics import _validate_ambisonics_order
 from .ambisonics import get_ambisonics_spread_coefs
 from .ambisonics import get_ambisonics_coefs
 
+
+
 # from .reverb_ambisonics import generate_sofa_file_full_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, \
 #     SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, \
-#     SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_recorded_reverb_spec, \
-#     retrieve_RIR_positions_spherical, retrieve_available_recorded_wrap_values, sofa_reverb_folder_path, SOFAReverb
+#     SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_reverb_spec, \
+#     retrieve_emitter_positions_spherical, retrieve_available_recorded_wrap_values, sofa_reverb_folder_path, SOFAReverb
 #
 # from .reverb_ambisonics import MATLAB_ROOT
 # from .reverb_ambisonics import SMIR_FOLDER_PATH
 # from .reverb_ambisonics import SmirReverbSpec
-# from .reverb_ambisonics import get_max_ambi_order_from_reverb_config
+# from .reverb_ambisonics import get_maximum_ambisonics_order_from_spec
 
 
 from .reverb_ambisonics import SmirReverb, SmirReverbSpec
 from .reverb_ambisonics import SOFAReverb, SOFAReverbSpec
-
+import pysofaconventions
 import copy
+
 try:
     import matlab_wrapper
 except ImportError:
@@ -330,8 +333,9 @@ def _get_value_from_dist(dist_tuple):
 
 def _validate_source_file(source_file_tuple):
     '''
-    Validate that a source_file tuple is in the right format a that it's values
+    Validate that a source_file tuple is in the right format and that it's values
     are valid.
+    Only 'const' and 'choose' distributions are allowed
 
     Parameters
     ----------
@@ -360,9 +364,6 @@ def _validate_source_file(source_file_tuple):
                 raise AmbiScaperError(
                     'Source file list must either be empty or all paths in '
                     'the list must point to valid files.')
-    else:
-        raise AmbiScaperError(
-            'Source file must be specified using a "const" or "choose" tuple.')
 
 
 
@@ -934,6 +935,9 @@ class AmbiScaper(object):
         # Also a SmirReverb
         self.smirReverb = SmirReverb()
 
+        # Also a container for reverbSpec
+        self.reverb_spec = None
+
 
         # TODO: put that probably inside SmirReverb()
         # Check Matlab!!
@@ -1262,57 +1266,76 @@ class AmbiScaper(object):
 
     def set_sofa_reverb_folder_path(self, path):
         """
-        TODO
-        :param path:
-        :return:
-        """
-        # TODO
+        Set the base path where to find the AmbisonicsDRIR SOFA files
 
+        :param path:
+
+            The path to the folder
+
+        :raises: AmbiScaperError
+
+            If the provided path does not exist or is not a folder
+        """
         self.sofaReverb.set_sofa_reverb_folder_path(path)
 
+    def get_sofa_reverb_folder_path(self):
+        """
+        Retrieve the base path where to find the AmbisonicsDRIR SOFA files
+
+        :return:
+
+            The path to the folder, or None if not set
+        """
+        return self.sofaReverb.get_sofa_reverb_folder_path()
 
 
-
-    def retrieve_available_reverb_files(self):
+    def retrieve_available_sofa_reverb_files(self):
         '''
         Get a list of the existing SOFA files at the current SOFA path
 
         :return:
+
+            A list containing the file names
+
+        :raises: AmbiScaperError
+
+            If the sofa folder is not specified
         '''
-
-        # TODO TODO TODO
-
-
         return self.sofaReverb.retrieve_available_sofa_reverb_files()
 
 
 
-
-
-
-    def add_recorded_reverb(self, name, wrap):
+    def add_sofa_reverb(self, name, wrap):
         '''
-        Specify an ambisonics reverb for the current sound scene based on recorded material.
+        Specify a sofa ambisonics reverb for the current sound scene based on recorded material.
 
-        Impulse Responses should be contained in the *ambiscaper/IR* folder.
-
-        .. note::
-
-            The structure of the IR folder is provisional.
-            In next versions the IRs will be specified in an standardized format, such as SOFA.
+        SOFA files should be located at the path pointed by sofaReverb.sofa_reverb_folder_path
 
 
         .. note::
 
             Recorded Ambisonics IRs have a limited Ambisonics Order and source position.
             Therefore, the election of such reverb will change the AmbiScaper parameters.
-            More precisely, Ambisonics Order will be equal to the one specified by the given IR.
-            In the case of source positions, they will be randomly selected from the available ones,
-            modifying thus the ``event_azimuth`` and ``event_elevation`` instanciated values.
+            More precisely, Ambisonics Order will be equal to the one specified by the given SOFA file.
 
         .. note::
 
             The parameter ``event_spread`` will be ommited when using reverb.
+
+        .. note::
+
+            Since recorded Ambisonics IRs have limited spatial resolution, the event positions
+            given at the event spec should be adapted to the ones available at the file.
+            Therefore, the ``wrap`` parameter allows the user to specify how this mapping should be performed.
+            At the moment there are the following possibilities for the ``wrap`` parameter:
+            -   'random':       The event spec values for azimuth and elevation will be ommited, and
+                    the system will create new positions ramdomly from the available IR positions
+            -   'wrap_azimuth': Events will be placed at the closest available position, considering only
+                    angular distance in azimuth
+            -   'wrap_elevation': Events will be placed at the closest available position, considering only
+                    angular distance in elevation
+            -   'wrap_surface': Events will be placed at the closest available position, considering the total
+                    distance in the spherical surface
 
         :param name: tuple
 
@@ -1326,7 +1349,7 @@ class AmbiScaper(object):
         '''
 
         # SAFETY_CHECKS
-        self.sofaReverb._validate_recorded_reverb_spec(name, wrap)
+        self.sofaReverb._validate_reverb_spec(name, wrap)
 
         # Create reverb spec
         self.reverb_spec = SOFAReverbSpec(name=name,wrap=wrap)
@@ -1424,7 +1447,7 @@ class AmbiScaper(object):
 
         # Make sure we can use this source file
         if (not allow_repeated_source) and (source_file in used_source_files):
-            source_files = _get_sorted_files(file_path)
+            source_files = _get_sorted_audio_files_recursive(file_path)
             if (len(source_files) == len(used_source_files) or
                         source_file_tuple[0] == "const"):
                 raise AmbiScaperError(
@@ -1549,21 +1572,14 @@ class AmbiScaper(object):
             if event_time + event_duration > self.duration:
                 old_event_time = event_time
                 event_time = self.duration - event_duration
-                if event_time < 0.0:
-                    event_time = 0.0
-                    if not disable_instantiation_warnings:
-                        warnings.warn(
-                            '{:s}: Event time set to 0.0 in order to avoid negative times'.format(event_id),
-                            AmbiScaperWarning)
-                else:
-                    if not disable_instantiation_warnings:
-                        warnings.warn(
-                            '{:s}: Event time ({:.2f}) is too great given event '
-                            'duration ({:.2f}) and soundscape duration ({:.2f}), '
-                            'changed to {:.2f}.'.format(
-                                event_id, old_event_time, event_duration,
-                                self.duration, event_time),
-                            AmbiScaperWarning)
+                if not disable_instantiation_warnings:
+                    warnings.warn(
+                        '{:s}: Event time ({:.2f}) is too great given event '
+                        'duration ({:.2f}) and soundscape duration ({:.2f}), '
+                        'changed to {:.2f}.'.format(
+                            event_id, old_event_time, event_duration,
+                            self.duration, event_time),
+                        AmbiScaperWarning)
         else:
             if event_time + event_duration_stretched > self.duration:
                 old_event_time = event_time
@@ -1613,18 +1629,15 @@ class AmbiScaper(object):
         # Return
         return instantiated_event
 
-    def _instantiate_reverb(self):
+    def _instantiate_reverb(self,reverb_spec):
 
-        if type (self.reverb_spec) is SmirReverbSpec:
-            return self._instantiate_smir_reverb()
-        elif type(self.reverb_spec) is SOFAReverbSpec:
-            return self._instantiate_recorded_reverb()
-        else:
-            raise AmbiScaperError(
-                'Unknown reverb type')
+        if type (reverb_spec) is SmirReverbSpec:
+            return self._instantiate_smir_reverb(reverb_spec)
+        elif type(reverb_spec) is SOFAReverbSpec:
+            return self._instantiate_sofa_reverb(reverb_spec)
 
 
-    def _instantiate_smir_reverb(self,
+    def _instantiate_smir_reverb(self,reverb_spec,
                            disable_instantiation_warnings=False):
         '''
 
@@ -1634,6 +1647,8 @@ class AmbiScaper(object):
                 If Matlab not found
 
         '''
+
+        # TODO
 
         # SAFETY_CHECKS
         if not self.matlab_available:
@@ -1687,15 +1702,17 @@ class AmbiScaper(object):
         return instantiated_reverb
 
 
-    def _instantiate_recorded_reverb(self, disable_instantiation_warnings=False):
+    def _instantiate_sofa_reverb(self,
+                                 reverb_spec,
+                                 disable_instantiation_warnings=False):
 
         ## name
 
-        name = self.reverb_spec.name
+        name = reverb_spec.name
         # If 'choose' and list is empty, then choose from all available IRs
         if name[0] == "choose" and not name[1]:
             name_tuple = list(name)
-            name_tuple[1] = self.retrieve_available_reverb_files()
+            name_tuple[1] = self.retrieve_available_sofa_reverb_files()
             name_tuple = tuple(name_tuple)
         else:
             name_tuple = name
@@ -1703,17 +1720,18 @@ class AmbiScaper(object):
 
         ## wrap
 
-        wrap = self.reverb_spec.wrap
+        wrap = reverb_spec.wrap
         # If 'choose' and list is empty, then choose from all available wrapping types
         if wrap[0] == "choose" and not wrap[1]:
             wrap_tuple = list(wrap)
-            wrap_tuple[1] = retrieve_available_recorded_wrap_values()
+            wrap_tuple[1] = SOFAReverb.valid_wrap_values
             wrap_tuple = tuple(wrap_tuple)
         else:
             wrap_tuple = wrap
         wrap = _get_value_from_dist(wrap_tuple)
 
         return SOFAReverbSpec(name=name,wrap=wrap)
+
 
     def _instantiate(self,
                      allow_repeated_source=True,
@@ -1821,14 +1839,19 @@ class AmbiScaper(object):
         if self.reverb_spec:
 
             # INSTANTIATE REVERB VALUES
-            instantiated_reverb_spec = self._instantiate_reverb()
+            instantiated_reverb_spec = self._instantiate_reverb(self.reverb_spec)
 
             # LIMIT AMBISONICS ORDER
             # The Ambisonic IRs might present a limitation on the ambisonics order
             # (lack of higher order recordings, or not enough simulated capsules)
             # We compute and store here the maximum order allowed,
             # and downgrade it if necessary
-            max_ambi_order =  self.sofaReverb.get_max_ambi_order_from_reverb_config(instantiated_reverb_spec)
+
+            # TODO: implement more elegantly with inheritance
+            if isinstance(instantiated_reverb_spec, SmirReverbSpec):
+                max_ambi_order =  self.smirReverb.get_max_ambi_order_from_reverb_config(instantiated_reverb_spec)
+            elif isinstance(instantiated_reverb_spec, SOFAReverbSpec):
+                max_ambi_order = self.sofaReverb.get_maximum_ambisonics_order_from_spec(instantiated_reverb_spec)
 
             if max_ambi_order < self.ambisonics_order:
                 warnings.warn(
@@ -1875,27 +1898,11 @@ class AmbiScaper(object):
                     # [radius, azimuth, elevation]
                 )
 
-                # Spread must be 0, so manually impose it by making a copy of fg_instanciated_specs
+                # Spread must be 0, so manually impose it by replacing the current event spec
                 imposed_fg_specs = []
-                for e in fg_instanciated_event_specs:
-                    # Note that spread is hardcoded to 0 by definition
-                    imposed_fg_specs.append(EventSpec(event_id=e.event_id,
-                                                      source_file=e.source_file,
-                                                      source_time=e.source_time,
-                                                      event_time=e.event_time,
-                                                      event_duration=e.event_duration,
-                                                      event_azimuth=e.event_azimuth,
-                                                      event_elevation=e.event_elevation,
-                                                      event_spread= 0.0,                # changed!
-                                                      snr=e.snr,
-                                                      role=e.role,
-                                                      pitch_shift=e.pitch_shift,
-                                                      time_stretch=e.time_stretch))
+                for event_spec in fg_instanciated_event_specs:
+                    event_spec = event_spec._replace(event_spread=0.0)
 
-                # Actually substitute (*deepcopy*) the old events for the new imposed ones
-                fg_instanciated_event_specs = []
-                for fg_spec in imposed_fg_specs:
-                    fg_instanciated_event_specs.append(copy.deepcopy(fg_spec))
 
 
             elif isinstance(instantiated_reverb_spec, SOFAReverbSpec):
@@ -1908,15 +1915,15 @@ class AmbiScaper(object):
                 )
 
                 # Retrieve loudspeaker positions
-                imposed_source_positions_spherical = self.sofaReverb.retrieve_RIR_positions_spherical(instantiated_reverb_spec.name)
+                imposed_source_positions_spherical = self.sofaReverb.retrieve_emitter_positions_spherical(instantiated_reverb_spec.name)
 
                 # Since we cannot modify directly an EventSpec
                 # we will copy all valid args from each event, and create a new set of events
                 # which will be substituted in the fg_instanciated_event_specs list
                 imposed_fg_specs = []
-                self.chosen_IR_indices = []
+                self.sofa_chosen_emitter_indices = []
 
-                for e in fg_instanciated_event_specs:
+                for event_spec in fg_instanciated_event_specs:
 
                     # Random
                     if instantiated_reverb_spec.wrap == 'random':
@@ -1926,46 +1933,42 @@ class AmbiScaper(object):
 
                         # Store the random indinces, so later in the generate_audio method we can
                         # easily retrieve the associated IRs
-                        # Achtung! indices start at 0, but audio files start at 1...
-                        self.chosen_IR_indices.append(random_index)
+                        self.sofa_chosen_emitter_indices.append(random_index)
 
                         # Assign actual values
                         # (no distribution tuples because we just instanciated
                         # the events in order to know the exact positions)
-                        imposed_azimuth = random_position[0]
-                        imposed_elevation =  random_position[1]
+                        imposed_azimuth = random_position[0][0]
+                        imposed_elevation =  random_position[1][0]
 
                     # Wrap
                     else:
                         if instantiated_reverb_spec.wrap == 'wrap_azimuth':
 
-                            index_of_closest = find_closest_spherical_point([e.event_azimuth,e.event_elevation],
+                            index_of_closest = find_closest_spherical_point([event_spec.event_azimuth,event_spec.event_elevation],
                                                                             imposed_source_positions_spherical,
                                                                             criterium='azimuth')
 
                         elif instantiated_reverb_spec.wrap == 'wrap_elevation':
 
-                            index_of_closest = find_closest_spherical_point([e.event_azimuth, e.event_elevation],
+                            index_of_closest = find_closest_spherical_point([event_spec.event_azimuth, event_spec.event_elevation],
                                                                             imposed_source_positions_spherical,
                                                                             criterium='elevation')
 
                         elif instantiated_reverb_spec.wrap == 'wrap_surface':
 
-                            index_of_closest = find_closest_spherical_point([e.event_azimuth, e.event_elevation],
+                            index_of_closest = find_closest_spherical_point([event_spec.event_azimuth, event_spec.event_elevation],
                                                                             imposed_source_positions_spherical,
                                                                             criterium='surface')
 
                         # Store the random indinces, so later in the generate_audio method we can
                         # easily retrieve the associated IRs
-                        # Achtung! indices start at 0, but audio files start at 1...
-                        self.chosen_IR_indices.append(index_of_closest)
+                        self.sofa_chosen_emitter_indices.append(index_of_closest)
 
                         # Once we have :index_of_closest:, let's assign the values
-                        imposed_azimuth = imposed_source_positions_spherical[index_of_closest][0]
-                        imposed_elevation = imposed_source_positions_spherical[index_of_closest][1]
+                        imposed_azimuth = imposed_source_positions_spherical[index_of_closest][0][0]
+                        imposed_elevation = imposed_source_positions_spherical[index_of_closest][1][0]
 
-
-                    # TODO: check1!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
                     # # TODO: compute onset/offset as well in the Smir case!!
@@ -1973,7 +1976,7 @@ class AmbiScaper(object):
                     # # since the convolution will affect event_time and event_duration
                     #
                     # # FILTER NUMERATION STARTS WITH 1!!
-                    # ir_idx =  self.chosen_IR_indices[-1] + 1
+                    # ir_idx =  self.sofa_chosen_emitter_indices[-1] + 1
                     #
                     # filter_name = RECORDED_REVERB_FILTER_NAME + str(ir_idx) + RECORDED_REVERB_FILTER_EXTENSION
                     # filter_path = os.path.join(generate_sofa_file_full_path(instantiated_reverb_spec.name), filter_name)
@@ -2003,40 +2006,33 @@ class AmbiScaper(object):
                     # imposed_event_duration = e.event_duration + max_offset_seconds
 
                     # TODO: hardcoded for the moment...
-                    imposed_event_time = e.event_time
-                    imposed_event_duration = e.event_duration
+                    imposed_event_time = event_spec.event_time
+                    imposed_event_duration = event_spec.event_duration
 
-                    # Now we have the imposed values, so let's create the imposed spec for the current event
+                    # Now we have the imposed values, so let's replace them into the current event spec
                     # Note that spread is hardcoded to 0 by definition
-                    # TODO: change implementation to the _replace() method
-                    imposed_fg_specs.append(EventSpec(event_id=e.event_id,
-                                                      source_file=e.source_file,
-                                                      source_time=e.source_time,
-                                                      event_time=imposed_event_time,        # changed!
-                                                      event_duration=imposed_event_duration,# changed!
-                                                      event_azimuth=imposed_azimuth,        # changed!
-                                                      event_elevation=imposed_elevation,    # changed!
-                                                      event_spread= 0.0,                    # changed!
-                                                      snr=e.snr,
-                                                      role=e.role,
-                                                      pitch_shift=e.pitch_shift,
-                                                      time_stretch=e.time_stretch))
 
-                # Actually substitute (*deepcopy*) the old events for the new imposed ones
-                fg_instanciated_event_specs = []
-                for fg_spec in imposed_fg_specs:
-                    fg_instanciated_event_specs.append(copy.deepcopy(fg_spec))
+                    event_spec = event_spec._replace(event_time=imposed_event_time,
+                                                     event_duration=imposed_event_duration,
+                                                     event_azimuth=imposed_azimuth,
+                                                     event_elevation=imposed_elevation,
+                                                     event_spread= 0.0)
+
+                # Add IR info to the data::value reverb spec
+                for i, speakeridx in enumerate(self.sofa_chosen_emitter_indices):
+
+                    newdict = instantiated_reverb_spec._asdict()
+                    newdict['reverb_id'] = 'h' + str(i)
+                    newdict['emitter'] = speakeridx
+                    newdict['listener'] = 0     # TODO!!!!!!!!!
+
+                    ann_reverb.append(time=0.0,
+                               duration=0.0,
+                               value=newdict,
+                               confidence=1.0)
+                jam.annotations.append(ann_reverb)
 
 
-
-            # Create the reverb annotation
-            ann_reverb.append(time=0.0,   # TODO: does it have any meaning for a reverb?
-                       duration=0.0,      # TODO: does it have any meaning for a reverb?
-                       value=instantiated_reverb_spec._asdict(),
-                       confidence=1.0)
-            jam.annotations.append(ann_reverb)
-
-            # TODO: add other info to sandbox
 
 
         #####################
@@ -2371,8 +2367,24 @@ class AmbiScaper(object):
             def is_foreground(event):
                 return e.value['role'] == 'foreground'
 
-            # Delete processed_tmpfiles only at the end of the method's lifetime
-            # with _close_temp_files(processed_tmpfiles):
+            # If the reverb spec is SOFA, let's open now the file,
+            # and load to memory the IR data.
+            # In this way we will avoid opening the file for every event in the spec.
+            if annotation_reverb:
+                if annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
+                    file_name =  annotation_reverb.data.value[0]['name']
+                    full_path =  self.sofaReverb.generate_sofa_file_full_path(file_name)
+                    sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(full_path, 'r')
+
+                    sofa_data_IR = sofa_file.getDataIR()
+                    sofa_sampling_rate = sofa_file.getSamplingRate()
+                    sofa_num_channels = sofa_file.getDimensionSize('R')
+                    sofa_channel_ordering = sofa_file.getVariableAttributeValue('Data.IR','ChannelOrdering')
+                    sofa_channel_normalization = sofa_file.getVariableAttributeValue('Data.IR','Normalization')
+
+                    sofa_file.close()
+                    # TODO: DO SOMETING WITH M!!!!!
+
 
             # Iterate over all events specified in the event annotation
             # fg_event_idx = -1 TODO
@@ -2421,6 +2433,7 @@ class AmbiScaper(object):
                 if is_foreground(e):
                     gain = self.ref_db + e.value['snr'] - lufs
                 elif is_background(e):
+
                     gain = self.ref_db - lufs
                 else:
                     raise AmbiScaperError(
@@ -2548,7 +2561,7 @@ class AmbiScaper(object):
 
                     elif annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
                         # Get the IRs associated to the source position
-                        # They are stored at the chosen_IR_indices list
+                        # They are stored at the sofa_chosen_emitter_indices list
                         # Watch out with the indices (wav files numbering starting at 1)
 
                         # TODO: implement that in a more elegant way
@@ -2560,46 +2573,37 @@ class AmbiScaper(object):
                         # we can retrieve the index from there
                         event_idx = _get_event_idx_from_id(e.value['event_id'],'foreground')
 
-                        # ir_irx holds the index of the ir to be used with the actual source
-                        # TODO: CHANGE NAME FROM chosen_IR_indices to something meaningful in sofa (emitterPositions or something)
-                        ir_idx = self.chosen_IR_indices[event_idx]
+                        # emitter_idx holds the index of the ir to be used with the actual source
+                        # TODO: CHANGE NAME FROM sofa_chosen_emitter_indices to something meaningful in sofa (emitterPositions or something)
+                        emitter_idx = self.sofa_chosen_emitter_indices[event_idx]
 
-                        # Open SOFA file and get the IR data
-                        # TODO: MOVE THIS IMPORT, PROBABLY THIS FUNCTION TO THE REVERB CLASS
-                        import pysofaconventions
-                        sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(self.sofaReverb.generate_sofa_file_full_path(reverb_name), 'r')
-
-                        # TODO: PROBABLY LOAD THE DATA.IR ONCE, AT THE FILE OPENING, SO WE AVOID OPENING IT EVERY TIME
-
+                        # Retrieve SOFA f IR data
                         # Data.IR has dimensions [M,R,E,N],
-                        # and the ir_idx is pointing to the E dimension
+                        # and the emitter_idx is pointing to the E dimension
                         # TODO: DO SOMETING WITH M!!!!!
-                        filter_data = sofa_file.getDataIR()[0,:,ir_idx,:]
-                        filter_sample_rate = sofa_file.getSamplingRate()
-                        num_channels = sofa_file.getDimensionSize('R')
-                        sofa_file.close()
 
-                        # TODO: probably we don't do longer this filter file copy or simlink,\
-                        # TODO:  but store the `E` index in the annotation file
-                        # used_filter_name = RECORDED_REVERB_FILTER_NAME + str(ir_idx) + RECORDED_REVERB_FILTER_EXTENSION
-                        # used_filter_path = os.path.join(generate_RIR_path(reverb_name), used_filter_name)
-                        #
-                        # # Create a symlink to the used filter on the source folder
-                        # # We could just copy the filter there for consistency,
-                        # # but that would increase too much the output size
-                        # # ACHTUNG!!! os.symlink is only defined for Unix,
-                        # # so this line will probably break in Windows
-                        # # TODO: handle Windows compatibility, test in Linux
-                        # try:
-                        #     symlink_path = os.path.join(destination_source_path, ir_filename)
-                        #     os.symlink(used_filter_path, symlink_path)
-                        # except OSError as err:
-                        #     if err.errno == 17:  # folder exists
-                        #         warnings.warn(
-                        #             'Could not create symlink: file exists: ' + symlink_path
-                        #         )
-                        #     else:
-                        #         raise
+                        # TODO: THINK A LITTLE BIT ABOUT THE NORMALIZATION ALGORITHM
+                        # now we are applying a normalization per ir, which means that level differences
+                        # among different postions (mainly due to distance) are not contemplated
+                        filter_data = normalize_ir(sofa_data_IR[0,:,emitter_idx,:])
+
+
+
+                        filter_sample_rate = sofa_sampling_rate
+                        num_channels = sofa_num_channels
+
+                        # TODO: ensure that filters are acn, sn3d
+                        if not sofa_channel_normalization == 'sn3d':
+                            raise Warning('ambisonics renormalization not implemented')
+
+                        if not sofa_channel_ordering == 'acn':
+                            raise Warning('ambisonics channel reordering not implemented')
+
+                        # write the filter to a file into the /source folder
+                        filter_name = 'h' + str(event_idx) + '.wav'
+                        full_path =  destination_source_path +'/' +  filter_name
+                        sf.write(full_path, np.transpose(filter_data), filter_sample_rate, subtype='FLOAT')
+
 
 
                         # # In both reverb cases, at this point we have the IR at the location pointed by used_filter_path

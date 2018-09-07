@@ -376,13 +376,15 @@ def wrap_number(x, x_min, x_max):
         or not isinstance(x_min, Number)
         or not isinstance(x_max, Number)):
         raise AmbiScaperError(
-            'Error wrapping number: not a number')
+            'Error wrapping number: not a number, got ' + str(type(x)))
     if (x_min > x_max):
         raise AmbiScaperError(
             'Error wrapping number: min greater than max'
         )
 
     return (((x - x_min) % (x_max - x_min)) + (x_max - x_min)) % (x_max - x_min) + x_min
+
+
 
 def delta_kronecker(q1,q2):
     '''
@@ -499,6 +501,24 @@ def spherical_to_cartesian(spherical_list):
     return [x,y,z]
 
 
+def degree_to_radian(degree):
+    """
+
+    :param degree:
+    :return:
+    """
+    return degree * 2 * np.pi / 360.
+
+
+def radian_to_degree(rad):
+    """
+
+    :param degree:
+    :return:
+    """
+    return rad * 360 / (2 * np.pi)
+
+
 def find_element_in_list(element, list_arg):
     '''
     Check if a given element is found in a given list.
@@ -543,63 +563,68 @@ def find_element_in_list(element, list_arg):
 
 
 def find_closest_spherical_point(point,list_of_points,criterium='azimuth'):
-    # '''
-    #
-    # :param point:
-    # :param list_of_points:
-    # :return:
-    # '''
-    #
-    # if not isinstance(point,list):
-    #     raise AmbiScaperError(
-    #         'Error on find_closest_spherical_point(): fist argument not a list, given' + str(point))
-    # elif len(point) != 2:
-    #     raise AmbiScaperError(
-    #         'Error on find_closest_spherical_point(): fist argument size != 2, given' + str(point))
-    #
-    # if not isinstance(list_of_points,list):
-    #     raise AmbiScaperError(
-    #         'Error on find_closest_spherical_point(): second argument not a list, given' + str(list_of_points))
-    # elif not all(isinstance(v,list) for v in list_of_points):
-    #     raise AmbiScaperError(
-    #         'Error on find_closest_spherical_point(): second argument not a list of lists, given' + str(list_of_points))
-    # elif not all(len(v) == 2 for v in list_of_points):
-    #     raise AmbiScaperError(
-    #         'Error on find_closest_spherical_point(): second argument not a list of lists of len 2, given' + str(list_of_points))
-    #
-    # if criterium not in ['azimuth','elevation','surface']:
-    #     raise AmbiScaperError(
-    #         'Error on find_closest_spherical_point(): criterium not known, given' + criterium)
-    # # Let's define the geometry with azi between 0 and 2pi
-    #
-    # azi = float(wrap_number(point[0],0,2*np.pi))
-    # ele = float(wrap_number(point[1],0,2*np.pi))
-    #
-    # list_of_distances = []
-    # for p in list_of_points:
-    #     target_azi = float(wrap_number(p[0],0,2*np.pi))
-    #     target_ele = float(wrap_number(p[1],0,2*np.pi))
-    #
-    #     # Closer in azimuth
-    #     if criterium is 'azimuth':
-    #         dist = np.abs(azi - target_azi)
-    #         dist = min(dist, (2 * np.pi) - dist) # Because azimuth is periodic every 2pi
-    #
-    #     elif criterium is 'elevation':
-    #         dist = np.abs(ele - target_ele)
-    #
-    #     elif criterium is 'surface': # both angles
-    #         dist_azi = np.abs(azi - target_azi)
-    #         dist_azi = min(dist_azi, (2 * np.pi) - dist_azi)  # Because azimuth is periodic every 2pi
-    #         dist_ele = np.abs(ele - target_ele)
-    #         # kinda euclidean distance from angles
-    #         dist = np.sqrt(pow(dist_azi,2)+pow(dist_ele,2))
-    #
-    #     list_of_distances.append(dist)
-    #
-    # index_of_min_distance = list_of_distances.index(min(list_of_distances))
-    # return (index_of_min_distance)
-    return 0
+
+    '''
+    :param point:
+    :param list_of_points:
+    :return:
+    '''
+
+    if not isinstance(point,list):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): fist argument not a list, given' + str(point))
+    elif len(point) != 2:
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): fist argument size != 2, given' + str(point))
+
+    if not isinstance(list_of_points,np.ndarray):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): second argument not an array, given' + str(list_of_points))
+    elif not all(isinstance(v,np.ndarray) for v in list_of_points):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): second argument not an array of arrays, given' + str(list_of_points))
+    elif not all(len(v) == 3 for v in list_of_points):
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): second argument not an array of arrays of len 3, given' + str(list_of_points))
+
+    if criterium not in ['azimuth','elevation','surface']:
+        raise AmbiScaperError(
+            'Error on find_closest_spherical_point(): criterium not known, given' + criterium)
+
+
+    # Let's define the geometry with azi between 0 and 2pi
+
+    azi = float(wrap_number(point[0],0,2*np.pi))
+    ele = float(wrap_number(point[1],-1*np.pi/2,np.pi/2))
+
+    list_of_distances = []
+    for p in list_of_points:
+
+        # TODO: this will probably fail if M != 1
+        p_azi = p[0][0]
+        p_ele = p[1][0]
+        target_azi = float(wrap_number(p_azi,0,2*np.pi))
+        target_ele = float(wrap_number(p_ele,-1*np.pi/2,np.pi/2))
+
+        # Closer in azimuth
+        if criterium is 'azimuth':
+            dist = np.abs(azi - target_azi)
+            dist = min(dist, (2 * np.pi) - dist) # Because azimuth is periodic every 2pi
+
+        elif criterium is 'elevation':
+            dist = np.abs(ele - target_ele)
+
+        elif criterium is 'surface': # both angles
+            dist_azi = np.abs(azi - target_azi)
+            dist_azi = min(dist_azi, (2 * np.pi) - dist_azi)  # Because azimuth is periodic every 2pi
+            dist_ele = np.abs(ele - target_ele)
+            # kinda euclidean distance from angles
+            dist = np.sqrt(pow(dist_azi,2)+pow(dist_ele,2))
+
+        list_of_distances.append(dist)
+
+    index_of_min_distance = list_of_distances.index(min(list_of_distances))
+    return (index_of_min_distance)
 
 
 # TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -847,3 +872,14 @@ def find_offset(ndarray,th=1e-4):
             break
 
     return offset
+
+
+def normalize_ir(ndarray, max=1):
+    """
+    :param ndarray:
+    :param max:
+    :return:
+    """
+    peak_value = np.amax(np.absolute(ndarray))
+    k = max / peak_value
+    return ndarray*k

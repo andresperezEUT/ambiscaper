@@ -3,7 +3,8 @@ import shutil
 import ambiscaper
 from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
-from ambiscaper.util import _close_temp_files
+from ambiscaper.reverb_ambisonics import SOFAReverbSpec, SOFAReverb
+from ambiscaper.util import _close_temp_files, _get_sorted_audio_files_recursive
 import pytest
 from ambiscaper.core import EventSpec
 # import tempfile
@@ -23,23 +24,24 @@ import warnings
 # FG_PATH = 'tests/data/audio/foreground'
 # BG_PATH = 'tests/data/audio/background'
 #
-FG_PATH = 'samples'
-BG_PATH = 'samples'
+# FG_PATH = 'samples'
+FG_PATH = os.path.abspath('./samples')
+BG_PATH = os.path.abspath('./samples')
 
 ALT_FG_PATH = 'tests/data/audio_alt_path/foreground'
 ALT_BG_PATH = 'tests/data/audio_alt_path/background'
 
-REG_WAV_PATH = 'tests/data/soundscape_20180301/soundscape_20180301.wav'
-REG_JAM_PATH = 'tests/data/soundscape_20180301/soundscape_20180301.jams'
-REG_TXT_PATH = 'tests/data/soundscape_20180301/soundscape_20180301.txt'
+REG_WAV_PATH = 'tests/data/soundscape_for_test/soundscape_for_test.wav'
+REG_JAM_PATH = 'tests/data/soundscape_for_test/soundscape_for_test.jams'
+REG_TXT_PATH = 'tests/data/soundscape_for_test/soundscape_for_test.txt'
 
-REG_BGONLY_WAV_PATH = 'tests/data/regression/bgonly_soundscape_20170928.wav'
-REG_BGONLY_JAM_PATH = 'tests/data/regression/bgonly_soundscape_20170928.jams'
-REG_BGONLY_TXT_PATH = 'tests/data/regression/bgonly_soundscape_20170928.txt'
-
-REG_REVERB_WAV_PATH = 'tests/data/regression/reverb_soundscape_20170928.wav'
-REG_REVERB_JAM_PATH = 'tests/data/regression/reverb_soundscape_20170928.jams'
-REG_REVERB_TXT_PATH = 'tests/data/regression/reverb_soundscape_20170928.txt'
+# REG_BGONLY_WAV_PATH = 'tests/data/regression/bgonly_soundscape_20170928.wav'
+# REG_BGONLY_JAM_PATH = 'tests/data/regression/bgonly_soundscape_20170928.jams'
+# REG_BGONLY_TXT_PATH = 'tests/data/regression/bgonly_soundscape_20170928.txt'
+#
+# REG_REVERB_WAV_PATH = 'tests/data/regression/reverb_soundscape_20170928.wav'
+# REG_REVERB_JAM_PATH = 'tests/data/regression/reverb_soundscape_20170928.jams'
+# REG_REVERB_TXT_PATH = 'tests/data/regression/reverb_soundscape_20170928.txt'
 
 # fg and bg labels for testing
 FB_LABELS = ['car_horn', 'human_voice', 'siren']
@@ -299,10 +301,6 @@ def test_get_value_from_dist():
     # COPY TESTS FROM test_validate_distribution (to ensure validation applied)
     def __test_bad_tuple_list(tuple_list):
         for t in tuple_list:
-            if isinstance(t, tuple):
-                print(t, len(t))
-            else:
-                print(t)
             pytest.raises(AmbiScaperError, ambiscaper.core._get_value_from_dist, t)
 
     # not tuple = error
@@ -573,20 +571,20 @@ def test_validate_time_stretch():
         AmbiScaperWarning, ambiscaper.core._validate_time_stretch, ('normal', 5, 1))
 
 
-# def test_validate_event():
-#
-#     pytest.raises(AmbiScaperError, ambiscaper.core._validate_event,
-#                   source_file=('choose', []),
-#                   source_time=('const', 0),
-#                   event_time=('const', 0),
-#                   event_duration=('const', 1),
-#                   event_azimuth=('const', 0),
-#                   event_elevation=('const', 0),
-#                   event_spread=('const', 0),
-#                   snr=('const', 0),
-#                   pitch_shift=None,
-#                   time_stretch=None)
+def test_validate_event():
 
+    # Let's check a valid event
+    ambiscaper.core._validate_event(
+        source_file=('choose', []),
+        source_time=('const', 0),
+        event_time=('const', 0),
+        event_duration=('const', 1),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 0),
+        pitch_shift=None,
+        time_stretch=None)
 
 def test_validate_soundscape_duration():
 
@@ -612,7 +610,7 @@ def test_validate_ambisonics_order():
         __test_bad_ambisonics_order(bv)
 
 
-def test_ambiscaper_init():
+def test_init():
     '''
     Test creation of AmbiScaper object.
     '''
@@ -624,11 +622,6 @@ def test_ambiscaper_init():
     sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 1, -1, FG_PATH, BG_PATH)
     sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 1, 1.3, FG_PATH, BG_PATH)
 
-    # all args valid
-    sc = ambiscaper.AmbiScaper(10.0, 3, FG_PATH, BG_PATH)
-    assert sc.fg_path == FG_PATH
-    assert sc.bg_path == BG_PATH
-
     # bad fg path
     sc = pytest.raises(AmbiScaperError, ambiscaper.AmbiScaper, 10.0, 3,
                        'tests/data/audio/wrong',
@@ -639,7 +632,14 @@ def test_ambiscaper_init():
                        FG_PATH,
                        'tests/data/audio/wrong')
 
+    # all args valid
+    sc = ambiscaper.AmbiScaper(10.0, 3, FG_PATH, BG_PATH)
+    assert sc.fg_path == FG_PATH
+    assert sc.bg_path == BG_PATH
 
+    sc = ambiscaper.AmbiScaper(10.0, 3, FG_PATH, None)
+    assert sc.fg_path == FG_PATH
+    assert sc.bg_path == None
 
     # ensure default values have been set
     sc = ambiscaper.AmbiScaper(10.0, 3, FG_PATH, BG_PATH)
@@ -649,7 +649,7 @@ def test_ambiscaper_init():
     assert sc.fade_out_len == 0.01  # 10 ms
 
 
-def test_ambiscaper_add_background():
+def test_add_background():
     '''
     Test AmbiScaper.add_background function
 
@@ -679,7 +679,7 @@ def test_ambiscaper_add_background():
     assert sc.bg_spec == [bg_event_expected]
 
 
-def test_ambiscaper_add_event():
+def test_add_event():
 
     sc = ambiscaper.AmbiScaper(10.0, 3, FG_PATH, BG_PATH)
 
@@ -714,9 +714,67 @@ def test_ambiscaper_add_event():
     assert sc.fg_spec[0] == fg_event_expected
 
 
-def test_ambiscaper_instantiate_event():
+def test_add_simulated_reverb():
+    # TODO!
+    return 0
 
-    # GF EVENT TO WORK WITH
+
+def test_add_sofa_reverb():
+
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    sofa_path = os.path.abspath('./SOFA')
+    sc.set_sofa_reverb_folder_path(sofa_path)
+    name_tuple = ('const', 'testpysofa.sofa')
+    wrap_tuple = ('const', 'random')
+
+    # Assert correct assignment
+    sc.add_sofa_reverb(name=name_tuple,
+                       wrap=wrap_tuple)
+
+    assert sc.reverb_spec == SOFAReverbSpec(name_tuple,wrap_tuple)
+
+
+def test_instantiate_event():
+
+
+    # BACKGROUND
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    bg_event = EventSpec(source_file=("const", 'Acoustics_Book/adult_female_speech.wav'),
+                         event_id=None,
+                         source_time=('const', 0),
+                         event_time=('uniform', 0, 9),
+                         event_duration=('truncnorm', 2, 1, 1, 3),
+                         event_azimuth=('truncnorm', np.pi, 1, 0, 2 * np.pi),
+                         event_elevation=('truncnorm', 0, 1, -np.pi/2, np.pi/2),
+                         event_spread=('uniform', 0, 1),
+                         snr=('uniform', 10, 20),
+                         role='background',
+                         pitch_shift=('normal', 0, 1),
+                         time_stretch=('uniform', 0.8, 1.2))
+
+    instantiated_bg_event = sc._instantiate_event(event=bg_event,
+                                                  event_idx=0,
+                                                  isbackground=True,
+                                                  allow_repeated_source=True,
+                                                  used_source_files=[],
+                                                  disable_instantiation_warnings=True)
+
+    assert instantiated_bg_event.source_file == os.path.abspath('samples/Acoustics_Book/adult_female_speech.wav')
+    assert instantiated_bg_event.event_id == 'bg0'
+    assert instantiated_bg_event.source_time == 0
+    assert 0 <= instantiated_bg_event.event_time <= 9
+    assert 1 <= instantiated_bg_event.event_duration <= 3
+    assert 0 <= instantiated_bg_event.event_azimuth <= 2*np.pi
+    assert -np.pi/2 <= instantiated_bg_event.event_elevation <= np.pi/2
+    assert 0 <= instantiated_bg_event.event_spread <= 1
+    assert 10 <= instantiated_bg_event.snr <= 20
+    assert instantiated_bg_event.role == 'background'
+    assert ambiscaper.util.is_real_number(instantiated_bg_event.pitch_shift)
+    assert 0.8 <= instantiated_bg_event.time_stretch <= 1.2
+
+
+    # FOREGROUND
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     fg_event = EventSpec(source_file=('const', 'Acoustics_Book/bagpipe_music.wav'),
                          event_id=None,
                          source_time=('const', 0),
@@ -727,19 +785,18 @@ def test_ambiscaper_instantiate_event():
                          event_spread=('uniform', 0, 1),
                          snr=('uniform', 10, 20),
                          role='foreground',
-                         pitch_shift=('normal', 0, 1),
+                         pitch_shift=None,
                          time_stretch=('uniform', 0.8, 1.2))
 
     # test valid case
-    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     instantiated_event = sc._instantiate_event(event=fg_event,
                                                event_idx=0,
                                                isbackground=False,
                                                allow_repeated_source=True,
                                                used_source_files=[],
                                                disable_instantiation_warnings=True)
-    assert instantiated_event.source_file == (
-        'samples/Acoustics_Book/bagpipe_music.wav')
+
+    assert instantiated_event.source_file == os.path.abspath('samples/Acoustics_Book/bagpipe_music.wav')
     assert instantiated_event.event_id == 'fg0'
     assert instantiated_event.source_time == 0
     assert 0 <= instantiated_event.event_time <= 9
@@ -749,42 +806,11 @@ def test_ambiscaper_instantiate_event():
     assert 0 <= instantiated_event.event_spread <= 1
     assert 10 <= instantiated_event.snr <= 20
     assert instantiated_event.role == 'foreground'
-    assert ambiscaper.util.is_real_number(instantiated_event.pitch_shift)
+    assert instantiated_event.pitch_shift is None
     assert 0.8 <= instantiated_event.time_stretch <= 1.2
 
-    # # when a source file needs to be replaced because it's used already
-    # fg_event2 = fg_event._replace(label=('const', 'Acoustics_Book/adult_female_speech.wav'))
-    # # repeat several times to increase chance of hitting the line we need to
-    # # test
-    # for _ in range(20):
-    #     instantiated_event = sc._instantiate_event(event=fg_event2,
-    #                                                event_idx=1,
-    #                                                isbackground=False,
-    #                                                allow_repeated_label=True,
-    #                                                allow_repeated_source=False,
-    #                                                used_source_files=(
-    #                                                 ['tests/data/audio/foreground/human_voice/'
-    #                                                  '42-Human-Vocal-Voice-all-aboard_edit.wav',
-    #                                                  'tests/data/audio/foreground/human_voice/'
-    #                                                  '42-Human-Vocal-Voice-taxi-1_edit.wav']),
-    #                                                 disable_instantiation_warnings=True)
-    #     assert instantiated_event.source_file == (
-    #         'tests/data/audio/foreground/human_voice/'
-    #         '42-Human-Vocal-Voice-taxi-2_edit.wav')
-
-
-
-    # repeated source when not allowed throws error
-    pytest.raises(AmbiScaperError, sc._instantiate_event,
-                  event=fg_event,
-                  event_idx=1,
-                  isbackground=False,
-                  allow_repeated_source=False,
-                  used_source_files=(
-                      ['samples/Acoustics_Book/bagpipe_music.wav']))
-
     # event duration longer than source duration: warning
-    fg_event2 = fg_event._replace(event_duration=('const', 25))
+    fg_event2 = fg_event._replace(event_duration=('const', 50))
     pytest.warns(AmbiScaperWarning, sc._instantiate_event,
                  event=fg_event2,
                  event_idx=1)
@@ -830,288 +856,240 @@ def test_ambiscaper_instantiate_event():
                  event_idx=1)
 
 
-# def test_ambiscaper_instantiate():
-#
-#     # Here we just instantiate a known fixed spec and check if that jams
-#     # we get back is as expected.
-#     sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
-#     sc.ref_db = -50
-#
-#     # background
-#     sc.add_background(
-#         source_file=(
-#             'const',
-#             'tests/data/audio/background/park/'
-#             '268903__yonts__city-park-tel-aviv-israel.wav'),
-#         source_time=('const', 0))
-#
-#     # foreground events
-#     sc.add_event(
-#         source_file=('const',
-#                      'tests/data/audio/foreground/'
-#                      'siren/69-Siren-1.wav'),
-#         source_time=('const', 5),
-#         event_time=('const', 2),
-#         event_duration=('const', 5),
-#         event_azimuth=('const', 0),
-#         event_elevation=('const', 0),
-#         event_spread=('const', 0),
-#         snr=('const', 5),
-#         pitch_shift=None,
-#         time_stretch=None)
-#
-#     sc.add_event(
-#         source_file=('const',
-#                      'tests/data/audio/foreground/'
-#                      'car_horn/17-CAR-Rolls-Royce-Horn.wav'),
-#         source_time=('const', 0),
-#         event_time=('const', 5),
-#         event_duration=('const', 2),
-#         event_azimuth=('const', 0),
-#         event_elevation=('const', 0),
-#         event_spread=('const', 0),
-#         snr=('const', 20),
-#         pitch_shift=('const', 1),
-#         time_stretch=None)
-#
-#     sc.add_event(
-#         source_file=('const',
-#                      'tests/data/audio/foreground/'
-#                      'human_voice/42-Human-Vocal-Voice-taxi-2_edit.wav'),
-#         source_time=('const', 0),
-#         event_time=('const', 7),
-#         event_duration=('const', 2),
-#         event_azimuth=('const', 0),
-#         event_elevation=('const', 0),
-#         event_spread=('const', 0),
-#         snr=('const', 10),
-#         pitch_shift=None,
-#         time_stretch=('const', 1.2))
-#
-#     jam = sc._instantiate(disable_instantiation_warnings=True)
-#     regjam = jams.load(REG_JAM_PATH)
-#     print(jam)
-#     # print(regjam)
-#
-#     # Note: can't compare directly, since:
-#     # 1. ambiscaper/and jams liberary versions may change
-#     # 2. raw annotation sandbox stores specs as OrderedDict and tuples, whereas
-#     # loaded ann (regann) simplifies those to dicts and lists
-#     # assert jam == regression_jam
-#
-#     # Must compare each part "manually"
-#     # 1. compare file metadata
-#     for k, kreg in zip(jam.file_metadata.keys(), regjam.file_metadata.keys()):
-#         assert k == kreg
-#         if k != 'jams_version':
-#             assert jam.file_metadata[k] == regjam.file_metadata[kreg]
-#
-#     # 2. compare jams sandboxes
-#     assert jam.sandbox == regjam.sandbox
-#
-#     # 3. compare annotations
-#     assert len(jam.annotations) == len(regjam.annotations) == 1
-#     ann = jam.annotations[0]
-#     regann = regjam.annotations[0]
-#
-#     # 3.1 compare annotation metadata
-#     assert ann.annotation_metadata == regann.annotation_metadata
-#
-#     # 3.2 compare sandboxes
-#     # Note: can't compare sandboxes directly, since in raw jam ambiscaper sandbox
-#     # stores event specs in EventSpec object (named tuple), whereas in loaded
-#     # jam these will get converted to list of lists.
-#     # assert ann.sandbox == regann.sandbox
-#     assert len(ann.sandbox.keys()) == len(regann.sandbox.keys()) == 1
-#     assert 'ambiscaper' in ann.sandbox.keys()
-#     assert 'ambiscaper' in regann.sandbox.keys()
-#
-#     # everything but the specs can be compared directly:
-#     for k, kreg in zip(sorted(ann.sandbox.ambiscaper.keys()),
-#                        sorted(regann.sandbox.ambiscaper.keys())):
-#         assert k == kreg
-#         if k not in ['bg_spec', 'fg_spec']:
-#             assert ann.sandbox.ambiscaper[k] == regann.sandbox.ambiscaper[kreg]
-#
-#     # to compare specs need to covert raw specs to list of lists
-#     assert (
-#         [[list(x) if type(x) == tuple else x for x in e] for e in
-#          ann.sandbox.ambiscaper['bg_spec']] == regann.sandbox.ambiscaper['bg_spec'])
-#
-#     assert (
-#         [[list(x) if type(x) == tuple else x for x in e] for e in
-#          ann.sandbox.ambiscaper['fg_spec']] == regann.sandbox.ambiscaper['fg_spec'])
-#
-#     # 3.3. compare namespace, time and duration
-#     assert ann.namespace == regann.namespace
-#     assert ann.time == regann.time
-#     assert ann.duration == regann.duration
-#
-#     # 3.4 compare data
-#     (ann.data == regann.data).all().all()
+    # Test different distribution tuples combinations
+
+    # Choose between all source files, and ensure we choose one of them
+    fg_event = EventSpec(source_file=('choose', []),
+                         event_id=None,
+                         source_time=('const', 0),
+                         event_time=('uniform', 0, 9),
+                         event_duration=('const', 0.5),
+                         event_azimuth=('truncnorm', np.pi, 1, 0, 2 * np.pi),
+                         event_elevation=('truncnorm', 0, 1, -np.pi/2, np.pi/2),
+                         event_spread=('uniform', 0, 1),
+                         snr=('uniform', 10, 20),
+                         role='foreground',
+                         pitch_shift=('normal', 0, 1),
+                         time_stretch=('uniform', 0.8, 1.2))
+
+    instantiated_event = sc._instantiate_event(event=fg_event,
+                                               event_idx=0,
+                                               isbackground=False)
+
+    available_source_files = _get_sorted_audio_files_recursive(FG_PATH)
+    assert instantiated_event.source_file in available_source_files
+
+    # Choose between some of the source files
+    fg_event = EventSpec(source_file=('choose', ['Bicycle_Horn/chokedhorn.wav','Bicycle_Horn/classichorn.wav']),
+                         event_id=None,
+                         source_time=('const', 0),
+                         event_time=('uniform', 0, 9),
+                         event_duration=('const', 0.5),
+                         event_azimuth=('truncnorm', np.pi, 1, 0, 2 * np.pi),
+                         event_elevation=('truncnorm', 0, 1, -np.pi / 2, np.pi / 2),
+                         event_spread=('uniform', 0, 1),
+                         snr=('uniform', 10, 20),
+                         role='foreground',
+                         pitch_shift=('normal', 0, 1),
+                         time_stretch=('uniform', 0.8, 1.2))
+
+    instantiated_event = sc._instantiate_event(event=fg_event,
+                                               event_idx=0,
+                                               isbackground=False)
+
+    available_source_files =  [os.path.abspath(p) for p in ['samples/Bicycle_Horn/chokedhorn.wav','samples/Bicycle_Horn/classichorn.wav']]
+    assert instantiated_event.source_file in available_source_files
 
 
-# def test_generate_audio():
-#
-#     # Regression test: same spec, same audio (not this will fail if we update
-#     # any of the audio processing techniques used (e.g. change time stretching
-#     # algorithm.
-#     sc = ambiscaper.AmbiScaper(duration=10.0,
-#                                ambisonics_order=1,
-#                                fg_path=FG_PATH,
-#                                bg_path=BG_PATH)
-#
-#     # background
-#     sc.add_background(
-#         source_file=(
-#             'const',
-#             'Handel_Trumpet/tr-1888d-piece3-st.wav'
-#         ),
-#         source_time=('const', 0))
-#
-#     # foreground events
-#     sc.add_event(
-#         source_file=('const',
-#                      'Acoustics_Book/tuba_arpeggio.wav'),
-#         source_time=('const', 5),
-#         event_time=('const', 2),
-#         event_duration=('const', 5),
-#         event_azimuth=('const', 0),
-#         event_elevation=('const', 0),
-#         event_spread=('const', 0),
-#         snr=('const', 5),
-#         pitch_shift=None,
-#         time_stretch=None)
-#
-#     sc.add_event(
-#         source_file=('const',
-#                      'Acoustics_Book/flute_music.wav'),
-#         source_time=('const', 0),
-#         event_time=('const', 5),
-#         event_duration=('const', 2),
-#         event_azimuth=('const', 0),
-#         event_elevation=('const', 0),
-#         event_spread=('const', 0),
-#         snr=('const', 20),
-#         pitch_shift=('const', 1),
-#         time_stretch=None)
-#
-#     sc.add_event(
-#         source_file=('const',
-#                      'Acoustics_Book/adult_female_speech.wav'),
-#         source_time=('const', 0),
-#         event_time=('const', 7),
-#         event_duration=('const', 2),
-#         event_azimuth=('const', 0),
-#         event_elevation=('const', 0),
-#         event_spread=('const', 0),
-#         snr=('const', 10),
-#         pitch_shift=None,
-#         time_stretch=('const', 1.2))
-#
-#     # tmpfiles = []
-#     # with _close_temp_files(tmpfiles):
-#
-#     # wav_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=True)
-#     # tmpfiles.append(wav_file)
-#
-#     # Create temmporary folder for the output
-#     tmp_dir = tempfile.mkdtemp()
-#     # Output files will have the same name as the folder, so keep it
-#     tmp_name = os.path.split(tmp_dir)[-1]
-#
-#     # Following code will raise a warning because the tmpfolder already exists
-#     # (we have just created it)
-#     # So, disable warnings temporally
-#     with warnings.catch_warnings():
-#         warnings.simplefilter("ignore")
-#         sc.generate(destination_path=tmp_dir,
-#                     generate_txt=True,
-#                     disable_instantiation_warnings=True)
-#
-#
-#     wav_file_name = os.path.join(tmp_dir, tmp_name + '.wav')
-#
-#     jam = sc._instantiate(disable_instantiation_warnings=True)
-#     print(jam.annotations[0])
-#     print(jam.annotations[0].search(namespace='ambiscaper_sound_event'))
-#     print(jam.annotations[0].search(namespace='ambiscaper_sound_event')[0])
-#     sc._generate_audio(destination_path=tmp_dir,
-#                        audio_filename=wav_file_name,
-#                        annotation_array=jam.annotations[0])
-#
-#     # validate audio
-#     wav, sr = soundfile.read(wav_file_name)
-#     regwav, sr = soundfile.read(REG_WAV_PATH)
-#     assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
-#
-#     # Don't disable sox warnings (just to cover line)
-#     sc._generate_audio(wav_file_name, jam.annotations[0],
-#                        disable_sox_warnings=False)
-#     # validate audio
-#     wav, sr = soundfile.read(wav_file_name)
-#     regwav, sr = soundfile.read(REG_WAV_PATH)
-#     assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
-#
-#     # namespace must be ambiscaper_sound_event
-#     jam.annotations[0].namespace = 'tag_open'
-#     pytest.raises(AmbiScaperError, sc._generate_audio, wav_file_name,
-#                   jam.annotations[0])
-#
-#     # unsupported event role must raise error
-#     jam.annotations[0].namespace = 'ambiscaper_sound_event'
-#     jam.annotations[0].data.loc[3]['value']['role'] = 'ewok'
-#     pytest.raises(AmbiScaperError, sc._generate_audio, wav_file_name,
-#                   jam.annotations[0])
-#
-#     # soundscape with no events will raise warning and won't generate audio
-#     sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
-#     sc.ref_db = -50
-#     jam = sc._instantiate(disable_instantiation_warnings=True)
-#     pytest.warns(AmbiScaperWarning, sc._generate_audio, wav_file_name,
-#                  jam.annotations[0])
-#
-#     # soundscape with only one event will use transformer (regression test)
-#     sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
-#     sc.ref_db = -20
-#     # background
-#     sc.add_background(
-#         source_file=('const',
-#                      'tests/data/audio/background/park/'
-#                      '268903__yonts__city-park-tel-aviv-israel.wav'),
-#         source_time=('const', 0))
-#     jam = sc._instantiate(disable_instantiation_warnings=True)
-#     sc._generate_audio(wav_file.name, jam.annotations[0], reverb=0.2)
-#     # validate audio
-#     wav, sr = soundfile.read(wav_file.name)
-#     regwav, sr = soundfile.read(REG_BGONLY_WAV_PATH)
-#     assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
-#
-#     # Delete recursively the temp folder
-#     shutil.rmtree(tmp_dir, ignore_errors=True)
+    # Error on source file distribution
+
+    fg_event = EventSpec(source_file=('incorrect_distribution', []),
+                         event_id=None,
+                         source_time=('const', 0),
+                         event_time=('uniform', 0, 9),
+                         event_duration=('const', 0.5),
+                         event_azimuth=('truncnorm', np.pi, 1, 0, 2 * np.pi),
+                         event_elevation=('truncnorm', 0, 1, -np.pi / 2, np.pi / 2),
+                         event_spread=('uniform', 0, 1),
+                         snr=('uniform', 10, 20),
+                         role='foreground',
+                         pitch_shift=('normal', 0, 1),
+                         time_stretch=('uniform', 0.8, 1.2))
+
+    pytest.raises(AmbiScaperError, sc._instantiate_event,
+                  event=fg_event,
+                  event_idx=1,
+                  isbackground=False)
 
 
-def test_generate():
+    # Source repetition test
+    # There is only one file which is still not used ('paphorn.wav')
+    # Let's add it by selecting 'source_file=('choose', []),
+    # and iterating until it's selected
+    # [NOTE: there are 20 iterations, so it's very unlikely that the missing file won't appear...]
 
-    # Final regression test on all files
-    sc = ambiscaper.AmbiScaper(duration=10.0,
-                               ambisonics_order=1,
-                               fg_path=FG_PATH,
-                               bg_path=BG_PATH)
+
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path='samples/Bicycle_Horn', bg_path=BG_PATH)
+    for i in range(20):
+        fg_event = EventSpec(source_file=('choose', []),
+                             event_id=None,
+                             source_time=('const', 0),
+                             event_time=('uniform', 0, 9),
+                             event_duration=('const', 0.5),
+                             event_azimuth=('truncnorm', np.pi, 1, 0, 2 * np.pi),
+                             event_elevation=('truncnorm', 0, 1, -np.pi / 2, np.pi / 2),
+                             event_spread=('uniform', 0, 1),
+                             snr=('uniform', 10, 20),
+                             role='foreground',
+                             pitch_shift=('normal', 0, 1),
+                             time_stretch=('uniform', 0.8, 1.2))
+        try:
+            used_source_files = ['samples/Bicycle_Horn/chokedhorn.wav',
+                                 'samples/Bicycle_Horn/classichorn.wav',
+                                 'samples/Bicycle_Horn/classichorn_double.wav']
+
+            instantiated_event = sc._instantiate_event(event=fg_event,
+                                                       event_idx=0,
+                                                       isbackground=False,
+                                                       allow_repeated_source=False,
+                                                       used_source_files=used_source_files)
+        except AmbiScaperError:
+            pass
+
+    # Now the instanciated event file must be the file missing (paphorn.wav)
+    assert instantiated_event.source_file == (
+            'samples/Bicycle_Horn/paphorn.wav')
+
+    # Now all files in the folder have been used
+    # Therefore, AmbiScaper should return Error
+    pytest.raises(AmbiScaperError, sc._instantiate_event,
+                  event=fg_event,
+                  event_idx=1,
+                  isbackground=False,
+                  allow_repeated_source=False,
+                  used_source_files=used_source_files)
+
+
+
+
+def test_instantiate_reverb():
+
+    # Instantiate SOFA reverb
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc.set_sofa_reverb_folder_path(os.path.abspath('./SOFA'))
+
+    sofa_reverb_spec = SOFAReverbSpec(name=('const', 'testpysofa.sofa'),
+                                      wrap=('const', 'random'))
+    instantiated_spec = sc._instantiate_reverb(reverb_spec=sofa_reverb_spec)
+    assert type(instantiated_spec) == SOFAReverbSpec
+
+    # TODO: SMIR REVERB
+
+
+
+def test_instantiate_smir_reverb():
+        # TODO:
+    return 0
+
+def test_instantiate_sofa_reverb():
+
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc.set_sofa_reverb_folder_path(os.path.abspath('./SOFA'))
+
+    # Check name
+    ## Const value
+    sofa_reverb_spec = SOFAReverbSpec(name=('const', 'testpysofa.sofa'),
+                                      wrap=('const', 'random'))
+    instantiated_spec = sc._instantiate_sofa_reverb(reverb_spec=sofa_reverb_spec)
+    assert instantiated_spec.name == 'testpysofa.sofa'
+    assert instantiated_spec.wrap == 'random'
+
+    ## Choose among all available files
+    sofa_reverb_spec2 = sofa_reverb_spec._replace(name=('choose', []))
+    instantiated_spec2 = sc._instantiate_sofa_reverb(reverb_spec=sofa_reverb_spec2)
+    assert instantiated_spec2.name in sc.retrieve_available_sofa_reverb_files()
+
+    # Check wrap
+    ## Choose among different wraps
+    sofa_reverb_spec3 = sofa_reverb_spec._replace(wrap=('choose', []))
+    instantiated_spec3 = sc._instantiate_sofa_reverb(reverb_spec=sofa_reverb_spec3)
+    assert instantiated_spec3.wrap in SOFAReverb.valid_wrap_values
+
+
+
+
+
+
+def test_set_sofa_reverb_folder_path():
+
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+
+    # Folder does not exist
+    sofa_path = 'fake_path'
+    pytest.raises(AmbiScaperError,sc.set_sofa_reverb_folder_path, sofa_path)
+
+    # Not a folder
+    sofa_path = os.path.abspath('./SOFA/testpysofa.sofa')
+    pytest.raises(AmbiScaperError, sc.set_sofa_reverb_folder_path, sofa_path)
+
+    # Correct: no error
+    sofa_path = os.path.abspath('./SOFA')
+    sc.set_sofa_reverb_folder_path(sofa_path)
+    assert sofa_path == sc.sofaReverb.sofa_reverb_folder_path
+
+
+def test_get_sofa_simulated_reverb():
+
+    # Path not set: None
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    assert None == sc.get_sofa_reverb_folder_path()
+
+    # Path correctly set
+    sofa_path = os.path.abspath('./SOFA')
+    sc.set_sofa_reverb_folder_path(sofa_path)
+    assert sofa_path == sc.get_sofa_reverb_folder_path()
+
+
+def test_retrieve_available_sofa_reverb_files():
+
+    sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+
+    # Error if path not specified
+    pytest.raises(AmbiScaperError,sc.retrieve_available_sofa_reverb_files)
+
+    sofa_path = os.path.abspath('./SOFA')
+    sc.set_sofa_reverb_folder_path(sofa_path)
+
+    # At the moment we have only one
+    groundtruth = ['testpysofa.sofa']
+
+    # Check with unordered lists
+    assert set(sc.retrieve_available_sofa_reverb_files()) == set(groundtruth)
+
+
+
+
+def test_instantiate():
+
+
+    # TODO: FIX REVERB SPEC STUFF
+
+    # Here we just instantiate a known fixed spec and check if that jams
+    # we get back is as expected.
+    sc = ambiscaper.AmbiScaper(10.0, 1, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.ref_db = -50
 
     # background
     sc.add_background(
         source_file=(
             'const',
-            'Handel_Trumpet/tr-1888d-piece3-st.wav'
-        ),
+            'Acoustics_Book/adult_female_speech.wav'),
         source_time=('const', 0))
 
     # foreground events
     sc.add_event(
         source_file=('const',
-                     'Acoustics_Book/tuba_arpeggio.wav'),
+                     'Bicycle_Horn/chokedhorn.wav'),
         source_time=('const', 5),
         event_time=('const', 2),
         event_duration=('const', 5),
@@ -1124,7 +1102,7 @@ def test_generate():
 
     sc.add_event(
         source_file=('const',
-                     'Acoustics_Book/flute_music.wav'),
+                     'Bicycle_Horn/classichorn.wav'),
         source_time=('const', 0),
         event_time=('const', 5),
         event_duration=('const', 2),
@@ -1137,7 +1115,260 @@ def test_generate():
 
     sc.add_event(
         source_file=('const',
-                     'Acoustics_Book/adult_female_speech.wav'),
+                     'Bicycle_Horn/paphorn.wav'),
+        source_time=('const', 0),
+        event_time=('const', 7),
+        event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 10),
+        pitch_shift=None,
+        time_stretch=('const', 1.2))
+
+    jam = sc._instantiate(disable_instantiation_warnings=True)
+    regjam = jams.load(REG_JAM_PATH)
+    # print(jam)
+    # print(regjam)
+
+    # Note: can't compare directly, since:
+    # 1. ambiscaper/and jams library versions may change
+    # 2. raw annotation sandbox stores specs as OrderedDict and tuples, whereas
+    # loaded ann (regann) simplifies those to dicts and lists
+    # assert jam == regression_jam
+
+    # Must compare each part "manually"
+    # 1. compare file metadata
+    for k, kreg in zip(jam.file_metadata.keys(), regjam.file_metadata.keys()):
+        assert k == kreg
+        if k != 'jams_version':
+            assert jam.file_metadata[k] == regjam.file_metadata[kreg]
+
+    # 2. compare jams sandboxes
+    assert jam.sandbox == regjam.sandbox
+
+    # 3. compare annotations
+    assert len(jam.annotations) == len(regjam.annotations) == 1
+    ann = jam.annotations[0]
+    regann = regjam.annotations[0]
+
+    # 3.1 compare annotation metadata
+    assert ann.annotation_metadata == regann.annotation_metadata
+
+    # 3.2 compare sandboxes
+    # Note: can't compare sandboxes directly, since in raw jam ambiscaper sandbox
+    # stores event specs in EventSpec object (named tuple), whereas in loaded
+    # jam these will get converted to list of lists.
+    # assert ann.sandbox == regann.sandbox
+    assert len(ann.sandbox.keys()) == len(regann.sandbox.keys()) == 1
+    assert 'ambiscaper' in ann.sandbox.keys()
+    assert 'ambiscaper' in regann.sandbox.keys()
+
+    # everything but the specs can be compared directly:
+    for k, kreg in zip(sorted(ann.sandbox.ambiscaper.keys()),
+                       sorted(regann.sandbox.ambiscaper.keys())):
+        assert k == kreg
+        if k not in ['bg_spec', 'fg_spec']:
+            assert ann.sandbox.ambiscaper[k] == regann.sandbox.ambiscaper[kreg]
+
+    # to compare specs need to covert raw specs to list of lists
+    assert (
+        [[list(x) if type(x) == tuple else x for x in e] for e in
+         ann.sandbox.ambiscaper['bg_spec']] == regann.sandbox.ambiscaper['bg_spec'])
+
+    assert (
+        [[list(x) if type(x) == tuple else x for x in e] for e in
+         ann.sandbox.ambiscaper['fg_spec']] == regann.sandbox.ambiscaper['fg_spec'])
+
+    # 3.3. compare namespace, time and duration
+    assert ann.namespace == regann.namespace
+    assert ann.time == regann.time
+    assert ann.duration == regann.duration
+
+    # 3.4 compare data
+    (ann.data == regann.data).all().all()
+
+
+def test_generate_audio():
+
+    # Regression test: same spec, same audio (not this will fail if we update
+    # any of the audio processing techniques used (e.g. change time stretching
+    # algorithm.
+    sc = ambiscaper.AmbiScaper(10.0, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc.ref_db = -50
+
+    # background
+    sc.add_background(
+        source_file=(
+            'const',
+            'Acoustics_Book/adult_female_speech.wav'),
+        source_time=('const', 0))
+
+    # foreground events
+    sc.add_event(
+        source_file=('const',
+                     'Bicycle_Horn/chokedhorn.wav'),
+        source_time=('const', 5),
+        event_time=('const', 2),
+        event_duration=('const', 5),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 5),
+        pitch_shift=None,
+        time_stretch=None)
+
+    sc.add_event(
+        source_file=('const',
+                     'Bicycle_Horn/classichorn.wav'),
+        source_time=('const', 0),
+        event_time=('const', 5),
+        event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 20),
+        pitch_shift=('const', 1),
+        time_stretch=None)
+
+    sc.add_event(
+        source_file=('const',
+                     'Bicycle_Horn/paphorn.wav'),
+        source_time=('const', 0),
+        event_time=('const', 7),
+        event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 10),
+        pitch_shift=None,
+        time_stretch=('const', 1.2))
+
+    # tmpfiles = []
+    # with _close_temp_files(tmpfiles):
+
+    # wav_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=True)
+    # tmpfiles.append(wav_file)
+
+    # Create temmporary folder for the output
+    tmp_dir = tempfile.mkdtemp()
+    # Output files will have the same name as the folder, so keep it
+    tmp_name = os.path.split(tmp_dir)[-1]
+
+    # Following code will raise a warning because the tmpfolder already exists
+    # (we have just created it)
+    # So, disable warnings temporally
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sc.generate(destination_path=tmp_dir,
+                    generate_txt=True,
+                    disable_instantiation_warnings=True)
+
+
+    wav_file_name = os.path.join(tmp_dir, tmp_name + '.wav')
+
+    jam = sc._instantiate(disable_instantiation_warnings=True)
+    annotation_array = jam.annotations
+    # print(jam.annotations[0])
+    # print(jam.annotations[0].search(namespace='ambiscaper_sound_event'))
+    # print(jam.annotations[0].search(namespace='ambiscaper_sound_event')[0])
+    sc._generate_audio(destination_path=tmp_dir,
+                       audio_filename=wav_file_name,
+                       annotation_array=annotation_array)
+
+    # validate audio
+    wav, sr = soundfile.read(wav_file_name)
+    regwav, sr = soundfile.read(REG_WAV_PATH)
+    assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
+
+    # TODO!!! continue here
+
+    # # namespace must be ambiscaper_sound_event
+    # jam.annotations[0].namespace = 'tag_open'
+    #
+    # print jam.annotations[0].namespace
+    #
+    # pytest.raises(AmbiScaperError, sc._generate_audio,
+    #               tmp_dir,
+    #               wav_file_name,
+    #               jam.annotations[0])
+    #
+    # # unsupported event role must raise error
+    # jam.annotations[0].namespace = 'ambiscaper_sound_event'
+    # jam.annotations[0].data.loc[3]['value']['role'] = 'ewok'
+    # pytest.raises(AmbiScaperError, sc._generate_audio, wav_file_name,
+    #               jam.annotations[0])
+    #
+    # # soundscape with no events will raise warning and won't generate audio
+    # sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    # sc.ref_db = -50
+    # jam = sc._instantiate(disable_instantiation_warnings=True)
+    # pytest.warns(AmbiScaperWarning, sc._generate_audio, wav_file_name,
+    #              jam.annotations[0])
+    #
+    # # soundscape with only one event will use transformer (regression test)
+    # sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
+    # sc.ref_db = -20
+    # # background
+    # sc.add_background(
+    #     source_file=('const',
+    #                  'tests/data/audio/background/park/'
+    #                  '268903__yonts__city-park-tel-aviv-israel.wav'),
+    #     source_time=('const', 0))
+    # jam = sc._instantiate(disable_instantiation_warnings=True)
+    # sc._generate_audio(wav_file.name, jam.annotations[0], reverb=0.2)
+    # # validate audio
+    # wav, sr = soundfile.read(wav_file.name)
+    # regwav, sr = soundfile.read(REG_BGONLY_WAV_PATH)
+    # assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
+
+    # Delete recursively the temp folder
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_generate():
+
+    # Final regression test on all files
+    sc = ambiscaper.AmbiScaper(10.0, 1, fg_path=FG_PATH, bg_path=BG_PATH)
+    sc.ref_db = -50
+
+    # background
+    sc.add_background(
+        source_file=(
+            'const',
+            'Acoustics_Book/adult_female_speech.wav'),
+        source_time=('const', 0))
+
+    # foreground events
+    sc.add_event(
+        source_file=('const',
+                     'Bicycle_Horn/chokedhorn.wav'),
+        source_time=('const', 5),
+        event_time=('const', 2),
+        event_duration=('const', 5),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 5),
+        pitch_shift=None,
+        time_stretch=None)
+
+    sc.add_event(
+        source_file=('const',
+                     'Bicycle_Horn/classichorn.wav'),
+        source_time=('const', 0),
+        event_time=('const', 5),
+        event_duration=('const', 2),
+        event_azimuth=('const', 0),
+        event_elevation=('const', 0),
+        event_spread=('const', 0),
+        snr=('const', 20),
+        pitch_shift=('const', 1),
+        time_stretch=None)
+
+    sc.add_event(
+        source_file=('const',
+                     'Bicycle_Horn/paphorn.wav'),
         source_time=('const', 0),
         event_time=('const', 7),
         event_duration=('const', 2),
