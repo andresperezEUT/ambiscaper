@@ -25,7 +25,8 @@ import glob
 import warnings
 
 from ambiscaper.ambiscaper_warnings import AmbiScaperWarning
-from ambiscaper.util import _validate_distribution, degree_to_radian
+from ambiscaper.util import _validate_distribution, degree_to_radian, radian_to_degree, cartesian_to_spherical_degree, \
+    spherical_degree_to_cartesian
 from ambiscaper.ambiscaper_exceptions import AmbiScaperError
 from ambiscaper.util import find_element_in_list, cartesian_to_spherical
 
@@ -831,13 +832,15 @@ class SOFAReverb():
 
 
 
-    def retrieve_emitter_positions_spherical(self, sofa_reverb_name):
+    def get_relative_speaker_positions_spherical(self, sofa_reverb_name):
         '''
-        Retrieve all speaker positions from a given SOFA reverb name
+        Retrieve apparent speaker positions from a SOFA file.
+        The method takes into account the Listener position and ordientation,
+        so it is not necessarily equal to the EmitterPosition list
 
         :param sofa_reverb_name: string referencing to a valid SOFA reverb name
 
-        :return: list of lists with the speaker positions in the format ``[azimuth, elevation, distance]`` (in radians).
+        :return: ndarray of shape (E,C) containing speaker positions in the format ``[azimuth, elevation, distance]`` (in radians).
 
         :raises: AmbiScaperError
 
@@ -848,36 +851,100 @@ class SOFAReverb():
             If there is a problem associated with the SOFA file
 
         '''
-        # TODO: compensate tilt with ListenerPosition, ListenerView, ListenerUp
-        # todo: WHAT ABOUT DIFFERENT LISTENER POSITIONS, DIFFERENT DISTANCES, ETC?
+
+        # TODO: only using M=0 for the moment!!!
 
         # Open the file
         try:
             sofa_reverb_file_path = self.generate_sofa_file_full_path(sofa_reverb_name)
             sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(sofa_reverb_file_path, 'r')
 
-            # Get EmitterPositions
-            # Emitter Positions has dimensions [E,C,I] or [E,C,M]
-            emitter_positions_cartesian_nparray = sofa_file.getEmitterPositionValues() # cartesian
-            emitter_positions_cartesian_list = []
+            # Load dimensions
+            m = 0 # Hardcoded. Extend it when needed
+            num_emitters = sofa_file.getDimensionSize('E')
 
+            # Load variables
+            listener_position = sofa_file.getListenerPositionValues()
+            listener_position_units, listener_position_coordinates = sofa_file.getListenerPositionInfo()
+            if sofa_file.hasListenerUp():
+                # TODO: up not used
+                listener_up = sofa_file.getListenerUpValues()
+                listener_up_units, listener_up_coordinates = sofa_file.getListenerUpInfo()
+                listener_view = sofa_file.getListenerViewValues()
+                listener_view_units, listener_view_coordinates = sofa_file.getListenerViewInfo()
 
-            E, C, M = sofa_file.getVariableShape('EmitterPosition')
-            for e in range(E):
-                for m in range(M):
-                    position_list =  emitter_positions_cartesian_nparray[e,:,m].tolist()
-                    emitter_positions_cartesian_list.append(position_list)
+            source_position = sofa_file.getSourcePositionValues()
+            source_position_units, source_position_coordinates = sofa_file.getSourcePositionInfo()
+            if sofa_file.hasSourceUp():
+                # TODO: up not used
+                source_up = sofa_file.getSourceUpValues()
+                source_up_units, source_up_coordinates = sofa_file.getSourceUpInfo()
+                source_view = sofa_file.getSourceViewValues()
+                source_view_units, source_view_coordinates = sofa_file.getSourceViewInfo()
 
-            emitter_positions_spherical_radians = [cartesian_to_spherical(d) for d in emitter_positions_cartesian_list]
+            emitter_position = sofa_file.getEmitterPositionValues()
+            emitter_position_units, emitter_position_coordinates = sofa_file.getEmitterPositionInfo()
+
+            sofa_file.close()
+
+            # iterate over emitters...
+            relative_speaker_positions = []
+            for e in range(num_emitters):
+
+                # Compute triangle!!
+                E_local_spherical = emitter_position[e, :, m] # Only first measurement!
+                if emitter_position_coordinates == 'cartesian':
+                    E_local_spherical = np.asarray(cartesian_to_spherical_degree(E_local_spherical))
+                if sofa_file.hasSourceView():
+                    S_view_spherical = source_view[m, :]
+                    if source_view_coordinates == 'cartesian':
+                        S_view_spherical = np.asarray(cartesian_to_spherical_degree(S_view_spherical))
+                    E_local_spherical[:-1] -= S_view_spherical[:-1]
+
+                # 1.2 Translation with respect to SourcePosition
+                E_local_cartesian = np.asarray(spherical_degree_to_cartesian(E_local_spherical))
+
+                S = source_position[m, :]
+                if source_position_coordinates == 'spherical':
+                    S = np.asarray(spherical_degree_to_cartesian(S))
+                E = E_local_cartesian + S
+                L = listener_position[m, :]
+                if listener_position_coordinates == 'spherical':
+                    L = np.asarray(spherical_degree_to_cartesian(L))
+
+                # 2. Get listener view
+                if sofa_file.hasListenerView():
+                    L_view = listener_view[m, :]
+                    if listener_view_coordinates == 'cartesian':
+                        L_view = np.asarray(cartesian_to_spherical_degree(L_view))
+                else:
+                    L_view = np.asarray([0., 0., 1.])  # Nop, in spherical
+
+                # 4. Compute relative angle from L to E
+                LE_vector = E - L
+
+                # Source and Listener are at the same position: no triangle
+                if np.allclose(LE_vector,np.zeros(3)):
+                    # Force not nan in elevation
+                    LE_angle = np.zeros(3)
+                else:
+                    LE_angle = np.asarray(cartesian_to_spherical_degree(LE_vector))  # this is already the angle respect to center
+
+                LE_angle[2] = np.linalg.norm(LE_vector)
+
+                # 5. Get relative position
+                relative_position = LE_angle - L_view
+                # to radians...
+                relative_position[0] = degree_to_radian(relative_position[0])
+                relative_position[1] = degree_to_radian(relative_position[1])
+                relative_position[2] = np.linalg.norm(LE_vector)
+
+                relative_speaker_positions.append(relative_position)
+
+            return np.asarray(relative_speaker_positions)
 
         except (AmbiScaperError,SOFAError) as e:
             raise e
-
-        # Close the file
-        sofa_file.close()
-
-        return emitter_positions_spherical_radians
-
 
 
 ######### RECORDED REVERB CONFIG #########

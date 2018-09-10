@@ -40,7 +40,7 @@ from .ambisonics import get_ambisonics_coefs
 # from .reverb_ambisonics import generate_sofa_file_full_path, _validate_smir_reverb_spec, SMIR_SUPPORTED_VIRTUAL_MICS, \
 #     SMIR_SOUND_SPEED, SMIR_NUM_HARMONICS, SMIR_OVERSAMPLING_FACTOR, get_receiver_position, SMIR_DEFAULT_SOURCE_RADIUS, \
 #     SMIR_HIGH_PASS_FILTER, SMIR_REFLECTION_ORDER, SMIR_REFLECTION_COEF_ANGLE_DEPENDENCY, _validate_reverb_spec, \
-#     retrieve_emitter_positions_spherical, retrieve_available_recorded_wrap_values, sofa_reverb_folder_path, SOFAReverb
+#     get_relative_speaker_positions_spherical, retrieve_available_recorded_wrap_values, sofa_reverb_folder_path, SOFAReverb
 #
 # from .reverb_ambisonics import MATLAB_ROOT
 # from .reverb_ambisonics import SMIR_FOLDER_PATH
@@ -1849,17 +1849,23 @@ class AmbiScaper(object):
 
             # TODO: implement more elegantly with inheritance
             if isinstance(instantiated_reverb_spec, SmirReverbSpec):
-                max_ambi_order =  self.smirReverb.get_max_ambi_order_from_reverb_config(instantiated_reverb_spec)
+                max_ambi_order_from_spec =  self.smirReverb.get_max_ambi_order_from_reverb_config(instantiated_reverb_spec)
             elif isinstance(instantiated_reverb_spec, SOFAReverbSpec):
-                max_ambi_order = self.sofaReverb.get_maximum_ambisonics_order_from_spec(instantiated_reverb_spec)
+                max_ambi_order_from_spec = self.sofaReverb.get_maximum_ambisonics_order_from_spec(instantiated_reverb_spec)
 
-            if max_ambi_order < self.ambisonics_order:
+            # Here, our current reverb does not allow the ambisonics order that we requested to AmbiScaper
+            # (IRs don't have enough order)
+            # So, we limit the internal ambisonics order to match the reverb limitation
+            if max_ambi_order_from_spec < self.ambisonics_order:
                 warnings.warn(
                     'User-defined Ambisonics order L=' + str(self.ambisonics_order) +
                     ' is higher than the maximum order allowed by the reverb spec. ' +
-                    'Downgrading to ' + str(max_ambi_order),
+                    'Downgrading to ' + str(max_ambi_order_from_spec),
                     AmbiScaperWarning)
-                self.ambisonics_order = max_ambi_order
+                self.ambisonics_order = max_ambi_order_from_spec
+
+            # In the case that the reverb has bigger ambisonics order than requested, just ignore the rest of the channels
+
 
 
             if isinstance(instantiated_reverb_spec,SmirReverbSpec):
@@ -1915,7 +1921,7 @@ class AmbiScaper(object):
                 )
 
                 # Retrieve loudspeaker positions
-                imposed_source_positions_spherical = self.sofaReverb.retrieve_emitter_positions_spherical(instantiated_reverb_spec.name)
+                imposed_source_positions_spherical = self.sofaReverb.get_relative_speaker_positions_spherical(instantiated_reverb_spec.name)
 
                 # Since we cannot modify directly an EventSpec
                 # we will copy all valid args from each event, and create a new set of events
@@ -1938,8 +1944,8 @@ class AmbiScaper(object):
                         # Assign actual values
                         # (no distribution tuples because we just instanciated
                         # the events in order to know the exact positions)
-                        imposed_azimuth = random_position[0][0]
-                        imposed_elevation =  random_position[1][0]
+                        imposed_azimuth = random_position[0]
+                        imposed_elevation =  random_position[1]
 
                     # Wrap
                     else:
@@ -2305,6 +2311,11 @@ class AmbiScaper(object):
             warnings.simplefilter("ignore")
             annotation_event = annotation_array.search(namespace='ambiscaper_sound_event')[0]
 
+            # TODO: find a smartest way to check that annotatinon is empty
+            if np.size(annotation_event.data) == 0:
+                raise AmbiScaperError(
+                    'No data found in the Event Annotation!')
+
             # Set annotation_reverb to empty valuye
             annotation_reverb = None
 
@@ -2372,6 +2383,7 @@ class AmbiScaper(object):
             # In this way we will avoid opening the file for every event in the spec.
             if annotation_reverb:
                 if annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
+
                     file_name =  annotation_reverb.data.value[0]['name']
                     full_path =  self.sofaReverb.generate_sofa_file_full_path(file_name)
                     sofa_file = pysofaconventions.SOFAAmbisonicsDRIR(full_path, 'r')
@@ -2553,9 +2565,9 @@ class AmbiScaper(object):
                         # TODO: check sr and change it in case
                         filter_data, filter_sample_rate = sf.read(used_filter_path)
 
-                        # Ensure that num channels is what it should be according to ambisonics order..
-                        assert np.shape(filter_data)[1] == get_number_of_ambisonics_channels(self.ambisonics_order)
-                        num_channels = np.shape(filter_data)[1]
+                        # Ensure that num channels is at least as big as the requested ambisonics order
+                        num_channels = get_number_of_ambisonics_channels(self.ambisonics_order)
+                        assert np.shape(filter_data)[1] >= num_channels
 
 
 
@@ -2586,11 +2598,11 @@ class AmbiScaper(object):
                         # now we are applying a normalization per ir, which means that level differences
                         # among different postions (mainly due to distance) are not contemplated
                         filter_data = normalize_ir(sofa_data_IR[0,:,emitter_idx,:])
-
-
-
                         filter_sample_rate = sofa_sampling_rate
-                        num_channels = sofa_num_channels
+
+                        # Ensure that num channels is at least as big as the requested ambisonics order
+                        num_channels = get_number_of_ambisonics_channels(self.ambisonics_order)
+                        assert np.shape(filter_data)[1] >= num_channels
 
                         # TODO: ensure that filters are acn, sn3d
                         if not sofa_channel_normalization == 'sn3d':
@@ -2600,9 +2612,10 @@ class AmbiScaper(object):
                             raise Warning('ambisonics channel reordering not implemented')
 
                         # write the filter to a file into the /source folder
+                        # just write the used channels (in the case that the filter provides higher orders)
                         filter_name = 'h' + str(event_idx) + '.wav'
                         full_path =  destination_source_path +'/' +  filter_name
-                        sf.write(full_path, np.transpose(filter_data), filter_sample_rate, subtype='FLOAT')
+                        sf.write(full_path, np.transpose(filter_data[:num_channels,:]), filter_sample_rate, subtype='FLOAT')
 
 
 
@@ -2645,7 +2658,7 @@ class AmbiScaper(object):
                     # Convolve each padded_file signal with the corresponding ambisonics channel IR
                     output_signal_list = []
                     for i in range(num_channels):
-                        output_signal_list.append(scipy.signal.fftconvolve(file_data[:, i], filter_data[:, i]))
+                        output_signal_list.append(scipy.signal.fftconvolve(file_data[:, i], filter_data.T[:, i]))
 
                     output_signal = np.transpose(np.array(output_signal_list))
 

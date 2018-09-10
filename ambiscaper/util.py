@@ -420,25 +420,24 @@ def delta_kronecker(q1,q2):
 
 def cartesian_to_spherical(cartesian_list):
     '''
-    Performs conversion from cartesian to spherical coordinates, with the following reference system:
+    Performs conversion from cartesian to spherical coordinates (in radians), with the following reference system:
 
         - azimuth 0: +x axis
         - elevation 0: horizontal plane ()
         - +y axis: azimuth pi/2
         - +x axis: elevation pi/2
 
-    :param cartesian_list: List of 3 floats, in the form ``[x,y,z]``.
+    :param cartesian_list: List of 3 floats or ndarray(3), in the form ``[x,y,z]``.
 
-    :returns: List of 3 floats, in the form ``[azimuth, elevation, radius]``.
+    :returns: List of 3 floats, in the form ``[azimuth, elevation, radius]``. (in radians)
 
     :raises: AmbiScaperError. If the input argument does not match the required type
     '''
 
-    # Both arguments should be lists of 3 floats
     def _validate_args(list_arg):
-        if not isinstance(list_arg,list):
+        if not isinstance(list_arg,list) and not isinstance(list_arg,np.ndarray):
             raise AmbiScaperError(
-                'Error on Cartesian to Spherical conversion: argument not a list, given ' + str(list_arg))
+                'Error on Cartesian to Spherical conversion: argument not a list, given ' + str(type(list_arg)) + str(list_arg))
         if len(list_arg) is not 3:
             raise AmbiScaperError(
                 'Error on Cartesian to Spherical conversion: argument should have lenght of 3, given' + str(list_arg))
@@ -459,27 +458,70 @@ def cartesian_to_spherical(cartesian_list):
 
     return [azimuth,elevation,r]
 
-def spherical_to_cartesian(spherical_list):
+def cartesian_to_spherical_degree(cartesian_list):
     '''
-    Performs conversion from spherical to cartesian coordinates, with the following reference system:
+    Performs conversion from cartesian to spherical coordinates (in degrees), with the following reference system:
+
+        - azimuth 0: +x axis
+        - elevation 0: horizontal plane ()
+        - +y axis: azimuth 90
+        - +x axis: elevation 90
+
+    :param cartesian_list: List of 3 floats or ndarray(3), in the form ``[x,y,z]``.
+
+    :returns: List of 3 floats, in the form ``[azimuth, elevation, radius]``. (in degrees)
+
+    :raises: AmbiScaperError. If the input argument does not match the required type
+    '''
+
+    spherical = cartesian_to_spherical(cartesian_list)
+    spherical[0] = radian_to_degree(spherical[0])
+    spherical[1] = radian_to_degree(spherical[1])
+    return spherical
+
+def spherical_degree_to_cartesian(spherical_list):
+    '''
+    Performs conversion from spherical (degrees) to cartesian coordinates, with the following reference system:
 
         - azimuth 0: +x axis
         - elevation 0: horizontal plane ()
         - +y axis: azimuth pi/2
         - +x axis: elevation pi/2
 
-    :param spherical_list: List of 3 floats, in the form ``[azimuth, elevation, radius]``.
+    :param spherical_list: List of 3 floats, in the form ``[azimuth, elevation, radius]``. (in degrees)
 
-    :returns: List of 3 floats, in the form ``[x,y,z]``.
+    :returns: List of 3 floats or ndarray(3), in the form ``[x,y,z]``.
+
+    :raises: AmbiScaperError. If the input argument does not match the required type
+    '''
+
+    spherical_list[0] = degree_to_radian(spherical_list[0])
+    spherical_list[1] = degree_to_radian(spherical_list[1])
+
+    cartesian = spherical_to_cartesian(spherical_list)
+    return cartesian
+
+def spherical_to_cartesian(spherical_list):
+    '''
+    Performs conversion from spherical (radians) to cartesian coordinates, with the following reference system:
+
+        - azimuth 0: +x axis
+        - elevation 0: horizontal plane ()
+        - +y axis: azimuth pi/2
+        - +x axis: elevation pi/2
+
+    :param spherical_list: List of 3 floats, in the form ``[azimuth, elevation, radius]``. (in radians)
+
+    :returns: List of 3 floats or ndarray(3), in the form ``[x,y,z]``.
 
     :raises: AmbiScaperError. If the input argument does not match the required type
     '''
 
     # Both arguments should be lists of 3 floats
     def _validate_args(list_arg):
-        if not isinstance(list_arg,list):
+        if not isinstance(list_arg, list) and not isinstance(list_arg, np.ndarray):
             raise AmbiScaperError(
-                'Error on Spherical to Cartesian conversion: argument not a list, given ' + str(list_arg))
+                'Error on Spherical to Cartesian conversion: argument not a list, given ' + str(type(list_arg)) + str(list_arg))
         if len(list_arg) is not 3:
             raise AmbiScaperError(
                 'Error on Spherical to Cartesian conversion: argument should have lenght of 3, given ' + str(list_arg))

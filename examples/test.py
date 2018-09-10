@@ -1,4 +1,4 @@
-### EXAMPLE 3
+### JUST SOME SANDBOX FOR TESTING STUFF
 
 import ambiscaper
 import numpy as np

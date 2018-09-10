@@ -7,7 +7,7 @@ Tests for functions in util.py
 from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, \
     spherical_to_cartesian, find_element_in_list, event_background_id_string, event_foreground_id_string, \
     _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution, find_closest_spherical_point, \
-    find_onset, find_offset
+    find_onset, find_offset, spherical_degree_to_cartesian, cartesian_to_spherical_degree
 from ambiscaper.util import _set_temp_logging_level
 from ambiscaper.util import _validate_folder_path
 from ambiscaper.util import _get_sorted_files
@@ -368,6 +368,24 @@ def test_delta_kronecker():
         __test_correct_delta_kronecker(*correct_entry)
 
 
+
+def test_cartesian_to_spherical_degree():
+
+    # test correct values
+    def __test_correct_cartesian_to_spherical_degree(cartesian, groundtruth):
+        assert np.allclose(groundtruth, cartesian_to_spherical_degree(cartesian))
+
+    correct_entries = [
+        # cartesian, groundtruth
+        # cartesian, groundtruth
+        [ [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+        [ [0.0, 1.0, 0.0], [90, 0.0, 1.0]],
+        [ [0.0, 0.0, 1.0], [0.0, 90, 1.0]],
+    ]
+
+    for correct_entry in correct_entries:
+        __test_correct_cartesian_to_spherical_degree(*correct_entry)
+
 def test_cartesian_to_spherical():
 
     # test incorrect values
@@ -398,6 +416,22 @@ def test_cartesian_to_spherical():
     ]
     for correct_entry in correct_entries:
         __test_correct_cartesian_to_spherical(*correct_entry)
+
+def test_spherical_degree_to_cartesian():
+
+    # test correct values
+    def __test_correct_spherical_degree_to_cartesian(spherical, groundtruth):
+        assert np.allclose(groundtruth, spherical_degree_to_cartesian(spherical))
+
+    correct_entries = [
+        # spherical degree, groundtruth
+        [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], ],
+        [[90, 0.0, 1.0], [0.0, 1.0, 0.0], ],
+        [[0.0, 90, 1.0], [0.0, 0.0, 1.0], ],
+    ]
+
+    for correct_entry in correct_entries:
+        __test_correct_spherical_degree_to_cartesian(*correct_entry)
 
 
 def test_spherical_to_cartesian():

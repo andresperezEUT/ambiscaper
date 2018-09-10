@@ -488,19 +488,34 @@ def test_set_sofa_reverb_folder_path():
 #     assert(get_receiver_position([2,4,6]) == [1,2,3])
 
 
-def test_retrieve_emitter_positions_spherical():
+def test_get_relative_speaker_positions_spherical():
 
     # Path does not exist
     sofa_reverb_name = 'fake_reverb.sofa'
     sofa_reverb = SOFAReverb()
-    pytest.raises(AmbiScaperError, sofa_reverb.retrieve_emitter_positions_spherical, sofa_reverb_name)
+    pytest.raises(AmbiScaperError, sofa_reverb.get_relative_speaker_positions_spherical, sofa_reverb_name)
 
     # In testpysofa.sofa there is only one emitter, located at [1,0,0] cartesian
     # EmitterPosition has dimensions (E,C,I)
+
     sofa_path = os.path.abspath('./SOFA')
+    # sofa_path = os.path.abspath('/Volumes/Dinge/SOFA/pinakothek/')
+
     sofa_reverb.set_sofa_reverb_folder_path(sofa_path)
 
     sofa_reverb_name = 'testpysofa.sofa'
-    groundtruth = [[0., 0., 1.]] # spherical
+    # sofa_reverb_name = 'room7_eigenmike.sofa'
+    # 8 speakers distributed in azimuth, elevation 8, distance 1
+    # Since Listener view is +90, everything will be shifted...
+    groundtruth = [
+        [-np.pi/2., 0., 1.],
+        [-np.pi/4, 0., 1.],
+        [0., 0., 1.],
+        [np.pi/4., 0., 1.],
+        [np.pi/2, 0., 1.],
+        [-5*np.pi/4, 0., 1.],
+        [-1*np.pi, 0., 1.],
+        [-3*np.pi/4, 0., 1.]
+    ]
 
-    assert np.array_equal(groundtruth,sofa_reverb.retrieve_emitter_positions_spherical(sofa_reverb_name))
+    assert np.allclose(groundtruth, sofa_reverb.get_relative_speaker_positions_spherical(sofa_reverb_name))
