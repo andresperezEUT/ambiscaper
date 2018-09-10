@@ -1619,6 +1619,7 @@ class AmbiScaper(object):
                                        source_time=source_time,
                                        event_time=event_time,
                                        event_duration=event_duration,
+                                       # event_duration=event_duration_stretched,
                                        event_azimuth=event_azimuth,
                                        event_elevation=event_elevation,
                                        event_spread=event_spread,
@@ -1815,12 +1816,12 @@ class AmbiScaper(object):
                 used_source_files=fg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
 
-            # Tune the event duration
-            if value.time_stretch is not None:
-                event_duration_stretched = (
-                    value.event_duration * value.time_stretch)
-            else:
-                event_duration_stretched = value.event_duration
+            # # # Tune the event duration
+            # if value.time_stretch is not None:
+            #     event_duration_stretched = (
+            #         value.event_duration * value.time_stretch)
+            # else:
+            #     event_duration_stretched = value.event_duration
 
             # Store event spec for later
             fg_instanciated_event_specs.append(value)
@@ -2050,17 +2051,29 @@ class AmbiScaper(object):
         # Set annotation duration (might be changed later due to cropping)
         ann.duration = self.duration
 
+        # Two event durations here:
+        # - `value:event_duration` refers to the original file duration
+        # - `top event_duration` is the actual file duration after time stretch
+        #   i.e., if `value_event_duration` is d and `time_stretch` is t, then
+        #   `top event_duration` should be d*t
+
         # Annotate background
         for bg_event_spec in bg_instanciated_event_specs:
+            time_stretch = bg_event_spec.time_stretch
+            duration = bg_event_spec.event_duration
+            event_duration_stretched = time_stretch * duration
             ann.append(time=bg_event_spec.event_time,
-                       duration=bg_event_spec.event_duration,
+                       duration=event_duration_stretched,
                        value=bg_event_spec._asdict(),
                        confidence=1.0)
 
         # Annotate foreground
         for fg_event_spec in fg_instanciated_event_specs:
+            time_stretch = fg_event_spec.time_stretch
+            duration = fg_event_spec.event_duration
+            event_duration_stretched = time_stretch * duration
             ann.append(time=fg_event_spec.event_time,
-                       duration=fg_event_spec.event_duration,
+                       duration=event_duration_stretched,
                        value=fg_event_spec._asdict(),
                        confidence=1.0)
 

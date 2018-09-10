@@ -12,7 +12,7 @@ ambisonics_order = 1
 samples_folder = '/Volumes/Dinge/audio/anechoic_openAIRlib_ccsa'
 
 # 3 Different datasets, each one with 1 to 3 simultaneous sounds
-num_soundscapes = 3
+num_soundscapes = 1
 for soundscape_idx in range(num_soundscapes):
 
     print('Creating soundscape: '+str(soundscape_idx))
@@ -28,16 +28,17 @@ for soundscape_idx in range(num_soundscapes):
     for event_idx in range(num_events):
         ### Add an event
         asc.add_event(source_file=('choose',[]),
-                             source_time=('const', 0),
-                             event_time=('const', 0),
-                             event_duration=('const', soundscape_duration),
-                             event_azimuth=('uniform', 0, 2 * np.pi),
-                             event_elevation=('uniform', -np.pi / 2, np.pi / 2),
-                             event_spread=('const', 0),
-                             snr=('const', 10),
-                             pitch_shift=('uniform', -2., 2.),
-                             time_stretch=('uniform', 0.8,1.2))
-
+                      source_time=('const', 0),
+                      event_time=('const', 0),
+                      event_duration=('const', 2),
+                      event_azimuth=('uniform', 0, 2 * np.pi),
+                      event_elevation=('uniform', -np.pi / 2, np.pi / 2),
+                      event_spread=('const', 0),
+                      snr=('const', 10),
+                      # pitch_shift=('uniform', -2., 2.),
+                      # time_stretch=('uniform', 0.8,1.2))
+                      pitch_shift = ('const',0),
+                      time_stretch = ('const',1.1))
     # Add a recorded reverb
 
     # TODO
