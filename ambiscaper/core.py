@@ -1907,7 +1907,6 @@ class AmbiScaper(object):
                 )
 
                 # Spread must be 0, so manually impose it by replacing the current event spec
-                imposed_fg_specs = []
                 for event_spec in fg_instanciated_event_specs:
                     event_spec = event_spec._replace(event_spread=0.0)
 
@@ -1923,21 +1922,16 @@ class AmbiScaper(object):
                 )
 
                 # Retrieve loudspeaker positions
-                imposed_source_positions_spherical = self.sofaReverb.get_relative_speaker_positions_spherical(instantiated_reverb_spec.name)
+                imposed_speaker_positions_spherical = self.sofaReverb.get_relative_speaker_positions_spherical(instantiated_reverb_spec.name)
 
-                # Since we cannot modify directly an EventSpec
-                # we will copy all valid args from each event, and create a new set of events
-                # which will be substituted in the fg_instanciated_event_specs list
-                imposed_fg_specs = []
                 self.sofa_chosen_emitter_indices = []
-
                 for event_spec in fg_instanciated_event_specs:
 
                     # Random
                     if instantiated_reverb_spec.wrap == 'random':
                         # just pick a random value
-                        random_index = random.randint(0, len(imposed_source_positions_spherical) - 1)
-                        random_position = imposed_source_positions_spherical[random_index]
+                        random_index = random.randint(0, len(imposed_speaker_positions_spherical) - 1)
+                        random_position = imposed_speaker_positions_spherical[random_index]
 
                         # Store the random indinces, so later in the generate_audio method we can
                         # easily retrieve the associated IRs
@@ -1954,19 +1948,19 @@ class AmbiScaper(object):
                         if instantiated_reverb_spec.wrap == 'wrap_azimuth':
 
                             index_of_closest = find_closest_spherical_point([event_spec.event_azimuth,event_spec.event_elevation],
-                                                                            imposed_source_positions_spherical,
+                                                                            imposed_speaker_positions_spherical,
                                                                             criterium='azimuth')
 
                         elif instantiated_reverb_spec.wrap == 'wrap_elevation':
 
                             index_of_closest = find_closest_spherical_point([event_spec.event_azimuth, event_spec.event_elevation],
-                                                                            imposed_source_positions_spherical,
+                                                                            imposed_speaker_positions_spherical,
                                                                             criterium='elevation')
 
                         elif instantiated_reverb_spec.wrap == 'wrap_surface':
 
                             index_of_closest = find_closest_spherical_point([event_spec.event_azimuth, event_spec.event_elevation],
-                                                                            imposed_source_positions_spherical,
+                                                                            imposed_speaker_positions_spherical,
                                                                             criterium='surface')
 
                         # Store the random indinces, so later in the generate_audio method we can
@@ -1974,8 +1968,8 @@ class AmbiScaper(object):
                         self.sofa_chosen_emitter_indices.append(index_of_closest)
 
                         # Once we have :index_of_closest:, let's assign the values
-                        imposed_azimuth = imposed_source_positions_spherical[index_of_closest][0][0]
-                        imposed_elevation = imposed_source_positions_spherical[index_of_closest][1][0]
+                        imposed_azimuth = imposed_speaker_positions_spherical[index_of_closest][0][0]
+                        imposed_elevation = imposed_speaker_positions_spherical[index_of_closest][1][0]
 
 
 
@@ -2019,7 +2013,6 @@ class AmbiScaper(object):
 
                     # Now we have the imposed values, so let's replace them into the current event spec
                     # Note that spread is hardcoded to 0 by definition
-
                     event_spec = event_spec._replace(event_time=imposed_event_time,
                                                      event_duration=imposed_event_duration,
                                                      event_azimuth=imposed_azimuth,
@@ -2591,7 +2584,6 @@ class AmbiScaper(object):
                         # They are stored at the sofa_chosen_emitter_indices list
                         # Watch out with the indices (wav files numbering starting at 1)
 
-                        # TODO: implement that in a more elegant way
                         reverb_name = annotation_reverb.data.value[0]['name']
 
                         # Construct the filter name given the speaker index:
