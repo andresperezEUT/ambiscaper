@@ -16,6 +16,6 @@ jams.schema.add_namespace(namespace_file)
 smir_reverb_namespace_file = resource_filename(__name__, 'namespaces/ambiscaper_smir_reverb.json')
 jams.schema.add_namespace(smir_reverb_namespace_file)
 
-# Add recorded_reverb namespace
-recorded_reverb_namespace_file = resource_filename(__name__, 'namespaces/ambiscaper_recorded_reverb.json')
+# Add sofa reverb namespace
+recorded_reverb_namespace_file = resource_filename(__name__, 'namespaces/ambiscaper_sofa_reverb.json')
 jams.schema.add_namespace(recorded_reverb_namespace_file)

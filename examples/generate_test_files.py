@@ -28,7 +28,7 @@ sc.add_event(
     event_spread=('const', 0),
     snr=('const', 5),
     pitch_shift=None,
-    time_stretch=None)
+    time_stretch=('const', 1))
 
 sc.add_event(
     source_file=('const',
@@ -40,8 +40,8 @@ sc.add_event(
     event_elevation=('const', 0),
     event_spread=('const', 0),
     snr=('const', 20),
-    pitch_shift=('const', 1),
-    time_stretch=None)
+    pitch_shift=None,
+    time_stretch=('const', 1))
 
 sc.add_event(
     source_file=('const',

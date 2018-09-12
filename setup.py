@@ -12,7 +12,7 @@ setup(
     author_email='andres.perez@upf.edu',
     url='https://andresperezlopez.github.io/ambiscaper/',
     packages=['ambiscaper'],
-    package_data={'ambiscaper': ['namespaces/ambiscaper_sound_event.json', 'namespaces/ambiscaper_recorded_reverb.json','namespaces/ambiscaper_smir_reverb.json']},
+    package_data={'ambiscaper': ['namespaces/ambiscaper_sound_event.json', 'namespaces/ambiscaper_sofa_reverb.json','namespaces/ambiscaper_smir_reverb.json']},
     long_description='Ambiscaper: a tool for automatic dataset generation and annotation of reverberant Ambisonics audio',
     keywords='ambisonics audio database sound soundscape',
     project_urls={

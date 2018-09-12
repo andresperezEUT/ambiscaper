@@ -1798,6 +1798,7 @@ class AmbiScaper(object):
                 allow_repeated_source=allow_repeated_source,
                 used_source_files=bg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
+
             # Store event spec for later
             bg_instanciated_event_specs.append(value)
             # # Keep track of used source files
@@ -1816,12 +1817,12 @@ class AmbiScaper(object):
                 used_source_files=fg_source_files,
                 disable_instantiation_warnings=disable_instantiation_warnings)
 
-            # # # Tune the event duration
-            # if value.time_stretch is not None:
-            #     event_duration_stretched = (
-            #         value.event_duration * value.time_stretch)
-            # else:
-            #     event_duration_stretched = value.event_duration
+            # # Tune the event duration
+            if value.time_stretch is not None:
+                event_duration_stretched = (
+                    value.event_duration * value.time_stretch)
+            else:
+                event_duration_stretched = value.event_duration
 
             # Store event spec for later
             fg_instanciated_event_specs.append(value)
@@ -1914,7 +1915,7 @@ class AmbiScaper(object):
 
             elif isinstance(instantiated_reverb_spec, SOFAReverbSpec):
 
-                ann_reverb = jams.Annotation(namespace='ambiscaper_recorded_reverb')
+                ann_reverb = jams.Annotation(namespace='ambiscaper_sofa_reverb')
 
                 # Add reverb spec info to sandbox
                 ann_reverb.sandbox.ambiscaper = jams.Sandbox(
@@ -2059,9 +2060,9 @@ class AmbiScaper(object):
 
         # Annotate background
         for bg_event_spec in bg_instanciated_event_specs:
-            time_stretch = bg_event_spec.time_stretch
             duration = bg_event_spec.event_duration
-            event_duration_stretched = time_stretch * duration
+            time_stretch = bg_event_spec.time_stretch
+            event_duration_stretched = duration if time_stretch is None else duration * time_stretch
             ann.append(time=bg_event_spec.event_time,
                        duration=event_duration_stretched,
                        value=bg_event_spec._asdict(),
@@ -2069,9 +2070,9 @@ class AmbiScaper(object):
 
         # Annotate foreground
         for fg_event_spec in fg_instanciated_event_specs:
-            time_stretch = fg_event_spec.time_stretch
             duration = fg_event_spec.event_duration
-            event_duration_stretched = time_stretch * duration
+            time_stretch = fg_event_spec.time_stretch
+            event_duration_stretched = duration if time_stretch is None else duration * time_stretch
             ann.append(time=fg_event_spec.event_time,
                        duration=event_duration_stretched,
                        value=fg_event_spec._asdict(),
@@ -2333,7 +2334,7 @@ class AmbiScaper(object):
             annotation_reverb = None
 
             # Check if there is annotation reverb
-            for namespace in ['ambiscaper_smir_reverb','ambiscaper_recorded_reverb']:
+            for namespace in ['ambiscaper_smir_reverb','ambiscaper_sofa_reverb']:
                 ann = annotation_array.search(namespace=namespace)
                 if ann:
                     annotation_reverb = ann[0]
@@ -2395,7 +2396,7 @@ class AmbiScaper(object):
             # and load to memory the IR data.
             # In this way we will avoid opening the file for every event in the spec.
             if annotation_reverb:
-                if annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
+                if annotation_reverb.namespace is 'ambiscaper_sofa_reverb':
 
                     file_name =  annotation_reverb.data.value[0]['name']
                     full_path =  self.sofaReverb.generate_sofa_file_full_path(file_name)
@@ -2581,10 +2582,11 @@ class AmbiScaper(object):
                         # Ensure that num channels is at least as big as the requested ambisonics order
                         num_channels = get_number_of_ambisonics_channels(self.ambisonics_order)
                         assert np.shape(filter_data)[1] >= num_channels
+                        assert sofa_num_channels >= num_channels
 
 
 
-                    elif annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
+                    elif annotation_reverb.namespace is 'ambiscaper_sofa_reverb':
                         # Get the IRs associated to the source position
                         # They are stored at the sofa_chosen_emitter_indices list
                         # Watch out with the indices (wav files numbering starting at 1)
@@ -2645,7 +2647,7 @@ class AmbiScaper(object):
                         # num_channels = np.shape(filter_data)[1]
                         #
                         # # The S3A filters are in fuma, so perform rescaling and channel reordering...
-                        # if annotation_reverb.namespace is 'ambiscaper_recorded_reverb':
+                        # if annotation_reverb.namespace is 'ambiscaper_sofa_reverb':
                         #     ordered_filter_data = change_channel_ordering_fuma_2_acn(filter_data)
                         #     normalized_filter_data = change_normalization_fuma_2_sn3d(ordered_filter_data)
                         #     filter_data = normalized_filter_data
@@ -2664,16 +2666,24 @@ class AmbiScaper(object):
                     #########
 
                     # Open the preprocessed file
-                    # TODO: check sr of file and filter...
-                    # file_data, file_sample_rate = sf.read(preprocessed_files[-1])
                     file_data, file_sample_rate = sf.read(padded_file)
 
-                    # Convolve each padded_file signal with the corresponding ambisonics channel IR
-                    output_signal_list = []
-                    for i in range(num_channels):
-                        output_signal_list.append(scipy.signal.fftconvolve(file_data[:, i], filter_data.T[:, i]))
+                    # Check if the sample rates of the file and the filter match with `self.sr`,
+                    # and resample in case
 
-                    output_signal = np.transpose(np.array(output_signal_list))
+                    if sofa_sampling_rate != self.sr:
+                        warnings.warn('TODO: SOFA RESAMPLE!')
+                    if file_sample_rate != self.sr:
+                        warnings.warn('TODO: FILE RESAMPLE!')
+
+                    # Convolve each padded_file signal with the corresponding ambisonics channel IR
+
+                    # Convolution will yield a signal of size L+M-1.
+                    # In order to preserve the given scene duration, let's cut the final result to the required sample number
+                    output_file_duration_samples = self.duration * self.sr
+                    output_signal = np.ndarray((output_file_duration_samples,num_channels))
+                    for i in range(num_channels):
+                        output_signal[:,i] = scipy.signal.fftconvolve(file_data[:, i], filter_data.T[:, i])[:output_file_duration_samples]
 
                     # The convolved signal is already in ambisonics format
                     # What we can do now is to process it as a wavfile
@@ -2711,9 +2721,6 @@ class AmbiScaper(object):
             else:
                 # Combiner needed for more than one file
                 final_combiner = sox.Combiner()
-                # TODO: REVERB
-                # if reverb is not None:
-                #   tfm.reverb(reverberance=reverb * 100)
                 final_combiner.build([t.name for t in processed_tmpfiles],
                                      os.path.join(destination_path, audio_filename),
                                      'mix')
