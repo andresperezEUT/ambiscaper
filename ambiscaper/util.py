@@ -454,7 +454,7 @@ def cartesian_to_spherical(cartesian_list):
 
     r = np.sqrt((x*x)+(y*y)+(z*z))
     azimuth = np.arctan2(y,x)
-    elevation = np.arcsin((z/r))
+    elevation = np.arcsin((z / r)) if r != 0 else 0
 
     return [azimuth,elevation,r]
 
@@ -619,15 +619,13 @@ def find_closest_spherical_point(point,list_of_points,criterium='azimuth'):
         raise AmbiScaperError(
             'Error on find_closest_spherical_point(): fist argument size != 2, given' + str(point))
 
+
     if not isinstance(list_of_points,np.ndarray):
         raise AmbiScaperError(
-            'Error on find_closest_spherical_point(): second argument not an array, given' + str(list_of_points))
-    elif not all(isinstance(v,np.ndarray) for v in list_of_points):
+            'Error on find_closest_spherical_point(): second argument not an ndarray, given' + str(list_of_points))
+    elif not np.shape(list_of_points)[-1] == 2:
         raise AmbiScaperError(
-            'Error on find_closest_spherical_point(): second argument not an array of arrays, given' + str(list_of_points))
-    elif not all(len(v) == 3 for v in list_of_points):
-        raise AmbiScaperError(
-            'Error on find_closest_spherical_point(): second argument not an array of arrays of len 3, given' + str(list_of_points))
+            'Error on find_closest_spherical_point(): second argument does not have last dimension 2' + str(list_of_points))
 
     if criterium not in ['azimuth','elevation','surface']:
         raise AmbiScaperError(
@@ -642,9 +640,8 @@ def find_closest_spherical_point(point,list_of_points,criterium='azimuth'):
     list_of_distances = []
     for p in list_of_points:
 
-        # TODO: this will probably fail if M != 1
-        p_azi = p[0][0]
-        p_ele = p[1][0]
+        p_azi = p[0]
+        p_ele = p[1]
         target_azi = float(wrap_number(p_azi,0,2*np.pi))
         target_ele = float(wrap_number(p_ele,-1*np.pi/2,np.pi/2))
 
@@ -667,15 +664,6 @@ def find_closest_spherical_point(point,list_of_points,criterium='azimuth'):
 
     index_of_min_distance = list_of_distances.index(min(list_of_distances))
     return (index_of_min_distance)
-
-
-# TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# TODO: REWRITE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 def _generate_event_id_from_idx(event_idx,role):

@@ -234,8 +234,6 @@ def test_polyphony_gini():
     def __test_gini_from_event_times(event_time_list, expected_gini,
                                      hop_size=0.01):
 
-        print(event_time_list)
-
         # create ambiscaper
         ambiscaper = AmbiScaper(duration=10.0,
                                 ambisonics_order=3,
@@ -264,7 +262,7 @@ def test_polyphony_gini():
         jam = ambiscaper._instantiate()
         ann = jam.annotations[0]
         gini = polyphony_gini(ann, hop_size=hop_size)
-        print(gini, expected_gini)
+        # print(gini, expected_gini)
         assert np.allclose([gini], [expected_gini], atol=1e-5)
 
     event_time_lists = ([
@@ -602,37 +600,36 @@ def test_find_closest_spherical_point():
         # first argument not list of len 2
         (0, [0, 0]),
         ([1, 2, 3], [0, 0]),
-        # second argument not list of lists of len 2
+        # second argument not ndarray of len 2
         ([0, 0], 0),
         ([0, 0], [0, 0]),
-        ([0, 0], [[0, 0], [1, 2, 3]]),
+        ([0, 0], np.asarray([[0, 0, 0], [1, 2, 3]])),
         # bad criterium string
-        ([0,0],[[0,0],[1,1]],'fake_criterium')
+        ([0,0],np.asarray([[0,0],[1,1]]),'fake_criterium')
 
     ]
     for ba in badargs:
         pytest.raises(AmbiScaperError, find_closest_spherical_point, *ba)
 
     # correct arguments
-
     point = [0,0]
-    list_of_points = [ [0,0], [1,1], [2,2] ]
+    list_of_points = np.asarray([ [0,0], [1,1], [2,2] ])
     assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='azimuth'))
 
     point = [0.9,0]
-    list_of_points = [ [0,0], [1,1], [2,2] ]
+    list_of_points = np.asarray([ [0,0], [1,1], [2,2] ])
     assert( 1 == find_closest_spherical_point(point,list_of_points,criterium='azimuth'))
 
     point = [0,0]   # wrapping azimuth around 2pi
-    list_of_points = [ [6,0], [1,1], [2,2] ]
+    list_of_points = np.asarray([ [6,0], [1,1], [2,2] ])
     assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='azimuth'))
 
     point = [0,1]   # wrapping azimuth around 2pi
-    list_of_points = [ [0,0], [1,1], [2,2] ]
+    list_of_points = np.asarray([ [0,0], [1,1], [2,2] ])
     assert( 1 == find_closest_spherical_point(point,list_of_points,criterium='elevation'))
 
     point = [1,1]   # wrapping azimuth around 2pi
-    list_of_points = [ [0,0], [4,1] ]
+    list_of_points = np.asarray([ [0,0], [4,1] ])
     assert( 0 == find_closest_spherical_point(point,list_of_points,criterium='surface'))
 
 
