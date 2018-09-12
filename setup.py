@@ -50,6 +50,6 @@ setup(
                 'sphinx_rtd_theme',
                 'numpydoc',
             ],
-        # 'tests': ['backports.tempfile', 'pysoundfile']
+        'tests': ['backports.tempfile', 'pysoundfile']
     }
 )
