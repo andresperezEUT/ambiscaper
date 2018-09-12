@@ -7,7 +7,7 @@ Tests for functions in util.py
 from ambiscaper.util import _close_temp_files, wrap_number, delta_kronecker, cartesian_to_spherical, \
     spherical_to_cartesian, find_element_in_list, event_background_id_string, event_foreground_id_string, \
     _generate_event_id_from_idx, _get_event_idx_from_id, _validate_distribution, find_closest_spherical_point, \
-    find_onset, find_offset, spherical_degree_to_cartesian, cartesian_to_spherical_degree
+    find_onset, find_offset, spherical_degree_to_cartesian, cartesian_to_spherical_degree, normalize_ir
 from ambiscaper.util import _set_temp_logging_level
 from ambiscaper.util import _validate_folder_path
 from ambiscaper.util import _get_sorted_files
@@ -675,3 +675,31 @@ def test_find_offset():
     assert 2 == find_offset(array,th=3.)
     assert None == find_offset(array,th=10.)
 
+def test_normalize_ir():
+
+    # bad arguments
+    badargs = [
+        # not ndarray
+        ([1,2,3],1),
+        # max not a number
+        (np.asarray([1,2]),[1,5])
+    ]
+
+    for ba in badargs:
+        pytest.raises(AmbiScaperError, normalize_ir, *ba)
+
+    # correct arguments
+    array = np.asarray([[5,4,3,2,1,0],[1,1,1,1,1,1]])
+    max = 1.
+    groundtruth = np.asarray([[5,4,3,2,1,0],[1,1,1,1,1,1]])/5.
+    assert np.allclose(normalize_ir(array,max), groundtruth)
+
+    array = np.asarray([[5,4,3,2,1,0],[1,1,1,1,1,1]])
+    max = 5
+    groundtruth = array
+    assert np.allclose(normalize_ir(array,max), groundtruth)
+
+    array = np.asarray([[-5,4,3,2,1,0],[1,1,1,1,1,1]])
+    max = 0.1
+    groundtruth = np.asarray([[-5,4,3,2,1,0],[1,1,1,1,1,1]])/50.
+    assert np.allclose(normalize_ir(array,max), groundtruth)

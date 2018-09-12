@@ -904,12 +904,22 @@ def find_offset(ndarray,th=1e-4):
     return offset
 
 
-def normalize_ir(ndarray, max=1):
+def normalize_ir(signal, max=1):
     """
-    :param ndarray:
-    :param max:
-    :return:
+    Given a multichannel signal, find the maximum peak and normalize all channels
+    with respect to that maximum (keeping thus the interchannel level proportion)
+
+    :param ndarray: the mulichannel signal (ndarray)
+    :param max: linear target maximum level (Number)
+    :return: the normalized signal
+    :raises: AmbiScaper error if args not correct
     """
-    peak_value = np.amax(np.absolute(ndarray))
+
+    if not isinstance(signal,np.ndarray):
+        raise AmbiScaperError('find_onset: fist arg not a ndarray')
+    elif not isinstance(max,Number):
+        raise AmbiScaperError('find_onset: second arg not a Number')
+
+    peak_value = np.amax(np.absolute(signal))
     k = max / peak_value
-    return ndarray*k
+    return signal*k
