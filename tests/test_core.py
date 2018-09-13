@@ -1405,11 +1405,11 @@ def test_generate():
     txt = pd.read_csv(txt_file_name, header=None, sep='\t')
     regtxt = pd.read_csv(REG_TXT_PATH, header=None, sep='\t')
 
-    print txt_file_name
-    print REG_TXT_PATH
+    print (txt_file_name)
+    print (REG_TXT_PATH)
 
-    print txt
-    print regtxt
+    print (txt)
+    print (regtxt)
 
     assert (txt == regtxt).all().all()
 
