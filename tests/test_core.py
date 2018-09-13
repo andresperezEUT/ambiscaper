@@ -1404,6 +1404,13 @@ def test_generate():
     txt_file_name = os.path.join(tmp_dir, tmp_name + '.txt')
     txt = pd.read_csv(txt_file_name, header=None, sep='\t')
     regtxt = pd.read_csv(REG_TXT_PATH, header=None, sep='\t')
+
+    print txt_file_name
+    print REG_TXT_PATH
+
+    print txt
+    print regtxt
+
     assert (txt == regtxt).all().all()
 
     # Delete recursively the temp folder
