@@ -21,12 +21,10 @@ import warnings
 # FIXTURES
 # Paths to files for testing
 
-# FG_PATH = 'tests/data/audio/foreground'
-# BG_PATH = 'tests/data/audio/background'
-#
-# FG_PATH = 'samples'
+
 FG_PATH = os.path.abspath('./samples')
 BG_PATH = os.path.abspath('./samples')
+
 
 ALT_FG_PATH = 'tests/data/audio_alt_path/foreground'
 ALT_BG_PATH = 'tests/data/audio_alt_path/background'
@@ -1168,17 +1166,20 @@ def test_instantiate():
     for k, kreg in zip(sorted(ann.sandbox.ambiscaper.keys()),
                        sorted(regann.sandbox.ambiscaper.keys())):
         assert k == kreg
-        if k not in ['bg_spec', 'fg_spec']:
+        if k not in ['bg_spec', 'fg_spec', 'bg_path', 'fg_path']:
             assert ann.sandbox.ambiscaper[k] == regann.sandbox.ambiscaper[kreg]
 
-    # to compare specs need to covert raw specs to list of lists
-    assert (
-        [[list(x) if type(x) == tuple else x for x in e] for e in
-         ann.sandbox.ambiscaper['bg_spec']] == regann.sandbox.ambiscaper['bg_spec'])
+    # the relative paths might be different, so let's check only the last part
+    for path in ['bg_path','fg_path']:
+        p1 = str(ann.sandbox.ambiscaper[path])
+        p2 = str(regann.sandbox.ambiscaper[path])
+        assert os.path.split(p1)[-1] == os.path.split(p2)[-1]
 
-    assert (
-        [[list(x) if type(x) == tuple else x for x in e] for e in
-         ann.sandbox.ambiscaper['fg_spec']] == regann.sandbox.ambiscaper['fg_spec'])
+    # to compare specs need to covert raw specs to list of lists
+    for spec in ['bg_spec', 'fg_spec']:
+        assert (
+            [[list(x) if type(x) == tuple else x for x in e] for e in
+             ann.sandbox.ambiscaper[spec]] == regann.sandbox.ambiscaper[spec])
 
     # 3.3. compare namespace, time and duration
     assert ann.namespace == regann.namespace
