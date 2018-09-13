@@ -1918,6 +1918,7 @@ class AmbiScaper(object):
 
                 # Add reverb spec info to sandbox
                 ann_reverb.sandbox.ambiscaper = jams.Sandbox(
+                    reverb_folder_path=self.get_sofa_reverb_folder_path(),
                     reverb_spec=self.reverb_spec,
                 )
 
@@ -1948,19 +1949,19 @@ class AmbiScaper(object):
                         if instantiated_reverb_spec.wrap == 'wrap_azimuth':
 
                             index_of_closest = find_closest_spherical_point([event_spec.event_azimuth,event_spec.event_elevation],
-                                                                            imposed_speaker_positions_spherical,
+                                                                            imposed_speaker_positions_spherical[:,:-1],
                                                                             criterium='azimuth')
 
                         elif instantiated_reverb_spec.wrap == 'wrap_elevation':
 
                             index_of_closest = find_closest_spherical_point([event_spec.event_azimuth, event_spec.event_elevation],
-                                                                            imposed_speaker_positions_spherical,
+                                                                            imposed_speaker_positions_spherical[:,-1],
                                                                             criterium='elevation')
 
                         elif instantiated_reverb_spec.wrap == 'wrap_surface':
 
                             index_of_closest = find_closest_spherical_point([event_spec.event_azimuth, event_spec.event_elevation],
-                                                                            imposed_speaker_positions_spherical,
+                                                                            imposed_speaker_positions_spherical[:,-1],
                                                                             criterium='surface')
 
                         # Store the random indinces, so later in the generate_audio method we can
@@ -1968,9 +1969,8 @@ class AmbiScaper(object):
                         self.sofa_chosen_emitter_indices.append(index_of_closest)
 
                         # Once we have :index_of_closest:, let's assign the values
-                        imposed_azimuth = imposed_speaker_positions_spherical[index_of_closest][0][0]
-                        imposed_elevation = imposed_speaker_positions_spherical[index_of_closest][1][0]
-
+                        imposed_azimuth = imposed_speaker_positions_spherical[index_of_closest][0]
+                        imposed_elevation = imposed_speaker_positions_spherical[index_of_closest][1]
 
 
                     # # TODO: compute onset/offset as well in the Smir case!!
