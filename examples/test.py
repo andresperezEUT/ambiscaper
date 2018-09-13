@@ -9,7 +9,7 @@ import random
 # AmbiScaper settings
 soundscape_duration = 5.0
 ambisonics_order = 1
-samples_folder = '/Volumes/Dinge/audio/anechoic_openAIRlib_ccsa'
+samples_folder = '../samples'
 
 
 num_soundscapes = 1

@@ -4,7 +4,7 @@
 import ambiscaper
 import os
 
-samples_folder = os.path.abspath('../samples')
+samples_folder = '../samples'
 
 sc = ambiscaper.AmbiScaper(10.0, 1, fg_path=samples_folder, bg_path=samples_folder)
 sc.ref_db = -50

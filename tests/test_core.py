@@ -22,8 +22,8 @@ import warnings
 # Paths to files for testing
 
 
-FG_PATH = os.path.abspath('./samples')
-BG_PATH = os.path.abspath('./samples')
+FG_PATH = 'samples'
+BG_PATH = 'samples'
 
 
 ALT_FG_PATH = 'tests/data/audio_alt_path/foreground'
@@ -757,7 +757,7 @@ def test_instantiate_event():
                                                   used_source_files=[],
                                                   disable_instantiation_warnings=True)
 
-    assert instantiated_bg_event.source_file == os.path.abspath('samples/Acoustics_Book/adult_female_speech.wav')
+    assert instantiated_bg_event.source_file == 'samples/Acoustics_Book/adult_female_speech.wav'
     assert instantiated_bg_event.event_id == 'bg0'
     assert instantiated_bg_event.source_time == 0
     assert 0 <= instantiated_bg_event.event_time <= 9
@@ -794,7 +794,7 @@ def test_instantiate_event():
                                                used_source_files=[],
                                                disable_instantiation_warnings=True)
 
-    assert instantiated_event.source_file == os.path.abspath('samples/Acoustics_Book/bagpipe_music.wav')
+    assert instantiated_event.source_file == 'samples/Acoustics_Book/bagpipe_music.wav'
     assert instantiated_event.event_id == 'fg0'
     assert instantiated_event.source_time == 0
     assert 0 <= instantiated_event.event_time <= 9
@@ -895,7 +895,7 @@ def test_instantiate_event():
                                                event_idx=0,
                                                isbackground=False)
 
-    available_source_files =  [os.path.abspath(p) for p in ['samples/Bicycle_Horn/chokedhorn.wav','samples/Bicycle_Horn/classichorn.wav']]
+    available_source_files =  ['samples/Bicycle_Horn/chokedhorn.wav','samples/Bicycle_Horn/classichorn.wav']
     assert instantiated_event.source_file in available_source_files
 
 
@@ -1126,13 +1126,12 @@ def test_instantiate():
 
     jam = sc._instantiate(disable_instantiation_warnings=True)
     regjam = jams.load(REG_JAM_PATH)
-    # print(jam)
-    # print(regjam)
 
     # Note: can't compare directly, since:
     # 1. ambiscaper/and jams library versions may change
     # 2. raw annotation sandbox stores specs as OrderedDict and tuples, whereas
     # loaded ann (regann) simplifies those to dicts and lists
+    # 3. absolute paths might be different
     # assert jam == regression_jam
 
     # Must compare each part "manually"
@@ -1400,12 +1399,6 @@ def test_generate():
     wav, sr = soundfile.read(wav_file_name)
     regwav, sr = soundfile.read(REG_WAV_PATH)
     assert np.allclose(wav, regwav, atol=1e-4, rtol=1e-4)
-
-    # validate jams
-    jams_file_name = os.path.join(tmp_dir, tmp_name + '.jams')
-    jam = jams.load(jams_file_name)
-    regjam = jams.load(REG_JAM_PATH)
-    assert jam == regjam
 
     # validate txt
     txt_file_name = os.path.join(tmp_dir, tmp_name + '.txt')

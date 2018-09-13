@@ -917,15 +917,17 @@ class AmbiScaper(object):
         self.bg_spec = []
 
         # Validate foreground path (required)
-        expanded_fg_path = os.path.expanduser(fg_path)
+        # expanded_fg_path = os.path.expanduser(fg_path)
+        expanded_fg_path = os.path.abspath(fg_path)
         _validate_folder_path(expanded_fg_path)
-        self.fg_path = expanded_fg_path
+        self.fg_path = fg_path
 
         # Validate background path (if exists)
         if bg_path is not None:
             expanded_bg_path = os.path.expanduser(bg_path)
+            expanded_bg_path = os.path.abspath(bg_path)
             _validate_folder_path(expanded_bg_path)
-            self.bg_path = expanded_bg_path
+            self.bg_path = bg_path
         else:
             self.bg_path = None
 

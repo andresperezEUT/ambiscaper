@@ -12,7 +12,7 @@
           "polyphony_max": 1, 
           "ambisonics_spread_slope": 1.0, 
           "polyphony_gini": 0.2750026363540494, 
-          "bg_path": "/Users/andres.perez/source/ambiscaper/samples", 
+          "bg_path": "../samples", 
           "ambisonics_order": 1, 
           "duration": 10.0, 
           "bg_spec": [
@@ -55,7 +55,7 @@
               null
             ]
           ], 
-          "fg_path": "/Users/andres.perez/source/ambiscaper/samples", 
+          "fg_path": "../samples", 
           "fg_spec": [
             [
               [
@@ -93,10 +93,7 @@
               ], 
               "foreground", 
               null, 
-              [
-                "const", 
-                1
-              ]
+              null
             ], 
             [
               [
@@ -133,11 +130,11 @@
                 20
               ], 
               "foreground", 
-              null, 
               [
                 "const", 
                 1
-              ]
+              ], 
+              null
             ], 
             [
               [
@@ -210,7 +207,7 @@
             "event_elevation": 0, 
             "event_azimuth": 0, 
             "event_duration": 10.0, 
-            "source_file": "/Users/andres.perez/source/ambiscaper/samples/Acoustics_Book/adult_female_speech.wav", 
+            "source_file": "../samples/Acoustics_Book/adult_female_speech.wav", 
             "snr": 0, 
             "time_stretch": null, 
             "pitch_shift": null, 
@@ -229,9 +226,9 @@
             "event_elevation": 0, 
             "event_azimuth": 0, 
             "event_duration": 1.523424, 
-            "source_file": "/Users/andres.perez/source/ambiscaper/samples/Bicycle_Horn/chokedhorn.wav", 
+            "source_file": "../samples/Bicycle_Horn/chokedhorn.wav", 
             "snr": 5, 
-            "time_stretch": 1, 
+            "time_stretch": null, 
             "pitch_shift": null, 
             "role": "foreground", 
             "event_spread": 0
@@ -248,10 +245,10 @@
             "event_elevation": 0, 
             "event_azimuth": 0, 
             "event_duration": 0.577302, 
-            "source_file": "/Users/andres.perez/source/ambiscaper/samples/Bicycle_Horn/classichorn.wav", 
+            "source_file": "../samples/Bicycle_Horn/classichorn.wav", 
             "snr": 20, 
-            "time_stretch": 1, 
-            "pitch_shift": null, 
+            "time_stretch": null, 
+            "pitch_shift": 1, 
             "role": "foreground", 
             "event_spread": 0
           }, 
@@ -267,7 +264,7 @@
             "event_elevation": 0, 
             "event_azimuth": 0, 
             "event_duration": 0.544558, 
-            "source_file": "/Users/andres.perez/source/ambiscaper/samples/Bicycle_Horn/paphorn.wav", 
+            "source_file": "../samples/Bicycle_Horn/paphorn.wav", 
             "snr": 10, 
             "time_stretch": 1.2, 
             "pitch_shift": null, 
