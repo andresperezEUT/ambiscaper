@@ -56,7 +56,7 @@ Let's start by instanciating it:
 
 .. code-block:: python
 
-    import ambiscaper
+    from ambiscaper import *
     import numpy as np
     import os
 
@@ -66,9 +66,9 @@ Let's start by instanciating it:
     foreground_folder = os.path.abspath('./samples/Acoustics_Book')
 
     ### Create an ambiscaper instance
-    ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
-                                       ambisonics_order=ambisonics_order,
-                                       fg_path=foreground_folder)
+    ambiscaper = AmbiScaper(duration=soundscape_duration,
+                            ambisonics_order=ambisonics_order,
+                            fg_path=foreground_folder)
 
 We are specifying three arguments to the AmbiScaper instance creation.
 
@@ -155,7 +155,7 @@ If everything went good so far, we will have the following output structure:
         * /Source/
             * *fg0.wav*
 
-Let's exlain them briefly:
+Let's explain them briefly:
 
 ``my_first_ambisonics_soundscape.wav`` is the main audio output: an Ambisonics multichanel audio file
 (in this case 4 channels, since we specified 1st Order Ambisonics), which contains the spatially encoded

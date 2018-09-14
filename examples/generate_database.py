@@ -15,7 +15,7 @@ samples_folder = '/Volumes/Dinge/audio/anechoic_openAIRlib_ccsa'
 num_datasets = 3
 num_soundscapes = 100
 
-for dataset_idx in range(1):
+for dataset_idx in range(num_datasets):
 
     print('Creating dataset: ' + str(dataset_idx))
 
@@ -45,7 +45,7 @@ for dataset_idx in range(1):
                           time_stretch=('uniform', 0.8,1.2))
 
         # Add a recorded reverb
-        asc.set_sofa_reverb_folder_path('/Volumes/Dinge/SOFA/pinakothek/')
+        asc.set_sofa_reverb_folder_path('/Volumes/Dinge/SOFA/BINCI/')
         asc.add_sofa_reverb(name=('choose', []),
                             wrap=('const', 'random'))
 

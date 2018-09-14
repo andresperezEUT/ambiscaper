@@ -41,7 +41,7 @@ for i in range(num_soundscapes):
     # Add a recorded reverb
 
     # TODO
-    asc.set_sofa_reverb_folder_path('/Volumes/Dinge/SOFA/pinakothek/')
+    asc.set_sofa_reverb_folder_path('/Volumes/Dinge/SOFA/BINCI/')
 
     # asc.add_sofa_reverb(name=('const', 'foyer.sofa'),
     #                     wrap=('const', 'random'))

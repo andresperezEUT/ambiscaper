@@ -26,9 +26,10 @@ Loudness computation is performed in a psychoacoustic way through the `LKFS scal
 
 .. code-block:: python
 
-    ### EXAMPLE 1
+    # Example 1: Foreground and background
+    # ------------------------------------
 
-    import ambiscaper
+    from ambiscaper import *
     import os
 
     # AmbiScaper settings
@@ -36,13 +37,13 @@ Loudness computation is performed in a psychoacoustic way through the `LKFS scal
     ambisonics_order = 1
 
     # We want to use the full samples folder as potential events
-    samples_folder = os.path.abspath('./samples/Handel_Trumpet')
+    samples_folder = '../../samples/Handel_Trumpet'
 
     ### Create an ambiscaper instance
-    ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
-                                       ambisonics_order=ambisonics_order,
-                                       fg_path=samples_folder,
-                                       bg_path=samples_folder)
+    ambiscaper = AmbiScaper(duration=soundscape_duration,
+                            ambisonics_order=ambisonics_order,
+                            fg_path=samples_folder,
+                            bg_path=samples_folder)
 
     # Configure reference noise floor level
     ambiscaper.ref_db = -30
@@ -51,15 +52,15 @@ Loudness computation is performed in a psychoacoustic way through the `LKFS scal
 
     # Background events, by definition, have maximum spread
     # That means that they will only contain energy in the W channel (the first one)
-    ambiscaper.add_background(source_file=('const','tr-1788d-piece4-sl.wav'),
+    ambiscaper.add_background(source_file=('const', 'tr-1788d-piece4-sl.wav'),
                               source_time=('const', 5.))
 
     ### Add an event
-    ambiscaper.add_event(source_file=('const','tr-1888d-high.wav'),
+    ambiscaper.add_event(source_file=('const', 'tr-1888d-high.wav'),
                          source_time=('const', 0),
                          event_time=('const', 0),
                          event_duration=('const', soundscape_duration),
-                         event_azimuth=('const', 0 ),
+                         event_azimuth=('const', 0),
                          event_elevation=('const', 0),
                          event_spread=('const', 0),
                          snr=('const', 10),
@@ -95,9 +96,10 @@ Setting it to ``False`` might be useful in many cases, but then there is the ris
 
 .. code-block:: python
 
-    ### EXAMPLE 2
+    # Example 2: 15th order, variable spread Ambisonics soundscape
+    # -------------------------------------------------------------
 
-    import ambiscaper
+    from ambiscaper import *
     import numpy as np
     import os
 
@@ -107,12 +109,12 @@ Setting it to ``False`` might be useful in many cases, but then there is the ris
     ambisonics_spread_slope = 0.25 # soft curve
 
     # We want to use the full samples folder as potential events
-    samples_folder = os.path.abspath('./samples/')
+    samples_folder = os.path.abspath('../../samples/')
 
     ### Create an ambiscaper instance
-    ambiscaper = ambiscaper.AmbiScaper(duration=soundscape_duration,
-                                       ambisonics_order=ambisonics_order,
-                                       fg_path=samples_folder)
+    ambiscaper = AmbiScaper(duration=soundscape_duration,
+                            ambisonics_order=ambisonics_order,
+                            fg_path=samples_folder)
 
     # Make everything a little bit softer to avoid clipping
     ambiscaper.ref_db = -40
@@ -142,43 +144,39 @@ Setting it to ``False`` might be useful in many cases, but then there is the ris
                         allow_repeated_source=True)
 
 
-Example 3: Reverberant soundscape from recorded Ambisonics IRs
---------------------------------------------------------------
+Example 3: Reverberant soundscape from recorded SOFA Ambisonics IRs
+-------------------------------------------------------------------
 
-So far we have been considering the anechoic case, which is great, but unfortunately not realistic.
+So far we have been considering the anechoic case, which is great, but unfortunately not very realistic.
 Reverberation is present in almost all acoustic environments, and most state-of-the-art algorithms
 for Blind Source Separation and Source Localization consider the reverberant case.
 Apart from the more scientifical approach, reverberant soundscapes sound very nice!
 
-In this example we will use the default reverbs shipped with AmbiScaper - they can be found under the */IRs/* folder.
-Currently, there are five sets of measurements available, corresponding to 5 different rooms with diverse reverberation
-characteristics, ranging from studio to church. All these reverbs come from the great research at Surrey,
-Salford and Southampton Universities, and from BBC.
-Please refer to [Coleman2015]_ for more information.
+In this example we will use `foyer_soundfield.sofa`, which is a nice reverb shipped with AmbiScaper.
+It corresponds to an acoustic measurement of an exhibition room in the Alte Pinakothed, Munich, Germany.
+This file is part of the `Ambisonics Room Impulse Responses dataset <https://zenodo.org/record/1417727#.W5uO2pMzZ24>`_.
 
 Reverberation is captured through `Impulse Responses (IRs) <https://en.wikipedia.org/wiki/Impulse_response>`_.
 In this particular case, we are using *Ambisonics IRs*, wich are IRs recorded with an Ambisonics microphone,
 thus capturing the spatial cues of the reverberation. It should be noticed that reverberation is variable along a room,
 in the sense that it depends on both the position of the emitter and the receiver.
 Since it would be impossible to record every possible pair of emitter/receiver positions, a spatial sampling strategie must be designed.
-
-Therefore, the given IRs are the recordings at different emitter positions, while the receiver remains fix (usually at the room center).
-The different speaker positions are specified in the ``LsPos.txt`` file.
-
-.. note::
-
-    We are working on a more compact, reliable and scalable way to store Ambisonics IRs,
-    by means of the development of an ad-hoc `SOFA <https://www.sofaconventions.org>`_ convention.
-    That means that the *IRs* folder structure might change in next releases.
-
 The implication for the soundscape generation is that we can only provide IRs from the actual measured emitter points,
 and with a limited spatial resolution (the Ambisonics order of the microphone used).
 
-In the following example, we define ``ambisonics_order = 2``.
-However, since we are defining a recorded reverb spec of order 1, ``'MainChurch'``, the system will automatically
-downgrade the Ambisonics order to match the minimum.
+The `SOFA conventions <www.sofaconventions.org>`_ conform a file description standard, intended for storing Impulse Responses
+from different measurement setups. The author has participated in the design of a SOFA convention for Ambisonics IRs,
+the *AmbisonicsDRIRconvention* (please refer to [Perez2018]_ for more information).
+AmbiScaper uses SOFA files through the `pysofaconventions <https://andresperezlopez.github.io/pysofaconventions/>`_ library,
+which is automatically installed with pip as a dependence.
+Therefore, all specific SOFA details remain hidden to the user.
 
-Furthermore, the source positions will be limited to the ones provided by the ``'MainChurch'`` measurements.
+
+In the following example, we define ``ambisonics_order = 2``.
+However, since we are using a recorded reverb spec of order 1, the system will automatically
+downgrade the Ambisonics order to match the common minimum.
+
+Furthermore, the source positions will be limited to the ones provided by the ``'Foyer'`` measurements.
 How AmbiScaper select the final source positions due to this constrain is selected through the ``wrap`` argument
 inside ``add_sofa_reverb()`` method. There are different options:
 
@@ -241,9 +239,9 @@ Please notice the warning message:
     ``AmbiScaperWarning: User-defined Ambisonics order L=2 is higher than the maximum order allowed by the reverb spec. Downgrading to 1 AmbiScaperWarning)``.
 
 The last remark is about the IRs. In order to be useful to dereverberation/reverb estimation applications,
-the actual IRs used are softlinked into the output */source/* folder, together with the source files.
-The name of the softlink corresponds to the ``event_id`` parameter for each source: for example, source 0,
-which is named ``fg0.wav``, will have a corresponding ``ir_fg0.wav`` softlink file, and so on.
+the actual IRs used are copied into the output */source/* folder, together with the source files.
+The name of the file corresponds to the ``event_id`` parameter for each source: for example, source 0,
+which is named ``fg0.wav``, will have a corresponding ``h0.wav`` file, and so on.
 
 
 Example 4: Reverberant soundscape from simulated Ambisonics IRs
@@ -252,6 +250,7 @@ Example 4: Reverberant soundscape from simulated Ambisonics IRs
 .. note::
 
     SIMULATED REVERBS ARE STILL IN DEVELOPMENT!!
+
 
 AmbiScaper provides the option to use simulated IRs to create synthetic reverberant sound scapes.
 This option might be useful in the cases in which it is not possible to record IRs, due to
@@ -362,9 +361,9 @@ virtually captured with a Soundfield microphone.
     Ambisonic spatial blur.
     In Audio Engineering Society Convention 142. Audio Engineering Society.
 
-.. [Coleman2015]
-    Coleman, P., Remaggi, L., and Jackson, PJB. (2015)
-    "S3A Room Impulse Responses", http://dx.doi.org/10.15126/surreydata.00808465
+.. [Perez2018]
+    Perez-Lopez, A. and de Muynke, J, (2018)
+    "Ambisonics Directional Room Impulse Response as a New Convention of the Spatially Oriented Format for Acoustics",http://www.aes.org/e-lib/browse.cfm?elib=19560
 
 .. [Jarrett2012]
     D. P. Jarrett, E. A. P. Habets, M. R. P. Thomas and P. A. Naylor,
