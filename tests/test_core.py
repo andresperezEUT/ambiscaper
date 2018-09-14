@@ -1409,7 +1409,10 @@ def test_generate():
             regtxtreader = csv.reader(regtxt, delimiter='\t')
 
             for row1, row2 in zip(txtreader, regtxtreader):
-                assert row1 == row2
+                assert np.isclose(float(row1[0]),float(row2[0]))
+                assert np.isclose(float(row1[1]),float(row2[1]))
+                assert row1[2] == row2[2]
+
 
     # Delete recursively the temp folder
     shutil.rmtree(tmp_dir, ignore_errors=True)
