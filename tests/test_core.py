@@ -16,7 +16,7 @@ import soundfile
 import jams
 import pandas as pd
 import warnings
-
+import csv
 
 # FIXTURES
 # Paths to files for testing
@@ -1402,16 +1402,14 @@ def test_generate():
 
     # validate txt
     txt_file_name = os.path.join(tmp_dir, tmp_name + '.txt')
-    txt = pd.read_csv(txt_file_name, header=None, sep='\t')
-    regtxt = pd.read_csv(REG_TXT_PATH, header=None, sep='\t')
+    with open(txt_file_name, mode='r') as txt:
+        txtreader = csv.reader(txt, delimiter='\t')
 
-    print (txt_file_name)
-    print (REG_TXT_PATH)
+        with open(REG_TXT_PATH, mode='r') as regtxt:
+            regtxtreader = csv.reader(regtxt, delimiter='\t')
 
-    print (txt)
-    print (regtxt)
-
-    assert (txt == regtxt).all().all()
+            for row1, row2 in zip(txtreader, regtxtreader):
+                assert row1 == row2
 
     # Delete recursively the temp folder
     shutil.rmtree(tmp_dir, ignore_errors=True)
