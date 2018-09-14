@@ -687,10 +687,20 @@ class SOFAReverb():
                 "SOFA reverb folder path is not specified!")
 
         available_sofa_files = []
+
+        # Iterate recursively over all files
         for (dirpath, dirnames, filenames) in os.walk(self.sofa_reverb_folder_path):
             for file in filenames:
+                # if file is sofa
                 if os.path.splitext(file)[-1] == '.sofa':
-                    available_sofa_files.append(os.path.join(os.path.split(dirpath)[-1], file))
+                    # Get the subpath relative to `self.sofa_reverb_folder_path`
+                    if dirpath == self.sofa_reverb_folder_path:
+                        # File is at the hierarchy top: no path prepend
+                        available_sofa_files.append(file)
+                    else:
+                        # We are not at the hierarchy top, so prepend the relative path
+                        relative_path = dirpath.replace(self.sofa_reverb_folder_path,'')
+                        available_sofa_files.append(os.path.join(relative_path,file))
 
         return available_sofa_files
 
