@@ -33,7 +33,7 @@ for event_idx in range(num_events):
 ambiscaper.set_sofa_reverb_folder_path('../../SOFA')
 
 # Add a recorded reverb
-ambiscaper.add_sofa_reverb(name=('const', 'foyer_soundfield.sofa'),
+ambiscaper.add_sofa_reverb(name=('const', 'sala1.sofa'),
                            wrap=('const', 'wrap_azimuth'))
 
 ### Genereate the audio and the annotation

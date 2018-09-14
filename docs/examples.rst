@@ -152,8 +152,8 @@ Reverberation is present in almost all acoustic environments, and most state-of-
 for Blind Source Separation and Source Localization consider the reverberant case.
 Apart from the more scientifical approach, reverberant soundscapes sound very nice!
 
-In this example we will use `foyer_soundfield.sofa`, which is a nice reverb shipped with AmbiScaper.
-It corresponds to an acoustic measurement of an exhibition room in the Alte Pinakothed, Munich, Germany.
+In this example we will use `sala1.sofa`, which is a nice reverb shipped with AmbiScaper.
+It corresponds to an acoustic measurement of an exhibition room in the Fundacio Miro, Barcelona.
 This file is part of the `Ambisonics Room Impulse Responses dataset <https://zenodo.org/record/1417727#.W5uO2pMzZ24>`_.
 
 Reverberation is captured through `Impulse Responses (IRs) <https://en.wikipedia.org/wiki/Impulse_response>`_.

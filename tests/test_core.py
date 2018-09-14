@@ -722,7 +722,7 @@ def test_add_sofa_reverb():
     sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     sofa_path = os.path.abspath('./SOFA')
     sc.set_sofa_reverb_folder_path(sofa_path)
-    name_tuple = ('const', 'testpysofa.sofa')
+    name_tuple = ('const', 'sala1.sofa')
     wrap_tuple = ('const', 'random')
 
     # Assert correct assignment
@@ -976,7 +976,7 @@ def test_instantiate_reverb():
     sc = ambiscaper.AmbiScaper(10.0, 3, fg_path=FG_PATH, bg_path=BG_PATH)
     sc.set_sofa_reverb_folder_path(os.path.abspath('./SOFA'))
 
-    sofa_reverb_spec = SOFAReverbSpec(name=('const', 'testpysofa.sofa'),
+    sofa_reverb_spec = SOFAReverbSpec(name=('const', 'sala1.sofa'),
                                       wrap=('const', 'random'))
     instantiated_spec = sc._instantiate_reverb(reverb_spec=sofa_reverb_spec)
     assert type(instantiated_spec) == SOFAReverbSpec
@@ -996,10 +996,10 @@ def test_instantiate_sofa_reverb():
 
     # Check name
     ## Const value
-    sofa_reverb_spec = SOFAReverbSpec(name=('const', 'testpysofa.sofa'),
+    sofa_reverb_spec = SOFAReverbSpec(name=('const', 'sala1.sofa'),
                                       wrap=('const', 'random'))
     instantiated_spec = sc._instantiate_sofa_reverb(reverb_spec=sofa_reverb_spec)
-    assert instantiated_spec.name == 'testpysofa.sofa'
+    assert instantiated_spec.name == 'sala1.sofa'
     assert instantiated_spec.wrap == 'random'
 
     ## Choose among all available files
@@ -1027,7 +1027,7 @@ def test_set_sofa_reverb_folder_path():
     pytest.raises(AmbiScaperError,sc.set_sofa_reverb_folder_path, sofa_path)
 
     # Not a folder
-    sofa_path = os.path.abspath('./SOFA/testpysofa.sofa')
+    sofa_path = os.path.abspath('./SOFA/sala1.sofa')
     pytest.raises(AmbiScaperError, sc.set_sofa_reverb_folder_path, sofa_path)
 
     # Correct: no error
@@ -1059,7 +1059,7 @@ def test_retrieve_available_sofa_reverb_files():
     sc.set_sofa_reverb_folder_path(sofa_path)
 
     # At the moment we have only one
-    groundtruth = ['testpysofa.sofa']
+    groundtruth = ['sala1.sofa']
 
     # Check with unordered lists
     assert set(sc.retrieve_available_sofa_reverb_files()) == set(groundtruth)

@@ -274,10 +274,10 @@ def test_validate_SOFA_reverb_spec():
     # bad name
     pytest.raises(AmbiScaperError, sofa_reverb._validate_reverb_spec, *[('const', 'fakeReverb'), ('const', 'wrap_azimuth')])
     # bad wrap
-    pytest.raises(AmbiScaperError, sofa_reverb._validate_reverb_spec, *[('const', 'testpysofa.sofa'), ('const', 'fakeWrap')])
+    pytest.raises(AmbiScaperError, sofa_reverb._validate_reverb_spec, *[('const', 'sala1.sofa'), ('const', 'fakeWrap')])
     # correct values
     try:
-        sofa_reverb._validate_reverb_spec(('const', 'testpysofa.sofa'), ('const', 'wrap_azimuth'))
+        sofa_reverb._validate_reverb_spec(('const', 'sala1.sofa'), ('const', 'wrap_azimuth'))
     except AmbiScaperError:
         raise AmbiScaperError
 
@@ -333,9 +333,9 @@ def test_validate_SOFA_reverb_name():
     # Incorrect name
     __test_bad_tuple(('const', 'CoolReverb'))
     # Not valid distribution
-    __test_bad_tuple(('choose', 'testpysofa.sofa'))
+    __test_bad_tuple(('choose', 'sala1.sofa'))
     # Bad choose list
-    __test_bad_tuple(('choose', ['testpysofa.sofa', 123]))
+    __test_bad_tuple(('choose', ['sala1.sofa', 123]))
 
     # bad consts in list for choose
     for bv in bad_values:
@@ -355,8 +355,8 @@ def test_validate_SOFA_reverb_name():
         except AmbiScaperError:
             raise AmbiScaperError
 
-    __assert_correct_tuple(('const','testpysofa.sofa'))
-    __assert_correct_tuple(('choose',['testpysofa.sofa','testpysofa.sofa']))
+    __assert_correct_tuple(('const','sala1.sofa'))
+    __assert_correct_tuple(('choose',['sala1.sofa','sala1.sofa']))
     __assert_correct_tuple(('choose',[]))
 
 def test_get_maximum_ambisonics_order_from_spec():
@@ -383,7 +383,7 @@ def test_get_maximum_ambisonics_order_from_spec():
 
     # [spec, groundtruth]
     incorrect_values = [
-        [SOFAReverbSpec(name='testpysofa.sofa',wrap='azimuth'),2],
+        [SOFAReverbSpec(name='sala1.sofa',wrap='azimuth'),2],
         # [SmirReverbSpec(IRlength=1024,
         #                 room_dimensions=[1.0, 1.0, 1.0],
         #                 t60=0.5,
@@ -403,7 +403,7 @@ def test_get_maximum_ambisonics_order_from_spec():
 
     # [spec, groundtruth]
     correct_values = [
-        [SOFAReverbSpec(name='testpysofa.sofa',wrap='azimuth'),1],
+        [SOFAReverbSpec(name='sala1.sofa',wrap='azimuth'),1],
         # [SmirReverbSpec(IRlength=1024,
         #                 room_dimensions=[1.0, 1.0, 1.0],
         #                 t60=0.5,
@@ -425,7 +425,7 @@ def test_retrieve_available_sofa_reverb_files():
     sofa_reverb.set_sofa_reverb_folder_path(sofa_path)
 
     # At the moment we have only one
-    groundtruth = ['testpysofa.sofa']
+    groundtruth = ['sala1.sofa']
 
     # Check with unordered lists
     assert set(sofa_reverb.retrieve_available_sofa_reverb_files()) == set(groundtruth)
@@ -435,7 +435,7 @@ def test_generate_sofa_file_full_path():
 
     # SOFA path not specified
     sofa_reverb = SOFAReverb()
-    pytest.raises(AmbiScaperError, sofa_reverb.generate_sofa_file_full_path, 'testpysofa.sofa')
+    pytest.raises(AmbiScaperError, sofa_reverb.generate_sofa_file_full_path, 'sala1.sofa')
 
     # Not valid arg
     sofa_path = os.path.abspath('./SOFA')
@@ -446,8 +446,8 @@ def test_generate_sofa_file_full_path():
 
     # test valid
     rootpath =  os.path.abspath('./SOFA')
-    path = os.path.join(rootpath,'testpysofa.sofa')
-    assert path == sofa_reverb.generate_sofa_file_full_path('testpysofa.sofa')
+    path = os.path.join(rootpath,'sala1.sofa')
+    assert path == sofa_reverb.generate_sofa_file_full_path('sala1.sofa')
 
 
 def test_get_sofa_reverb_folder_path():
@@ -470,7 +470,7 @@ def test_set_sofa_reverb_folder_path():
     pytest.raises(AmbiScaperError, sofa_reverb.set_sofa_reverb_folder_path, sofa_path)
 
     # Path not a folder
-    sofa_path = os.path.abspath('./SOFA/testpysofa.sofa')
+    sofa_path = os.path.abspath('./SOFA/sala1.sofa')
     pytest.raises(AmbiScaperError, sofa_reverb.set_sofa_reverb_folder_path, sofa_path)
 
     # Test correct
@@ -495,7 +495,7 @@ def test_get_relative_speaker_positions_spherical():
     sofa_reverb = SOFAReverb()
     pytest.raises(AmbiScaperError, sofa_reverb.get_relative_speaker_positions_spherical, sofa_reverb_name)
 
-    # In testpysofa.sofa there is only one emitter, located at [1,0,0] cartesian
+    # In sala1.sofa there is only one emitter, located at [1,0,0] cartesian
     # EmitterPosition has dimensions (E,C,I)
 
     sofa_path = os.path.abspath('./SOFA')
@@ -503,19 +503,17 @@ def test_get_relative_speaker_positions_spherical():
 
     sofa_reverb.set_sofa_reverb_folder_path(sofa_path)
 
-    sofa_reverb_name = 'testpysofa.sofa'
+    sofa_reverb_name = 'sala1.sofa'
     # sofa_reverb_name = 'room7_eigenmike.sofa'
     # 8 speakers distributed in azimuth, elevation 8, distance 1
     # Since Listener view is +90, everything will be shifted...
     groundtruth = [
-        [-np.pi/2., 0., 1.],
-        [-np.pi/4, 0., 1.],
-        [0., 0., 1.],
-        [np.pi/4., 0., 1.],
-        [np.pi/2, 0., 1.],
-        [-5*np.pi/4, 0., 1.],
-        [-1*np.pi, 0., 1.],
-        [-3*np.pi/4, 0., 1.]
+        [0, 0., 1.],
+        [0, 0., 2.],
+        [0, 0., 3.],
+        [0, 0., 4.],
+        [-np.pi/2, 0., 1.],
+        [-np.pi/2, 0., 2.],
     ]
 
     assert np.allclose(groundtruth, sofa_reverb.get_relative_speaker_positions_spherical(sofa_reverb_name))
