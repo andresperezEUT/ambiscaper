@@ -671,11 +671,11 @@ class SOFAReverb():
 
     def retrieve_available_sofa_reverb_files(self):
         '''
-        Get a list of the existing SOFA files at the current SOFA path
+        Get a list of the existing SOFA files at the current SOFA path (recursively).
 
         :return:
 
-            An array containing all available files (not tested for validity)
+            An array containing all available sofa files (not tested for validity)
 
         :raises: AmbiScaper error
 
@@ -686,8 +686,13 @@ class SOFAReverb():
             raise AmbiScaperError(
                 "SOFA reverb folder path is not specified!")
 
-        return [e for e in os.listdir(self.sofa_reverb_folder_path) if not e == 'README.md' and not e == '.DS_Store']
+        available_sofa_files = []
+        for (dirpath, dirnames, filenames) in os.walk(self.sofa_reverb_folder_path):
+            for file in filenames:
+                if os.path.splitext(file)[-1] == '.sofa':
+                    available_sofa_files.append(os.path.join(os.path.split(dirpath)[-1], file))
 
+        return available_sofa_files
 
     def generate_sofa_file_full_path(self, sofa_reverb_name):
         '''

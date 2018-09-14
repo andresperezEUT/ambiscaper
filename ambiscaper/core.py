@@ -1293,7 +1293,7 @@ class AmbiScaper(object):
 
     def retrieve_available_sofa_reverb_files(self):
         '''
-        Get a list of the existing SOFA files at the current SOFA path
+        Get a list of the existing SOFA files at the current SOFA path (recursively)
 
         :return:
 
